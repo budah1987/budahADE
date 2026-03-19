@@ -1,0 +1,16 @@
+.DS_Store
+*.xcuserdata
+xcuserdata/
+DerivedData/
+build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcworkspace
+!*.xcodeproj/project.pbxproj
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM

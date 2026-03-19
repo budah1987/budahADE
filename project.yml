@@ -1,0 +1,55 @@
+name: BudahADE
+options:
+  bundleIdPrefix: com.budah
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_OBJC_BRIDGING_HEADER: BudahADE-Bridging-Header.h
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    SWIFT_VERSION: "5.9"
+
+targets:
+  BudahADE:
+    type: application
+    platform: macOS
+    sources:
+      - path: BudahADE
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.budah.ade
+        PRODUCT_NAME: BudahADE
+        INFOPLIST_FILE: BudahADE/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: BudahADE-Bridging-Header.h
+        LIBRARY_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/GhosttyKit.xcframework/macos-arm64_x86_64"
+        HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/GhosttyKit.xcframework/macos-arm64_x86_64/Headers"
+          - "$(PROJECT_DIR)"
+        OTHER_LDFLAGS:
+          - "-lghostty"
+          - "-lz"
+          - "-lc++"
+          - "-framework Metal"
+          - "-framework MetalKit"
+          - "-framework QuartzCore"
+          - "-framework IOSurface"
+          - "-framework Carbon"
+          - "-framework CoreGraphics"
+          - "-framework CoreText"
+          - "-framework Foundation"
+          - "-framework AppKit"
+          - "-framework UniformTypeIdentifiers"
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+    dependencies: []

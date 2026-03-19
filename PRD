@@ -1,0 +1,192 @@
+PRODUCT REQUIREMENTS DOCUMENT: ADE (Agentic Development Environment)
+1. Overview
+Product Name: [Your ADE Name]
+Type: Desktop application (Electron/Tauri/web-native)
+Target Platform: macOS/Windows/Linux
+Core Value Prop: A workspace where specs, conversations, and code coexist — built for teams of humans and agents collaborating on the same codebase.
+
+2. Core User Flows
+Flow 1: Starting a New Project
+User creates workspace → selects local folder
+User pastes or writes PRD in left panel
+PRD auto-parses into task checklist
+User assigns first task to agent (with @context)
+Agent streams response in chat panel
+Generated code appears as inline diff in editor
+User reviews → accepts/rejects per file
+Flow 2: Multi-Agent Orchestration
+User opens "Orchestration" view (canvas mode)
+Drops agent nodes: Researcher, Implementer, Reviewer
+Connects nodes with dependency arrows
+Each agent node has configuration panel (model, system prompt, max tokens)
+User hits "Run Pipeline" — agents execute sequentially
+Canvas shows live status (waiting/running/completed/error)
+Output from each agent feeds into next agent's context
+Flow 3: Resuming Previous Session
+User opens ADE → sees conversation history sidebar
+Selects previous chat thread → full context restored
+Agent continues from where it left off
+All file contexts, diffs, and decisions preserved
+3. Layout & UI Specifications
+Primary Layout (Desktop)
+
+
+┌─────────────────┬──────────────────┬─────────────────┐
+│   NAV PANEL     │   CHAT/ SPEC     │   EDITOR PANEL  │
+│   (240px)       │   (400px flex)   │   (flex-grow)   │
+│                 │                  │                 │
+│  📁 Files       │  📋 PRD Title    │  ┌─────────────┐│
+│  💬 Conversations│  ─────────────  │  │ Tab: main.js││
+│  🤖 Agents      │  [Task 1    ✓]   │  │ Tab: utils  ││
+│  ⚙️ Settings    │  [Task 2    ⏳]   │  ├─────────────┤│
+│                 │  [Task 3    ⬜]   │  │  CODE WITH  ││
+│  ─────────────  │                  │  │  INLINE     ││
+│  + New Chat     │  💬 Chat history │  │  DIFF       ││
+│                 │  ─────────────  │  │             ││
+│                 │  User: implement│  │  + green    ││
+│                 │  Agent: here's.. │  │  - red      ││
+│                 │  [Accept] [Reject]│ │  [✓] [✗]    ││
+│                 │                  │  └─────────────┘│
+│                 │  🖥️ Terminal     │                 │
+│                 │  (collapsible)   │                 │
+└─────────────────┴──────────────────┴─────────────────┘
+Secondary Layout (Canvas/Orchestration Mode)
+Full-width canvas with zoom/pan
+Left sidebar: agent palette (draggable nodes)
+Right sidebar: selected node configuration
+Bottom panel: execution logs across all agents
+4. Feature Specifications
+4.1 PRD Panel (Left-Center)
+Must Have:
+
+Markdown editor with live preview toggle
+Auto-extract checklist items from markdown - [ ] syntax
+Task status: pending → in-progress → completed → failed
+Assign agent per task (dropdown: "Claude", "GPT-4", "Codex", custom)
+Estimated tokens/chars per task
+Collapsible sections (H2/H3 headers become sections)
+Nice to Have:
+
+Template library (new project, bug fix, feature addition)
+Version history of PRD edits
+Comments/annotations on specific lines
+4.2 Chat/Conversation Panel
+Must Have:
+
+Persistent threads with searchable titles
+Message types: user, agent, system, error
+Code blocks with copy button and "apply to file" action
+@-mentions with autocomplete for files, functions, agents
+Context indicator: "Agent sees: 3 files, ~8k tokens"
+Regenerate / edit previous message / branch conversation
+Streaming Display:
+
+Token-by-token streaming for agent responses
+Syntax highlighting during stream (Tree-sitter or Prism)
+Cancel generation button (always visible during stream)
+4.3 Editor Panel (Right)
+Must Have:
+
+Monaco Editor (VS Code's editor) or CodeMirror 6
+Inline diff view: original code on left, proposed on right
+Accept/reject buttons per hunk (not just per file)
+Syntax highlighting for 20+ languages
+Minimap for navigation
+Breadcrumb: file > function > line
+Diff Visualization:
+
+Green background for additions, red for deletions
+Line numbers for both versions
+Collapse unchanged regions
+"Apply all" and "Discard all" actions
+Navigation arrows to jump between changes
+4.4 Terminal Panel (Bottom)
+Must Have:
+
+Multiple terminal tabs (xterm.js)
+Each tab can spawn agent conversation
+ANSI color support
+Clear terminal / copy output buttons
+Auto-scroll to bottom (with disable toggle)
+Agent Terminal Mode:
+
+Special mode where terminal is "wrapped" by agent
+User types natural language → agent translates to shell commands
+Confirmation required for destructive commands (rm, git push, etc.)
+Command history searchable
+4.5 Orchestration Canvas (Special View)
+Must Have:
+
+Infinite canvas (using React Flow or similar)
+Node types: Agent, Task, Decision, Output
+Edges: straight lines with arrowheads, labeled with data flow
+Node configuration sidebar on selection
+Execution controls: Run, Pause, Stop
+Status badges on nodes: ⏳ waiting, ▶️ running, ✅ done, ❌ error
+Node Data Structure:
+
+json
+
+
+{
+  "id": "agent-1",
+  "type": "agent",
+  "position": { "x": 100, "y": 100 },
+  "data": {
+    "name": "Research Agent",
+    "model": "claude-sonnet-4",
+    "systemPrompt": "You are a research agent...",
+    "maxTokens": 4000,
+    "temperature": 0.2,
+    "outputTo": ["agent-2"]
+  }
+}
+5. Technical Architecture
+Frontend Stack Recommendation
+Framework: React 18+ with TypeScript
+State Management: Zustand (conversations, UI state) + React Query (server state)
+Editor: Monaco Editor (via @monaco-editor/react)
+Diff: Monaco's built-in diff editor or react-diff-viewer
+Markdown: MDX or react-markdown with remark-gfm
+Canvas: React Flow (@xyflow/react)
+Terminal: xterm.js
+Build: Vite or Next.js (if web-first) / Tauri (if desktop-native)
+Backend/Agent Layer
+Local API: FastAPI or Express server
+LLM Clients: OpenAI SDK, Anthropic SDK, Ollama for local models
+Context Management: Vector DB (Chroma/LanceDB) for code embeddings
+Session Storage: SQLite for conversations, file metadata
+File System Integration
+Native file watching (chokidar) for real-time sync
+Git integration (simple-git) for branch/commit awareness
+Project indexing: tree-sitter parsers for code structure
+6. Key Interactions & Micro-Interactions
+Critical Moments
+1. Starting a Generation
+
+User hits Cmd+Enter or clicks "Send"
+Input field clears and shows placeholder "Agent is thinking..."
+Context indicator updates with files being sent
+Streaming begins within 500ms
+2. Receiving a Diff
+
+New tab opens in editor with proposed changes
+Diff view auto-opens with first change highlighted
+Accept/Reject buttons pulse subtly to draw attention
+Counter badge updates on file tree showing "3 pending changes"
+3. Multi-Agent Handoff
+
+Canvas shows animated data flow along edge
+Receiving agent node pulses with "incoming context..."
+Previous agent's output appears as collapsed context in chat
+New agent acknowledges receipt: "I see [Research Agent] found..."
+4. Error Recovery
+
+Error message inline with retry button
+"View logs" expands technical details
+One-click "Retry with more context" or "Try different model"
+7. Success Metrics
+Time from spec to first working code < 5 minutes
+Agent iterations needed per task < 3
+User acceptance rate for generated code > 70%
+Multi-agent pipelines completed without human intervention > 50%
