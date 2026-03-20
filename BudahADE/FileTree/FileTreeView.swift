@@ -51,7 +51,6 @@ private struct FileTreeRowView: View {
         VStack(alignment: .leading, spacing: 0) {
             rowButton
 
-            // Inline preview — only motion in the file tree
             if isSelected {
                 FilePreviewView(path: node.path, kind: node.kind)
                     .padding(.horizontal, 8)
@@ -59,7 +58,6 @@ private struct FileTreeRowView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
             }
 
-            // Children — no animation
             if node.isDirectory && node.isExpanded, let children = node.children {
                 ForEach(children) { child in
                     FileTreeRowView(node: child, depth: depth + 1, selectedPath: $selectedPath)
@@ -79,11 +77,10 @@ private struct FileTreeRowView: View {
             }
         } label: {
             HStack(spacing: 5) {
-                // Chevron or blank spacer
                 Group {
                     if node.isDirectory {
                         Image(systemName: node.isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 8.5, weight: .semibold))
+                            .font(.system(size: 8, weight: .semibold))
                             .foregroundColor(Theme.textMuted)
                     } else {
                         Color.clear
@@ -97,8 +94,8 @@ private struct FileTreeRowView: View {
                     .frame(width: 14, alignment: .center)
 
                 Text(node.name)
-                    .font(.system(size: 12))
-                    .foregroundColor(isSelected ? Theme.textPrimary : (node.isDirectory ? Theme.textSecondary.opacity(0.9) : Theme.textSecondary))
+                    .font(Theme.body(12))
+                    .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
@@ -109,7 +106,7 @@ private struct FileTreeRowView: View {
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(isSelected ? Theme.elevated : Color.clear)
+                    .fill(isSelected ? Theme.selectedFill : Color.clear)
                     .padding(.horizontal, 4)
             )
         }

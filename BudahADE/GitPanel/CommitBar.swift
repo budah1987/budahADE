@@ -10,36 +10,33 @@ struct CommitBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Summary line
             Text("\(repo.stagedFiles.count) file\(repo.stagedFiles.count == 1 ? "" : "s") staged")
-                .font(Theme.uiFont(size: 11))
+                .font(Theme.caption(11))
                 .foregroundColor(Theme.textMuted)
 
-            // Commit message field
             TextField("Commit message...", text: $commitMessage)
                 .textFieldStyle(.plain)
-                .font(Theme.uiFont(size: 12))
+                .font(Theme.body(12))
                 .foregroundColor(Theme.textPrimary)
                 .padding(8)
-                .background(Theme.glassInputFill)
-                .cornerRadius(6)
+                .background(Theme.surface3)
+                .cornerRadius(Theme.pillCornerRadius)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Theme.border, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Theme.pillCornerRadius)
+                        .stroke(Theme.borderSubtle, lineWidth: 0.5)
                 )
                 .onSubmit {
                     performCommit()
                 }
 
-            // Commit button
             Button(action: performCommit) {
                 Text("Commit")
-                    .font(Theme.uiFont(size: 12, weight: .semibold))
+                    .font(Theme.label(12))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 7)
-                    .background(canCommit ? Theme.accent : Theme.accent.opacity(0.4))
-                    .cornerRadius(6)
+                    .background(canCommit ? Theme.accent.opacity(0.85) : Theme.accent.opacity(0.3))
+                    .cornerRadius(Theme.pillCornerRadius)
             }
             .buttonStyle(.plain)
             .disabled(!canCommit)

@@ -14,13 +14,13 @@ struct LeftPanelView: View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
                 tabBar
-                    .padding(.horizontal, 8)
-                    .padding(.top, 8)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 6)
+                    .padding(.bottom, 2)
 
-                Divider()
-                    .background(Theme.border)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                Rectangle()
+                    .fill(Theme.border)
+                    .frame(height: 1)
 
                 // Content area
                 Group {
@@ -36,8 +36,7 @@ struct LeftPanelView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(width: panelWidth)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.panelCornerRadius))
+            // No individual background/clip/border — parent sidebar zone provides these
 
             // Drag handle
             dragHandle
@@ -47,25 +46,27 @@ struct LeftPanelView: View {
     // MARK: - Tab Bar
 
     private var tabBar: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             ForEach(LeftPanelTab.allCases, id: \.self) { tab in
                 Button {
-                    state.activeLeftTab = tab
+                    withAnimation(.easeInOut(duration: 0.12)) {
+                        state.activeLeftTab = tab
+                    }
                 } label: {
                     Text(tab.rawValue.capitalized)
-                        .font(Theme.uiFont(size: 12, weight: .medium))
+                        .font(Theme.label(11))
                         .foregroundColor(
                             state.activeLeftTab == tab
                                 ? Theme.textPrimary
-                                : Theme.textSecondary
+                                : Theme.textMuted
                         )
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(
                             Group {
                                 if state.activeLeftTab == tab {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(Theme.elevated)
+                                    RoundedRectangle(cornerRadius: Theme.pillCornerRadius)
+                                        .fill(Color.white.opacity(0.10))
                                 }
                             }
                         )
@@ -81,7 +82,7 @@ struct LeftPanelView: View {
 
     private var dragHandle: some View {
         Rectangle()
-            .fill(isDragging ? Theme.accent.opacity(0.5) : Color.clear)
+            .fill(isDragging ? Theme.accent.opacity(0.3) : Color.clear)
             .frame(width: 4)
             .contentShape(Rectangle())
             .onHover { hovering in

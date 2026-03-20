@@ -7,6 +7,7 @@ struct WorkspaceDropdown: View {
     @State private var searchText: String = ""
     @State private var hoveredWorkspaceId: UUID?
     @State private var isHovered: Bool = false
+    @State private var highlightedIndex: Int = 0
 
     private var filteredAvailableProjects: [ProjectInfo] {
         let openPaths = Set(appState.workspaces.map(\.projectPath))
@@ -26,10 +27,10 @@ struct WorkspaceDropdown: View {
         } label: {
             HStack(spacing: 4) {
                 Text(appState.activeWorkspace?.projectName ?? "No Project")
-                    .font(Theme.uiFont(size: 12, weight: .medium))
+                    .font(Theme.label(12))
                     .foregroundColor(isHovered || isExpanded ? Theme.textPrimary : Theme.textSecondary)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 8, weight: .bold))
                     .foregroundColor(Theme.textMuted)
                     .rotationEffect(.degrees(isExpanded ? 180 : 0))
                     .animation(.easeInOut(duration: 0.15), value: isExpanded)
@@ -37,58 +38,103 @@ struct WorkspaceDropdown: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(.ultraThinMaterial)
-                    .opacity(isHovered || isExpanded ? 1 : 0)
+                RoundedRectangle(cornerRadius: Theme.pillCornerRadius)
+                    .fill(isHovered || isExpanded ? Theme.hoverFill : Color.clear)
             )
-            .animation(.easeInOut(duration: 0.15), value: isHovered)
+            .animation(.easeInOut(duration: 0.12), value: isHovered)
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .onReceive(NotificationCenter.default.publisher(for: .toggleWorkspaceSwitcher)) { _ in
             isExpanded.toggle()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .selectTabByIndex)) { notification in
+            guard isExpanded,
+                  let index = notification.userInfo?["index"] as? Int else { return }
+            let wsCount = filteredOpenWorkspaces.count
+            if index <= wsCount {
+                let wsIdx = index - 1
+                if let globalIdx = appState.workspaces.firstIndex(where: { $0.id == filteredOpenWorkspaces[wsIdx].id }) {
+                    appState.switchToWorkspace(at: globalIdx)
+                }
+            }
+            isExpanded = false
+        }
+        .onChange(of: isExpanded) { _, expanded in
+            appState.isWorkspaceSwitcherOpen = expanded
+            if expanded { highlightedIndex = 0 }
+            if !expanded { searchText = "" }
+        }
         .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
             dropdownContent
-                .frame(width: 320)
+                .frame(width: 300)
         }
     }
 
     // MARK: - Dropdown Content
+
+    /// Total number of selectable rows (open workspaces + recent projects + "Open Folder")
+    private var selectableCount: Int {
+        filteredOpenWorkspaces.count + filteredAvailableProjects.count + 1
+    }
+
+    private var openFolderIndex: Int {
+        filteredOpenWorkspaces.count + filteredAvailableProjects.count
+    }
+
+    private func selectHighlighted() {
+        let wsCount = filteredOpenWorkspaces.count
+        if highlightedIndex == openFolderIndex {
+            openFolderPanel()
+        } else if highlightedIndex < wsCount {
+            let ws = filteredOpenWorkspaces[highlightedIndex]
+            if let globalIdx = appState.workspaces.firstIndex(where: { $0.id == ws.id }) {
+                appState.switchToWorkspace(at: globalIdx)
+            }
+            isExpanded = false
+        } else {
+            let projectIdx = highlightedIndex - wsCount
+            if projectIdx < filteredAvailableProjects.count {
+                appState.openProject(filteredAvailableProjects[projectIdx])
+            }
+            isExpanded = false
+        }
+    }
 
     private var dropdownContent: some View {
         VStack(spacing: 0) {
             // Search
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundColor(Theme.textMuted)
                 TextField("Search projects...", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(Theme.body(13))
                     .foregroundColor(Theme.textPrimary)
+                    .onSubmit { selectHighlighted() }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
-            Divider().background(Theme.border)
+            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Open workspaces
                     if !filteredOpenWorkspaces.isEmpty {
                         sectionHeader("Open")
                         ForEach(Array(filteredOpenWorkspaces.enumerated()), id: \.element.id) { idx, ws in
                             let globalIdx = appState.workspaces.firstIndex(where: { $0.id == ws.id }) ?? idx
-                            workspaceRow(ws: ws, index: globalIdx)
+                            let flatIdx = idx
+                            workspaceRow(ws: ws, index: globalIdx, isHighlighted: highlightedIndex == flatIdx)
                         }
                     }
 
-                    // Available projects
                     if !filteredAvailableProjects.isEmpty {
                         sectionHeader("Recent")
-                        ForEach(filteredAvailableProjects) { project in
-                            projectRow(project)
+                        ForEach(Array(filteredAvailableProjects.enumerated()), id: \.element.id) { idx, project in
+                            let flatIdx = filteredOpenWorkspaces.count + idx
+                            projectRow(project, isHighlighted: highlightedIndex == flatIdx)
                         }
                     }
                 }
@@ -96,23 +142,43 @@ struct WorkspaceDropdown: View {
             }
             .frame(maxHeight: 300)
 
-            Divider().background(Theme.border)
+            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
 
-            // Open folder button
             Button(action: openFolderPanel) {
                 HStack(spacing: 6) {
                     Image(systemName: "folder.badge.plus")
                         .font(.system(size: 11))
                     Text("Open Folder...")
-                        .font(.system(size: 12))
+                        .font(Theme.body(12))
                 }
                 .foregroundColor(Theme.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
+                .background(
+                    highlightedIndex == openFolderIndex
+                        ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.hoverFill)
+                        : nil
+                )
             }
             .buttonStyle(.plain)
         }
-        .background(Theme.panelSurface)
+        .background(Theme.surface2)
+        .onKeyPress(.downArrow) {
+            if selectableCount > 0 {
+                highlightedIndex = (highlightedIndex + 1) % selectableCount
+            }
+            return .handled
+        }
+        .onKeyPress(.upArrow) {
+            if selectableCount > 0 {
+                highlightedIndex = (highlightedIndex - 1 + selectableCount) % selectableCount
+            }
+            return .handled
+        }
+        .onKeyPress(.return) {
+            selectHighlighted()
+            return .handled
+        }
     }
 
     // MARK: - Rows
@@ -121,12 +187,13 @@ struct WorkspaceDropdown: View {
         Text(title.uppercased())
             .font(.system(size: 10, weight: .semibold))
             .foregroundColor(Theme.textMuted)
+            .tracking(0.8)
             .padding(.horizontal, 14)
             .padding(.top, 10)
             .padding(.bottom, 4)
     }
 
-    private func workspaceRow(ws: WorkspaceState, index: Int) -> some View {
+    private func workspaceRow(ws: WorkspaceState, index: Int, isHighlighted: Bool = false) -> some View {
         let isActive = index == appState.activeWorkspaceIndex
         return Button {
             appState.switchToWorkspace(at: index)
@@ -135,14 +202,14 @@ struct WorkspaceDropdown: View {
             HStack(spacing: 10) {
                 Circle()
                     .fill(isActive ? Theme.accent : Theme.textMuted.opacity(0.4))
-                    .frame(width: 6, height: 6)
+                    .frame(width: 5, height: 5)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(ws.projectName)
                         .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                         .foregroundColor(isActive ? Theme.textPrimary : Theme.textSecondary)
                     Text("\(ws.tasks.count) task\(ws.tasks.count == 1 ? "" : "s")")
-                        .font(.system(size: 11))
+                        .font(Theme.caption(11))
                         .foregroundColor(Theme.textMuted)
                 }
 
@@ -153,21 +220,26 @@ struct WorkspaceDropdown: View {
                         appState.closeWorkspace(at: index)
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.system(size: 8, weight: .semibold))
                             .foregroundColor(Theme.textMuted)
-                            .frame(width: 18, height: 18)
+                            .frame(width: 16, height: 16)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
+            .background(
+                isHighlighted
+                    ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.hoverFill)
+                    : nil
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private func projectRow(_ project: ProjectInfo) -> some View {
+    private func projectRow(_ project: ProjectInfo, isHighlighted: Bool = false) -> some View {
         Button {
             appState.openProject(project)
             isExpanded = false
@@ -176,14 +248,19 @@ struct WorkspaceDropdown: View {
                 Image(systemName: "folder")
                     .font(.system(size: 11))
                     .foregroundColor(Theme.textMuted)
-                    .frame(width: 6)
+                    .frame(width: 5)
                 Text(project.name)
-                    .font(.system(size: 13))
+                    .font(Theme.body(13))
                     .foregroundColor(Theme.textSecondary)
                 Spacer()
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
+            .background(
+                isHighlighted
+                    ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.hoverFill)
+                    : nil
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

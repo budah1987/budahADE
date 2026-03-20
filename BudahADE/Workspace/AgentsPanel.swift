@@ -9,7 +9,7 @@ struct AgentsPanel: View {
         VStack(spacing: 0) {
             if let task = activeTask, !task.tabs.isEmpty {
                 ScrollView {
-                    VStack(spacing: 2) {
+                    VStack(spacing: 1) {
                         ForEach(task.tabs) { tab in
                             agentRow(tab: tab, task: task)
                         }
@@ -30,32 +30,30 @@ struct AgentsPanel: View {
             task.selectTab(tab.id)
         } label: {
             HStack(spacing: 10) {
-                // Status dot
                 Circle()
-                    .fill(isActive ? Theme.accent : Theme.textMuted.opacity(0.3))
-                    .frame(width: 6, height: 6)
+                    .fill(isActive ? Theme.accent : Theme.textMuted.opacity(0.4))
+                    .frame(width: 5, height: 5)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(tab.title)
                         .font(.system(size: 12, weight: isActive ? .semibold : .regular))
                         .foregroundColor(isActive ? Theme.textPrimary : Theme.textSecondary)
                         .lineLimit(1)
 
-                    // Running indicator
                     if tab.isRunning {
                         Text("Running")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.accent.opacity(0.8))
+                            .font(Theme.caption(10))
+                            .foregroundColor(Theme.accent.opacity(0.7))
                     }
                 }
 
                 Spacer()
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isActive ? Theme.elevated : Color.clear)
+                RoundedRectangle(cornerRadius: Theme.pillCornerRadius)
+                    .fill(isActive ? Theme.selectedFill : Color.clear)
             )
             .contentShape(Rectangle())
         }
@@ -66,13 +64,13 @@ struct AgentsPanel: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             Text("No agents running")
-                .font(.system(size: 13))
+                .font(Theme.label(12))
                 .foregroundColor(Theme.textMuted)
             Text("Press ⌘T to start a new agent")
-                .font(.system(size: 11))
-                .foregroundColor(Theme.textMuted.opacity(0.6))
+                .font(Theme.caption(11))
+                .foregroundColor(Theme.textMuted.opacity(0.5))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

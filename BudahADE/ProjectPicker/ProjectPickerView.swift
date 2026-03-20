@@ -13,13 +13,13 @@ struct ProjectPickerView: View {
         VStack(spacing: 0) {
             // Title
             Text("BudahADE")
-                .font(.system(size: 36, weight: .bold))
+                .font(Theme.display(36))
                 .foregroundColor(Theme.textPrimary)
                 .padding(.top, 48)
                 .padding(.bottom, 8)
 
             Text("Select a project to get started")
-                .font(.system(size: 14))
+                .font(Theme.body(14))
                 .foregroundColor(Theme.textSecondary)
                 .padding(.bottom, 32)
 
@@ -27,20 +27,20 @@ struct ProjectPickerView: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(Theme.textMuted)
-                    .font(.system(size: 14))
+                    .font(.system(size: 13))
 
                 TextField("Search projects...", text: $store.searchText)
                     .textFieldStyle(.plain)
                     .foregroundColor(Theme.textPrimary)
-                    .font(.system(size: 14))
+                    .font(Theme.body(14))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Theme.panelSurface)
-            .cornerRadius(8)
+            .background(Theme.surface2)
+            .cornerRadius(Theme.cardCornerRadius)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Theme.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
+                    .stroke(Theme.border, lineWidth: 0.5)
             )
             .padding(.horizontal, 48)
             .padding(.bottom, 24)
@@ -71,18 +71,18 @@ struct ProjectPickerView: View {
             Button(action: openFolderPanel) {
                 HStack(spacing: 6) {
                     Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 13))
+                        .font(.system(size: 12))
                     Text("Open Folder...")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Theme.label(13))
                 }
                 .foregroundColor(Theme.accent)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Theme.panelSurface)
-                .cornerRadius(8)
+                .background(Theme.surface2)
+                .cornerRadius(Theme.cardCornerRadius)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Theme.accent.opacity(0.4), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
+                        .stroke(Theme.accent.opacity(0.3), lineWidth: 0.5)
                 )
             }
             .buttonStyle(.plain)
@@ -136,26 +136,26 @@ struct ProjectCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: "folder.fill")
-                .font(.system(size: 28))
-                .foregroundColor(Theme.accent)
+                .font(.system(size: 24))
+                .foregroundColor(Theme.accent.opacity(0.7))
 
             Text(project.name)
-                .font(.system(size: 14, weight: .semibold))
+                .font(Theme.label(14))
                 .foregroundColor(Theme.textPrimary)
                 .lineLimit(1)
 
             Text(dateString)
-                .font(.system(size: 11))
-                .foregroundColor(Theme.textSecondary)
+                .font(Theme.caption(11))
+                .foregroundColor(Theme.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(isHovered ? Theme.elevated : Theme.panelSurface)
-        .cornerRadius(Theme.panelCornerRadius)
+        .background(isHovered ? Theme.surface3 : Theme.surface2)
+        .cornerRadius(Theme.cardCornerRadius)
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.panelCornerRadius)
-                .stroke(Theme.border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
+                .stroke(isHovered ? Theme.borderActive : Theme.borderSubtle, lineWidth: 0.5)
         )
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
     }
 }

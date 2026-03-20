@@ -20,12 +20,12 @@ struct TaskCompletionSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Text("Complete Task")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(Theme.headline(17))
                     .foregroundColor(Theme.textPrimary)
                 Text(task.branchName)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Theme.mono(11))
                     .foregroundColor(Theme.textMuted)
             }
             .padding(.top, 24)
@@ -34,39 +34,44 @@ struct TaskCompletionSheet: View {
             VStack(spacing: 14) {
                 // PR Title
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("PR Title")
-                        .font(.system(size: 11, weight: .medium))
+                    Text("PR TITLE")
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(Theme.textMuted)
+                        .tracking(0.8)
                     TextField("Pull request title", text: $prTitle)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 13))
+                        .font(Theme.body(13))
                         .foregroundColor(Theme.textPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(Theme.elevated)
-                        .cornerRadius(8)
+                        .background(Theme.surface3)
+                        .cornerRadius(Theme.cardCornerRadius)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
+                                .stroke(Theme.border, lineWidth: 0.5)
+                        )
                 }
 
                 // PR Body
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Description (optional)")
-                        .font(.system(size: 11, weight: .medium))
+                    Text("DESCRIPTION")
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(Theme.textMuted)
+                        .tracking(0.8)
                     TextEditor(text: $prBody)
-                        .font(.system(size: 12))
+                        .font(Theme.body(12))
                         .foregroundColor(Theme.textPrimary)
                         .frame(height: 80)
                         .padding(8)
-                        .background(Theme.elevated)
-                        .cornerRadius(8)
+                        .background(Theme.surface3)
+                        .cornerRadius(Theme.cardCornerRadius)
                         .scrollContentBackground(.hidden)
                 }
 
-                // Error
                 if let error = errorMessage {
                     Text(error)
-                        .font(.system(size: 11))
-                        .foregroundColor(.red)
+                        .font(Theme.caption(11))
+                        .foregroundColor(Theme.error)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -84,13 +89,13 @@ struct TaskCompletionSheet: View {
                                 .frame(width: 14, height: 14)
                         }
                         Text("Create PR")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(Theme.label(13))
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
-                    .background(!prTitle.isEmpty ? Theme.accent : Theme.accent.opacity(0.4))
-                    .cornerRadius(8)
+                    .background(!prTitle.isEmpty ? Theme.accent.opacity(0.85) : Theme.accent.opacity(0.3))
+                    .cornerRadius(Theme.cardCornerRadius)
                 }
                 .buttonStyle(.plain)
                 .disabled(prTitle.isEmpty || isCreatingPR)
@@ -100,14 +105,14 @@ struct TaskCompletionSheet: View {
                         workspace.completeTask(task.id)
                         dismiss()
                     }
-                    .font(.system(size: 12))
+                    .font(Theme.body(12))
                     .foregroundColor(Theme.textSecondary)
                     .buttonStyle(.plain)
 
                     Spacer()
 
                     Button("Cancel") { dismiss() }
-                        .font(.system(size: 12))
+                        .font(Theme.body(12))
                         .foregroundColor(Theme.textMuted)
                         .buttonStyle(.plain)
                 }
@@ -116,7 +121,7 @@ struct TaskCompletionSheet: View {
             .padding(.bottom, 24)
         }
         .frame(width: 400)
-        .background(Theme.panelSurface)
+        .background(Theme.surface2)
         .cornerRadius(14)
     }
 
@@ -129,13 +134,11 @@ struct TaskCompletionSheet: View {
 
         Task {
             do {
-                // Push branch
                 try await GitWorktreeManager.runGit(
                     args: ["push", "-u", "origin", task.branchName],
                     repoPath: task.worktreePath
                 )
 
-                // Create PR via gh CLI
                 var args = ["pr", "create", "--title", prTitle, "--body", prBody]
                 if prBody.isEmpty { args = ["pr", "create", "--title", prTitle, "--body", ""] }
                 try await runProcess(

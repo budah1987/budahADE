@@ -27,7 +27,7 @@ struct DiffView: View {
         } else if line.hasPrefix("+") {
             return Theme.success
         } else if line.hasPrefix("-") {
-            return Color.red.opacity(0.7)
+            return Theme.error.opacity(0.85)
         } else {
             return Theme.textSecondary
         }
@@ -35,9 +35,9 @@ struct DiffView: View {
 
     private func lineBackground(for line: String) -> Color {
         if line.hasPrefix("+") {
-            return Theme.success.opacity(0.08)
+            return Theme.success.opacity(0.06)
         } else if line.hasPrefix("-") {
-            return Color.red.opacity(0.06)
+            return Theme.error.opacity(0.05)
         } else {
             return .clear
         }

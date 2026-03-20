@@ -23,8 +23,9 @@ struct StagingView: View {
                 emptyState("No staged files")
             }
 
-            Divider()
-                .background(Theme.border)
+            Rectangle()
+                .fill(Theme.borderSubtle)
+                .frame(height: 0.5)
                 .padding(.vertical, 4)
 
             // Unstaged section
@@ -58,16 +59,16 @@ struct StagingView: View {
     ) -> some View {
         HStack {
             Text(title)
-                .font(Theme.uiFont(size: 11, weight: .semibold))
+                .font(Theme.label(11))
                 .foregroundColor(Theme.textSecondary)
                 .textCase(.uppercase)
 
             Text("\(count)")
-                .font(Theme.uiFont(size: 10, weight: .medium))
+                .font(Theme.mono(10))
                 .foregroundColor(Theme.textMuted)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1)
-                .background(Theme.elevated)
+                .background(Theme.surface3)
                 .cornerRadius(4)
 
             Spacer()
@@ -78,12 +79,12 @@ struct StagingView: View {
                         Image(systemName: actionIcon)
                             .font(.system(size: 9, weight: .bold))
                         Text(actionLabel)
-                            .font(Theme.uiFont(size: 10, weight: .medium))
+                            .font(Theme.label(10))
                     }
                     .foregroundColor(Theme.textSecondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(Theme.hoverPill)
+                    .background(Theme.hoverFill)
                     .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -101,8 +102,8 @@ struct StagingView: View {
             statusBadge(file.status)
 
             Text(file.path)
-                .font(Theme.uiFont(size: 12))
-                .foregroundColor(Theme.textPrimary)
+                .font(Theme.body(12))
+                .foregroundColor(Theme.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
@@ -116,11 +117,11 @@ struct StagingView: View {
                 }
             } label: {
                 Image(systemName: staged ? "minus" : "plus")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Theme.textSecondary)
-                    .frame(width: 18, height: 18)
-                    .background(Theme.hoverPill)
-                    .cornerRadius(4)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(Theme.textMuted)
+                    .frame(width: 16, height: 16)
+                    .background(Theme.hoverFill)
+                    .cornerRadius(3)
             }
             .buttonStyle(.plain)
         }
@@ -130,7 +131,7 @@ struct StagingView: View {
         .onTapGesture {
             onSelectFile(file.path, staged)
         }
-        .background(Theme.hoverPill.opacity(0.01)) // enables hit testing
+        .background(Theme.hoverFill.opacity(0.01))
     }
 
     // MARK: - Status Badge
@@ -141,16 +142,16 @@ struct StagingView: View {
             .font(.system(size: 10, weight: .bold, design: .monospaced))
             .foregroundColor(statusColor(status))
             .frame(width: 18, height: 18)
-            .background(statusColor(status).opacity(0.15))
+            .background(statusColor(status).opacity(0.12))
             .cornerRadius(3)
     }
 
     private func statusColor(_ status: String) -> Color {
         switch status {
-        case "M": return Theme.info
+        case "M": return Theme.warning
         case "A": return Theme.success
-        case "D": return Color.red.opacity(0.85)
-        case "R": return Theme.warning
+        case "D": return Theme.error
+        case "R": return Theme.info
         case "?": return Theme.textMuted
         default: return Theme.textSecondary
         }
@@ -161,7 +162,7 @@ struct StagingView: View {
     @ViewBuilder
     private func emptyState(_ text: String) -> some View {
         Text(text)
-            .font(Theme.uiFont(size: 11))
+            .font(Theme.caption(11))
             .foregroundColor(Theme.textMuted)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)

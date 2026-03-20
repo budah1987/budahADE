@@ -114,6 +114,7 @@ struct BudahADEApp: App {
 class AppState: ObservableObject {
     @Published var workspaces: [WorkspaceState] = []
     @Published var activeWorkspaceIndex: Int = 0
+    @Published var isWorkspaceSwitcherOpen: Bool = false
 
     var hasNoWorkspaces: Bool { workspaces.isEmpty }
 
@@ -180,12 +181,7 @@ struct ContentView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                if !appState.hasNoWorkspaces {
-                    WorkspaceDropdown()
-                        .environmentObject(appState)
-                }
-            }
+            // Empty — workspace dropdown is now in the task rail
         }
     }
 }

@@ -8,6 +8,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Initialize Ghostty on launch
         GhosttyAppManager.shared.initialize()
+
+        // Make window transparent for glass effects
+        DispatchQueue.main.async {
+            NSApplication.shared.windows.forEach { window in
+                window.isOpaque = false
+                window.backgroundColor = .clear
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

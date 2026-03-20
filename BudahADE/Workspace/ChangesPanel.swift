@@ -17,10 +17,8 @@ struct ChangesPanel: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Branch indicator
                 branchHeader
 
-                // Unstaged files
                 sectionView(
                     title: "Unstaged",
                     count: repo.unstagedFiles.count,
@@ -39,7 +37,6 @@ struct ChangesPanel: View {
                     }
                 }
 
-                // Staged files
                 sectionView(
                     title: "Staged",
                     count: repo.stagedFiles.count,
@@ -53,11 +50,11 @@ struct ChangesPanel: View {
                             VStack(spacing: 6) {
                                 TextField("Commit message", text: $commitMessage, axis: .vertical)
                                     .textFieldStyle(.plain)
-                                    .font(.system(size: 12))
+                                    .font(Theme.body(12))
                                     .foregroundColor(Theme.textPrimary)
                                     .padding(8)
-                                    .background(Theme.appBackground)
-                                    .cornerRadius(6)
+                                    .background(Theme.surface3)
+                                    .cornerRadius(Theme.pillCornerRadius)
                                     .lineLimit(3)
                                     .padding(.horizontal, 12)
 
@@ -74,7 +71,6 @@ struct ChangesPanel: View {
                     }
                 }
 
-                // Recent commits
                 sectionView(
                     title: "Commits",
                     count: repo.recentCommits.count,
@@ -97,15 +93,15 @@ struct ChangesPanel: View {
     private var branchHeader: some View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.triangle.branch")
-                .font(.system(size: 10))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundColor(Theme.accent)
             Text(repo.currentBranch)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .font(Theme.mono(11, weight: .medium))
                 .foregroundColor(Theme.textSecondary)
             Spacer()
             Button(action: { repo.refresh() }) {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 10))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundColor(Theme.textMuted)
             }
             .buttonStyle(.plain)
@@ -124,22 +120,25 @@ struct ChangesPanel: View {
     ) -> some View {
         VStack(spacing: 0) {
             Button {
-                expandedSection = expandedSection == section ? nil : section
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    expandedSection = expandedSection == section ? nil : section
+                }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: expandedSection == section ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundColor(Theme.textMuted)
+                        .frame(width: 10)
                     Text(title)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.label(11))
                         .foregroundColor(Theme.textSecondary)
                     if count > 0 {
                         Text("\(count)")
-                            .font(.system(size: 10))
+                            .font(Theme.mono(10))
                             .foregroundColor(Theme.textMuted)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(Theme.elevated)
+                            .background(Theme.surface3)
                             .cornerRadius(4)
                     }
                     Spacer()
@@ -161,31 +160,32 @@ struct ChangesPanel: View {
     private func fileRow(_ file: GitFileStatus, staged: Bool) -> some View {
         HStack(spacing: 8) {
             Text(file.status)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundColor(statusColor(file.status))
                 .frame(width: 12)
 
             Text(file.path)
-                .font(.system(size: 11, design: .monospaced))
+                .font(Theme.mono(11))
                 .foregroundColor(Theme.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
             Spacer()
 
-            Button(staged ? "↓" : "↑") {
-                if staged {
-                    repo.unstage(file.path)
-                } else {
-                    repo.stage(file.path)
-                }
+            Button {
+                if staged { repo.unstage(file.path) } else { repo.stage(file.path) }
+            } label: {
+                Image(systemName: staged ? "minus" : "plus")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(Theme.textMuted)
+                    .frame(width: 16, height: 16)
+                    .background(Theme.hoverFill)
+                    .cornerRadius(3)
             }
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(Theme.textMuted)
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
     }
 
     // MARK: - Commit Row
@@ -193,30 +193,30 @@ struct ChangesPanel: View {
     private func commitRow(_ commit: GitCommit) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(commit.message)
-                .font(.system(size: 11))
+                .font(Theme.body(11))
                 .foregroundColor(Theme.textSecondary)
                 .lineLimit(1)
             HStack(spacing: 6) {
                 Text(String(commit.id.prefix(7)))
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(Theme.accent.opacity(0.8))
+                    .font(Theme.mono(10))
+                    .foregroundColor(Theme.accent.opacity(0.7))
                 Text(commit.date)
-                    .font(.system(size: 10))
+                    .font(Theme.caption(10))
                     .foregroundColor(Theme.textMuted)
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 5)
     }
 
     // MARK: - Helpers
 
     private func statusColor(_ status: String) -> Color {
         switch status {
-        case "M": return .orange
-        case "A": return .green
-        case "D": return .red
-        case "R": return .blue
+        case "M": return Theme.warning
+        case "A": return Theme.success
+        case "D": return Theme.error
+        case "R": return Theme.info
         default: return Theme.textMuted
         }
     }
@@ -227,12 +227,12 @@ struct ChangesPanel: View {
 struct PillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11, weight: .medium))
+            .font(Theme.label(11))
             .foregroundColor(.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
-            .background(Theme.accent.opacity(configuration.isPressed ? 0.7 : 1))
-            .cornerRadius(6)
+            .background(Theme.accent.opacity(configuration.isPressed ? 0.6 : 0.85))
+            .cornerRadius(Theme.pillCornerRadius)
             .frame(maxWidth: .infinity)
     }
 }

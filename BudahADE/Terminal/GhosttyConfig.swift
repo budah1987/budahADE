@@ -6,7 +6,7 @@ struct GhosttyConfig {
     var fontSize: CGFloat = 13
     var theme: String?
     var workingDirectory: String?
-    var backgroundColor: NSColor = Theme.nsPanelSurface
+    var backgroundColor: NSColor = NSColor(hex: 0x141416)
     var backgroundOpacity: Double = 1.0
     var foregroundColor: NSColor = Theme.nsTextPrimary
 

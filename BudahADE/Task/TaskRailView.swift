@@ -2,38 +2,47 @@ import SwiftUI
 
 struct TaskRailView: View {
     @ObservedObject var workspace: WorkspaceState
-    @Binding var editingTaskId: UUID?
+    var renameTarget: RenameTarget? = nil
+
+    @State private var hoveredTaskId: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("TASKS")
-                    .font(.system(size: 10, weight: .semibold))
+            // Project name — like Attio's "Acme Tech" at top of sidebar
+            WorkspaceDropdown()
+                .padding(.horizontal, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+
+            // Section header
+            HStack(alignment: .firstTextBaseline) {
+                Text("Tasks")
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(Theme.textMuted)
-                    .tracking(0.8)
                 Spacer()
+                Text("\(workspace.tasks.count)")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundColor(Theme.textMuted)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 6)
 
             // Task list
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 2) {
                     ForEach(workspace.tasks) { task in
-                        TaskRowView(
+                        TaskCardView(
                             task: task,
                             isActive: task.id == workspace.activeTaskId,
-                            isEditing: task.id == editingTaskId,
+                            isHovered: task.id == hoveredTaskId,
+                            isSpotlit: renameTarget == .task(taskId: task.id),
                             onSelect: { workspace.selectTask(task.id) },
                             onComplete: { workspace.taskForCompletion = task },
-                            onDelete: { workspace.deleteTask(task.id) },
-                            onCommitRename: { newName in
-                                task.name = newName
-                                editingTaskId = nil
-                            }
+                            onDelete: { workspace.deleteTask(task.id) }
                         )
+                        .onHover { hovering in
+                            hoveredTaskId = hovering ? task.id : nil
+                        }
                     }
                 }
                 .padding(.horizontal, 6)
@@ -41,30 +50,28 @@ struct TaskRailView: View {
 
             Spacer(minLength: 0)
 
-            Divider()
-                .background(Theme.border)
-                .padding(.horizontal, 8)
-
+            // New Task button
             Button {
                 workspace.showNewTaskSheet = true
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 10, weight: .semibold))
                     Text("New Task")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(Theme.label(12))
                 }
                 .foregroundColor(Theme.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Theme.border).frame(height: 1)
+            }
         }
         .frame(width: 160)
-        .background(Theme.panelSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.panelCornerRadius))
         .sheet(item: $workspace.taskForCompletion) { task in
             TaskCompletionSheet(workspace: workspace, task: task)
                 .background(Theme.appBackground)
@@ -72,70 +79,84 @@ struct TaskRailView: View {
     }
 }
 
-// MARK: - Task Row
+// MARK: - Task Card
 
-private struct TaskRowView: View {
+private struct TaskCardView: View {
     @ObservedObject var task: TaskState
     let isActive: Bool
-    let isEditing: Bool
+    let isHovered: Bool
+    var isSpotlit: Bool = false
     let onSelect: () -> Void
     let onComplete: () -> Void
     let onDelete: () -> Void
-    let onCommitRename: (String) -> Void
-
-    @State private var editText: String = ""
-    @FocusState private var isFocused: Bool
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(dotColor)
-                    .frame(width: 6, height: 6)
-                    .padding(.leading, 2)
+            VStack(alignment: .leading, spacing: 6) {
+                // Row 1: Status indicator + Task name
+                HStack(spacing: 6) {
+                    AgentStatusView(status: leadingStatus)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    if isEditing {
-                        TextField("", text: $editText)
-                            .font(.system(size: 12, weight: isActive ? .semibold : .regular))
-                            .foregroundColor(isActive ? Theme.textPrimary : Theme.textSecondary)
-                            .textFieldStyle(.plain)
-                            .lineLimit(1)
-                            .focused($isFocused)
-                            .onSubmit { onCommitRename(editText) }
-                            .onExitCommand { onCommitRename(editText) }
-                    } else {
-                        Text(task.name)
-                            .font(.system(size: 12, weight: isActive ? .semibold : .regular))
-                            .foregroundColor(isActive ? Theme.textPrimary : Theme.textSecondary)
-                            .lineLimit(1)
-                    }
+                    Text(task.name)
+                        .font(.system(size: 12, weight: isActive && task.status != .completed ? .semibold : .regular))
+                        .foregroundColor(
+                            task.status == .completed
+                                ? Color.white.opacity(0.25)
+                                : isActive
+                                    ? Color.white.opacity(0.92)
+                                    : Color.white.opacity(0.38)
+                        )
+                        .lineLimit(1)
+                        .animation(.easeOut(duration: 0.12), value: isActive)
+                }
+
+                // Row 2: Branch name
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(Theme.textMuted)
 
                     Text(task.branchName)
-                        .font(.system(size: 10))
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
                         .foregroundColor(Theme.textMuted)
                         .lineLimit(1)
                 }
+                .padding(.leading, 12)
 
-                Spacer(minLength: 0)
+                // Row 3: Status summary + elapsed time
+                statusSummaryRow
+                    .padding(.leading, 12)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 7)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isActive ? Theme.elevated : Color.clear)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(fillColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(borderColor, lineWidth: 0.5)
+                    )
             )
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+            .animation(.easeOut(duration: 0.12), value: leadingStatus)
             .contentShape(Rectangle())
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .preference(
+                            key: RenameSpotlightKey.self,
+                            value: isSpotlit
+                                ? geo.frame(in: .named("workspace"))
+                                : .zero
+                        )
+                }
+            )
         }
         .buttonStyle(.plain)
-        .onChange(of: isEditing) { _, editing in
-            if editing {
-                editText = task.name
-                isFocused = true
-            }
-        }
         .contextMenu {
-            Button("Rename") { onCommitRename(task.name) } // triggers edit mode via parent
+            Button("Rename") {
+                NotificationCenter.default.post(name: .renameTask, object: nil)
+            }
             Button("Complete Task...") { onComplete() }
             Divider()
             Button(role: .destructive, action: onDelete) {
@@ -144,10 +165,99 @@ private struct TaskRowView: View {
         }
     }
 
-    private var dotColor: Color {
-        switch task.status {
-        case .active:    return isActive ? Theme.accent : Theme.textMuted.opacity(0.5)
+    // MARK: - Status Summary
+
+    @ViewBuilder
+    private var statusSummaryRow: some View {
+        HStack {
+            if task.status == .completed {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Theme.success)
+                        .frame(width: 4, height: 4)
+                    Text("completed")
+                        .font(.system(size: 9))
+                        .foregroundColor(Theme.success)
+                }
+            } else {
+                HStack(spacing: 3) {
+                    ForEach(Array(task.statusSummary.enumerated()), id: \.offset) { _, entry in
+                        let (status, count) = entry
+                        Circle()
+                            .fill(statusDotColor(status))
+                            .frame(width: 4, height: 4)
+                        Text("\(count) \(statusLabel(status))")
+                            .font(.system(size: 9))
+                            .foregroundColor(statusDotColor(status))
+                    }
+                }
+            }
+
+            Spacer()
+
+            Text(task.elapsedTime)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color.white.opacity(0.18))
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var fillColor: Color {
+        switch leadingStatus {
+        case .working:
+            return isHovered
+                ? Color(hex: 0x6366f1).opacity(0.10)
+                : Color(hex: 0x6366f1).opacity(0.05)
+        case .completed:
+            return isHovered
+                ? Color(hex: 0x5a9a6b).opacity(0.08)
+                : Color(hex: 0x5a9a6b).opacity(0.04)
+        default:
+            return isHovered ? Color.white.opacity(0.03) : .clear
+        }
+    }
+
+    private var borderColor: Color {
+        switch leadingStatus {
+        case .working:
+            return isHovered
+                ? Color(hex: 0x6366f1).opacity(0.28)
+                : Color(hex: 0x6366f1).opacity(0.15)
+        case .completed:
+            return isHovered
+                ? Color(hex: 0x5a9a6b).opacity(0.20)
+                : Color(hex: 0x5a9a6b).opacity(0.12)
+        default:
+            return .clear
+        }
+    }
+
+    /// Highest-priority agent status to show as the card's leading indicator
+    private var leadingStatus: AgentStatus {
+        if task.status == .completed { return .completed }
+        // Show the most active status across all agents
+        let statuses = task.tabs.map(\.agentStatus)
+        if statuses.contains(.working) { return .working }
+        if statuses.contains(.thinking) { return .thinking }
+        return .inactive
+    }
+
+    private func statusDotColor(_ status: AgentStatus) -> Color {
+        switch status {
+        case .inactive:  return Theme.textMuted
+        case .thinking:  return Theme.success
+        case .working:   return Color(hex: 0x818cf8)
         case .completed: return Theme.success
+        }
+    }
+
+    private func statusLabel(_ status: AgentStatus) -> String {
+        switch status {
+        case .inactive:  return "idle"
+        case .thinking:  return "active"
+        case .working:   return "working"
+        case .completed: return "done"
         }
     }
 }

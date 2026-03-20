@@ -18,12 +18,12 @@ struct NewTaskSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Text("What are you working on?")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(Theme.headline(17))
                     .foregroundColor(Theme.textPrimary)
                 Text(workspace.projectName)
-                    .font(.system(size: 12))
+                    .font(Theme.caption(12))
                     .foregroundColor(Theme.textMuted)
             }
             .padding(.top, 28)
@@ -32,18 +32,23 @@ struct NewTaskSheet: View {
             VStack(spacing: 16) {
                 // Task name field
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Task name")
-                        .font(.system(size: 11, weight: .medium))
+                    Text("TASK NAME")
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(Theme.textMuted)
+                        .tracking(0.8)
 
                     TextField("e.g. Rate limiter", text: $taskName)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 14))
+                        .font(Theme.body(14))
                         .foregroundColor(Theme.textPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(Theme.elevated)
-                        .cornerRadius(8)
+                        .background(Theme.surface3)
+                        .cornerRadius(Theme.cardCornerRadius)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
+                                .stroke(Theme.border, lineWidth: 0.5)
+                        )
                         .focused($focusedField, equals: .name)
                         .onChange(of: taskName) { _, newValue in
                             if branchName.isEmpty || branchName == slugify(taskName.dropLast()) {
@@ -55,18 +60,23 @@ struct NewTaskSheet: View {
 
                 // Branch name field
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Branch name")
-                        .font(.system(size: 11, weight: .medium))
+                    Text("BRANCH")
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(Theme.textMuted)
+                        .tracking(0.8)
 
                     TextField("feat/my-feature", text: $branchName)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 14, design: .monospaced))
+                        .font(Theme.mono(14))
                         .foregroundColor(Theme.textPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(Theme.elevated)
-                        .cornerRadius(8)
+                        .background(Theme.surface3)
+                        .cornerRadius(Theme.cardCornerRadius)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
+                                .stroke(Theme.border, lineWidth: 0.5)
+                        )
                         .focused($focusedField, equals: .branch)
                         .onSubmit { if isValid { createTask() } }
                 }
@@ -74,12 +84,12 @@ struct NewTaskSheet: View {
                 // Base branch
                 HStack {
                     Text("Based on")
-                        .font(.system(size: 11))
+                        .font(Theme.caption(11))
                         .foregroundColor(Theme.textMuted)
 
                     TextField("main", text: $baseBranch)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Theme.mono(11))
                         .foregroundColor(Theme.textSecondary)
                         .frame(maxWidth: 80)
                 }
@@ -95,7 +105,7 @@ struct NewTaskSheet: View {
                         workspace.showNewTaskSheet = false
                     }
                     .buttonStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(Theme.body(13))
                     .foregroundColor(Theme.textSecondary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -111,13 +121,13 @@ struct NewTaskSheet: View {
                                 .frame(width: 14, height: 14)
                         }
                         Text("Create Task")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(Theme.label(13))
                     }
                     .foregroundColor(.white)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 9)
-                    .background(isValid ? Theme.accent : Theme.accent.opacity(0.4))
-                    .cornerRadius(8)
+                    .background(isValid ? Theme.accent : Theme.accent.opacity(0.3))
+                    .cornerRadius(Theme.cardCornerRadius)
                 }
                 .buttonStyle(.plain)
                 .disabled(!isValid || isCreating)
@@ -126,7 +136,7 @@ struct NewTaskSheet: View {
             .padding(.bottom, 24)
         }
         .frame(width: 380)
-        .background(Theme.panelSurface)
+        .background(Theme.surface2)
         .cornerRadius(14)
         .onAppear {
             focusedField = .name

@@ -17,7 +17,6 @@ struct GitPanelView: View {
         VSplitView {
             // Top: branch picker, staging, commit
             VStack(alignment: .leading, spacing: 0) {
-                // Branch picker
                 HStack {
                     BranchPicker(repo: repo)
                     Spacer()
@@ -25,10 +24,10 @@ struct GitPanelView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
 
-                Divider()
-                    .background(Theme.border)
+                Rectangle()
+                    .fill(Theme.borderSubtle)
+                    .frame(height: 0.5)
 
-                // Staging area
                 ScrollView {
                     StagingView(repo: repo) { path, staged in
                         selectedFile = path
@@ -37,10 +36,10 @@ struct GitPanelView: View {
                     }
                 }
 
-                Divider()
-                    .background(Theme.border)
+                Rectangle()
+                    .fill(Theme.borderSubtle)
+                    .frame(height: 0.5)
 
-                // Commit bar
                 CommitBar(repo: repo)
             }
             .frame(minHeight: 200)
@@ -50,7 +49,7 @@ struct GitPanelView: View {
                 if let file = selectedFile {
                     HStack {
                         Text(file)
-                            .font(Theme.uiFont(size: 11, weight: .medium))
+                            .font(Theme.mono(11, weight: .medium))
                             .foregroundColor(Theme.textSecondary)
                             .lineLimit(1)
 
@@ -61,21 +60,21 @@ struct GitPanelView: View {
                             selectedDiff = ""
                         } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: 9, weight: .semibold))
                                 .foregroundColor(Theme.textMuted)
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
-                    .background(Theme.panelSurface)
+                    .background(Theme.surface2)
 
                     DiffView(diff: selectedDiff)
                 } else {
                     VStack {
                         Spacer()
                         Text("Select a file to view diff")
-                            .font(Theme.uiFont(size: 12))
+                            .font(Theme.body(12))
                             .foregroundColor(Theme.textMuted)
                         Spacer()
                     }
@@ -85,7 +84,7 @@ struct GitPanelView: View {
             }
             .frame(minHeight: 100)
         }
-        .background(Theme.panelSurface)
+        .background(Theme.sidebar)
         .onAppear {
             repo.startPolling()
         }

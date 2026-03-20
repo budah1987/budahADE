@@ -18,8 +18,8 @@ final class TerminalSurfaceView: NSView {
 
     private func setup() {
         wantsLayer = true
-        layer?.masksToBounds = true
-        layer?.backgroundColor = Theme.nsAppBackground.cgColor
+        layer?.masksToBounds = false
+        layer?.backgroundColor = NSColor(hex: 0x141416).cgColor
         updateTrackingAreas()
     }
 

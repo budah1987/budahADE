@@ -35,6 +35,7 @@
 		B637F69B5A385EC7D882E5C1 /* GitWorktreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A658A83DDCAA7B7F63B1827 /* GitWorktreeManager.swift */; };
 		B68A9BA58C76081C1BD3C20A /* GitPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B705CFF356264227986EFC3 /* GitPanelView.swift */; };
 		BFD578FE7958B66754A04103 /* StagingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0BB662F1E68870408AB79C0 /* StagingView.swift */; };
+		C6E6CD27B61BBF2CD2DF6B50 /* AgentStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 767DE60DA0CF895A8BD7606E /* AgentStatusView.swift */; };
 		D93EF647D18F66ED982F9A3A /* TerminalSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 097E88C7634C6AEA371FCED8 /* TerminalSurfaceView.swift */; };
 		DCE5831F073A29D3341884FA /* FileTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104D96E4E1790C3C829BE427 /* FileTreeView.swift */; };
 		E14E1B6A81061CDB00DFBD02 /* NewTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08E0CF750B2777728F76B48 /* NewTaskSheet.swift */; };
@@ -64,6 +65,7 @@
 		5B705CFF356264227986EFC3 /* GitPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitPanelView.swift; sourceTree = "<group>"; };
 		5F15487E095AC64498BF5BC2 /* FilePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreviewView.swift; sourceTree = "<group>"; };
 		6B054982DD13BCE9E13925DB /* WorkspaceState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceState.swift; sourceTree = "<group>"; };
+		767DE60DA0CF895A8BD7606E /* AgentStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatusView.swift; sourceTree = "<group>"; };
 		7B94B1A39F46BEB5453BDD49 /* TerminalPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPanelView.swift; sourceTree = "<group>"; };
 		875EEB2C511F4F2AF8730381 /* PaneLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneLayout.swift; sourceTree = "<group>"; };
 		889ADE1D08FC1BD0EF48D255 /* AgentsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsPanel.swift; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 		B41BC2537EB0E2BA710AD4D6 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				767DE60DA0CF895A8BD7606E /* AgentStatusView.swift */,
 				A03D062065CF15E980ECF4E6 /* KeyboardShortcuts.swift */,
 				AC6BAB7A597B9483594284F5 /* Theme.swift */,
 			);
@@ -266,6 +269,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C6E6CD27B61BBF2CD2DF6B50 /* AgentStatusView.swift in Sources */,
 				AD9AAC5CD5D8BDAAB0ACFB9A /* AgentsPanel.swift in Sources */,
 				7A7D73AC2FC90BC7632D63AF /* AppDelegate.swift in Sources */,
 				943AE62532082E736CADB572 /* BranchPicker.swift in Sources */,
