@@ -1,0 +1,394 @@
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct PlanCanvasView: View {
+    @ObservedObject var canvas: PlanCanvasState
+    @State private var lastZoom: CGFloat = 1.0
+    @State private var contextMenuPosition: CGPoint = .zero
+    @State private var mousePosition: CGPoint? = nil
+    @State private var viewportSize: CGSize = .zero
+
+    // Local viewport state — avoids @Published rebuilds during gestures
+    @State private var localZoom: CGFloat = 1.0
+    @State private var localPanOffset: CGSize = .zero
+
+    // Spacebar panning
+    @State private var isSpacePanning: Bool = false
+
+    // Debounced commit to canvas state
+    @State private var commitTask: DispatchWorkItem?
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                // Background layer (dot grid)
+                canvasBackground
+
+                // Content layer (zoom + pan transform)
+                canvasContent
+                    .allowsHitTesting(!isSpacePanning)
+
+                // Smart guides overlay (in canvas coords, transformed)
+                SmartGuidesOverlay(guides: canvas.guides)
+                    .scaleEffect(localZoom, anchor: .topLeading)
+                    .offset(localPanOffset)
+                    .allowsHitTesting(false)
+
+                // HUD (not affected by zoom)
+                hudOverlay
+
+                // Empty state
+                if canvas.elements.isEmpty {
+                    emptyCanvas
+                        .allowsHitTesting(false)
+                }
+            }
+            .onAppear {
+                viewportSize = geo.size
+                syncFromCanvas()
+            }
+            .onChange(of: geo.size) { _, new in viewportSize = new }
+            .background(
+                CanvasInputMonitor(
+                    onScroll: { deltaX, deltaY, isZoom in
+                        if isZoom {
+                            let newZoom = (localZoom + deltaY * 0.01).clamped(to: 0.1...3.0)
+                            if let anchor = mousePosition {
+                                zoomAtLocal(newZoom: newZoom, screenAnchor: anchor)
+                            } else {
+                                localZoom = newZoom
+                            }
+                            commitViewportToCanvas()
+                        } else {
+                            localPanOffset = CGSize(
+                                width: localPanOffset.width + deltaX,
+                                height: localPanOffset.height + deltaY
+                            )
+                            commitViewportToCanvas()
+                        }
+                    },
+                    onPanDrag: { deltaX, deltaY in
+                        localPanOffset = CGSize(
+                            width: localPanOffset.width + deltaX,
+                            height: localPanOffset.height + deltaY
+                        )
+                        commitViewportToCanvas()
+                    },
+                    onSpaceStateChanged: { isHeld in
+                        isSpacePanning = isHeld
+                    },
+                    onEscape: {
+                        canvas.selectedId = nil
+                    }
+                )
+            )
+            .gesture(canvasZoomGesture)
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let point):
+                    mousePosition = point
+                    contextMenuPosition = screenToCanvasLocal(point)
+                case .ended:
+                    mousePosition = nil
+                }
+            }
+            .contextMenu {
+                canvasContextMenu(at: contextMenuPosition)
+            }
+            .onTapGesture(count: 2) {
+                if let mouse = mousePosition {
+                    let canvasPos = screenToCanvasLocal(mouse)
+                    let snapped = GridSnap.snapPoint(canvasPos)
+                    canvas.addTerminalTile(agent: .claude, at: snapped)
+                }
+            }
+            .onTapGesture {
+                canvas.selectedId = nil
+            }
+            .onDrop(of: [.image, .fileURL], isTargeted: nil) { providers in
+                handleDrop(providers)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .canvasResetZoom)) { _ in
+            canvas.resetZoom()
+            syncFromCanvas()
+            lastZoom = 1.0
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .canvasZoomToFit)) { _ in
+            canvas.zoomToFit(viewportSize: viewportSize)
+            syncFromCanvas()
+            lastZoom = localZoom
+        }
+        // Sync when canvas state changes externally (e.g. resetZoom animation)
+        .onChange(of: canvas.zoom) { _, new in
+            if abs(localZoom - new) > 0.001 { localZoom = new }
+        }
+        .onChange(of: canvas.panOffset.width) { _, _ in
+            let cp = canvas.panOffset
+            if abs(localPanOffset.width - cp.width) > 0.5 ||
+               abs(localPanOffset.height - cp.height) > 0.5 {
+                localPanOffset = cp
+            }
+        }
+    }
+
+    // MARK: - Local Viewport Helpers
+
+    private func syncFromCanvas() {
+        localZoom = canvas.zoom
+        localPanOffset = canvas.panOffset
+    }
+
+    private func commitViewportToCanvas() {
+        // Debounce: only push to @Published after gestures settle (150ms)
+        // This prevents full view tree rebuilds on every scroll frame
+        commitTask?.cancel()
+        let task = DispatchWorkItem { [localZoom, localPanOffset] in
+            canvas.zoom = localZoom
+            canvas.panOffset = localPanOffset
+        }
+        commitTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: task)
+    }
+
+    private func zoomAtLocal(newZoom: CGFloat, screenAnchor: CGPoint) {
+        let clamped = newZoom.clamped(to: 0.1...3.0)
+        let canvasX = (screenAnchor.x - localPanOffset.width) / localZoom
+        let canvasY = (screenAnchor.y - localPanOffset.height) / localZoom
+        localZoom = clamped
+        localPanOffset = CGSize(
+            width: screenAnchor.x - canvasX * clamped,
+            height: screenAnchor.y - canvasY * clamped
+        )
+    }
+
+    private func screenToCanvasLocal(_ screenPoint: CGPoint) -> CGPoint {
+        CGPoint(
+            x: (screenPoint.x - localPanOffset.width) / localZoom,
+            y: (screenPoint.y - localPanOffset.height) / localZoom
+        )
+    }
+
+    // MARK: - Canvas Background
+
+    private var canvasBackground: some View {
+        Canvas { context, size in
+            let spacing: CGFloat = CanvasGrid.unit * localZoom
+            guard spacing > 2 else { return }
+
+            let offsetX = localPanOffset.width.truncatingRemainder(dividingBy: spacing)
+            let offsetY = localPanOffset.height.truncatingRemainder(dividingBy: spacing)
+
+            // Compute grid index origin so we know which dots are major
+            let originGridX = Int((-localPanOffset.width / spacing).rounded(.down))
+            let originGridY = Int((-localPanOffset.height / spacing).rounded(.down))
+
+            let minorColor = Color.white.opacity(0.10)
+            let majorColor = Color.white.opacity(0.22)
+            let minorSize: CGFloat = 1.5
+            let majorSize: CGFloat = 2.5
+            let majorN = CanvasGrid.majorEvery
+
+            var ix = 0
+            var x = offsetX
+            while x < size.width {
+                var iy = 0
+                var y = offsetY
+                while y < size.height {
+                    let gx = originGridX + ix
+                    let gy = originGridY + iy
+                    let isMajor = (gx % majorN == 0) && (gy % majorN == 0)
+                    let dotSize = isMajor ? majorSize : minorSize
+                    let color = isMajor ? majorColor : minorColor
+
+                    let rect = CGRect(
+                        x: x - dotSize / 2,
+                        y: y - dotSize / 2,
+                        width: dotSize,
+                        height: dotSize
+                    )
+                    context.fill(Path(ellipseIn: rect), with: .color(color))
+                    y += spacing
+                    iy += 1
+                }
+                x += spacing
+                ix += 1
+            }
+        }
+        .background(Theme.appBackground)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    // MARK: - Canvas Content (with viewport culling)
+
+    private var canvasContent: some View {
+        ZStack {
+            ForEach(visibleElements) { element in
+                CanvasElementView(element: element, canvas: canvas)
+            }
+        }
+        .scaleEffect(localZoom, anchor: .topLeading)
+        .offset(localPanOffset)
+    }
+
+    /// Only render elements whose screen-space rect intersects the viewport
+    private var visibleElements: [CanvasElement] {
+        guard viewportSize.width > 0 else { return canvas.elements }
+        let margin: CGFloat = 100  // render slightly outside viewport for smooth scrolling
+        let viewport = CGRect(
+            x: -margin, y: -margin,
+            width: viewportSize.width + margin * 2,
+            height: viewportSize.height + margin * 2
+        )
+        return canvas.elements.filter { el in
+            let screenRect = CGRect(
+                x: el.position.x * localZoom + localPanOffset.width,
+                y: el.position.y * localZoom + localPanOffset.height,
+                width: el.size.width * localZoom,
+                height: el.size.height * localZoom
+            )
+            return viewport.intersects(screenRect)
+        }
+    }
+
+    // MARK: - Context Menu
+
+    @ViewBuilder
+    private func canvasContextMenu(at position: CGPoint) -> some View {
+        // Agents
+        Menu("Add Agent") {
+            ForEach(AgentMode.allCases) { agent in
+                Button {
+                    canvas.addTerminalTile(agent: agent, at: position)
+                } label: {
+                    Label(agent.displayName, systemImage: agent.iconName)
+                }
+            }
+        }
+
+        Button {
+            let name = "plan-notes-\(UUID().uuidString.prefix(4)).md"
+            let path = (canvas.worktreePath as NSString).appendingPathComponent(name)
+            if !FileManager.default.fileExists(atPath: path) {
+                FileManager.default.createFile(atPath: path, contents: nil)
+            }
+            canvas.addTile(type: .document(path: path), at: position)
+        } label: {
+            Label("Add Document", systemImage: "doc.text")
+        }
+
+        Button {
+            canvas.addTile(
+                type: .browser(url: URL(string: "https://google.com")),
+                at: position
+            )
+        } label: {
+            Label("Add Browser", systemImage: "globe")
+        }
+
+        Divider()
+
+        Menu("Add Frame") {
+            Button("Horizontal") {
+                canvas.addFrame(at: position, axis: .horizontal)
+            }
+            Button("Vertical") {
+                canvas.addFrame(at: position, axis: .vertical)
+            }
+        }
+
+        Button {
+            canvas.addText(at: position)
+        } label: {
+            Label("Add Text", systemImage: "textformat")
+        }
+    }
+
+    // MARK: - HUD Overlay
+
+    private var hudOverlay: some View {
+        VStack {
+            Spacer()
+            HStack {
+                // Zoom indicator
+                Text("\(Int(localZoom * 100))%")
+                    .font(Theme.mono(11))
+                    .foregroundColor(Theme.textMuted)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Theme.surface2.opacity(0.8))
+                    )
+                    .padding(12)
+
+                Spacer()
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    // MARK: - Empty Canvas
+
+    private var emptyCanvas: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "rectangle.split.2x2")
+                .font(.system(size: 32, weight: .thin))
+                .foregroundColor(Theme.textMuted)
+            Text("Plan your work")
+                .font(Theme.headline(18))
+                .foregroundColor(Theme.textPrimary)
+            Text("Right-click to add tiles, frames, and text")
+                .font(Theme.body(13))
+                .foregroundColor(Theme.textMuted)
+        }
+    }
+
+    // MARK: - Gestures
+
+    private var canvasZoomGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                let newZoom = (lastZoom * value.magnification).clamped(to: 0.1...3.0)
+                if let anchor = mousePosition {
+                    zoomAtLocal(newZoom: newZoom, screenAnchor: anchor)
+                } else {
+                    localZoom = newZoom
+                }
+            }
+            .onEnded { _ in
+                lastZoom = localZoom
+                commitViewportToCanvas()
+            }
+    }
+
+    // MARK: - Drag and Drop (files)
+
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        for provider in providers {
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { data, _ in
+                    guard let data = data as? Data,
+                          let url = URL(dataRepresentation: data, relativeTo: nil),
+                          url.isFileURL else { return }
+
+                    let ext = url.pathExtension.lowercased()
+                    let imageExts = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tiff"]
+
+                    Task { @MainActor in
+                        let position = canvas.nextFreePosition()
+                        if imageExts.contains(ext) {
+                            canvas.addTile(type: .image(path: url.path), at: position)
+                        } else if ext == "md" || ext == "txt" {
+                            canvas.addTile(type: .document(path: url.path), at: position)
+                        }
+                    }
+                }
+                return true
+            }
+        }
+        return false
+    }
+}

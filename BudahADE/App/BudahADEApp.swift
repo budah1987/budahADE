@@ -42,6 +42,21 @@ struct BudahADEApp: App {
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
 
+                Button("Toggle Plan/Build") {
+                    NotificationCenter.default.post(name: .toggleTaskMode, object: nil)
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                Button("Reset Zoom") {
+                    NotificationCenter.default.post(name: .canvasResetZoom, object: nil)
+                }
+                .keyboardShortcut("0", modifiers: .command)
+
+                Button("Zoom to Fit") {
+                    NotificationCenter.default.post(name: .canvasZoomToFit, object: nil)
+                }
+                .keyboardShortcut("0", modifiers: [.command, .shift])
+
                 Divider()
 
                 Button("Switch Workspace") {
@@ -200,4 +215,7 @@ extension Notification.Name {
     static let selectTaskByIndex = Notification.Name("budahADE.selectTaskByIndex")
     static let renameTab = Notification.Name("budahADE.renameTab")
     static let renameTask = Notification.Name("budahADE.renameTask")
+    static let toggleTaskMode = Notification.Name("budahADE.toggleTaskMode")
+    static let canvasResetZoom = Notification.Name("budahADE.canvasResetZoom")
+    static let canvasZoomToFit = Notification.Name("budahADE.canvasZoomToFit")
 }

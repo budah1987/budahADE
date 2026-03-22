@@ -33,7 +33,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
 
     // Forward individual TaskState changes → WorkspaceState.objectWillChange
     // so WorkspaceView re-renders when tabs/terminals change inside a task.
-    private var taskCancellables: [UUID: AnyCancellable] = [:]
+    private var taskCancellables: [UUID: [AnyCancellable]] = [:]
 
     init(projectPath: String) {
         self.projectPath = projectPath
@@ -58,8 +58,16 @@ final class WorkspaceState: ObservableObject, Identifiable {
         )
 
         // Forward task's published changes → workspace so WorkspaceView re-renders
-        taskCancellables[task.id] = task.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
+        var cancellables: [AnyCancellable] = []
+        cancellables.append(
+            task.objectWillChange
+                .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+        )
+        cancellables.append(
+            task.specState.objectWillChange
+                .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+        )
+        taskCancellables[task.id] = cancellables
 
         tasks.append(task)
         activeTaskId = task.id

@@ -43,6 +43,26 @@
 		EB4A4870B0D12CBF87A327B5 /* KeyboardShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A03D062065CF15E980ECF4E6 /* KeyboardShortcuts.swift */; };
 		F91DAF8940F0D4B0F909E8A9 /* WorkspaceState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B054982DD13BCE9E13925DB /* WorkspaceState.swift */; };
 		FE6D6A8982F8B628F071221B /* ChangesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4375DBB766AE4C741845F57 /* ChangesPanel.swift */; };
+		AA01000100010001AA010001 /* TileType.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB01000100010001BB010001 /* TileType.swift */; };
+		AA02000200020002AA020002 /* CanvasNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB02000200020002BB020002 /* CanvasNode.swift */; };
+		AA03000300030003AA030003 /* AgentPrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB03000300030003BB030003 /* AgentPrompts.swift */; };
+		AA04000400040004AA040004 /* ContextManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB04000400040004BB040004 /* ContextManifest.swift */; };
+		AA05000500050005AA050005 /* PlanCanvasState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB05000500050005BB050005 /* PlanCanvasState.swift */; };
+		AA06000600060006AA060006 /* AddTileMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB06000600060006BB060006 /* AddTileMenu.swift */; };
+		AA07000700070007AA070007 /* PlanCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB07000700070007BB070007 /* PlanCanvasView.swift */; };
+		AA08000800080008AA080008 /* TileChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB08000800080008BB080008 /* TileChrome.swift */; };
+		AA09000900090009AA090009 /* TerminalTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB09000900090009BB090009 /* TerminalTileView.swift */; };
+		AA0A000A000A000AAA0A000A /* DocumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0A000A000A000ABB0A000A /* DocumentTileView.swift */; };
+		AA0B000B000B000BAA0B000B /* ImageTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0B000B000B000BBB0B000B /* ImageTileView.swift */; };
+		AA0C000C000C000CAA0C000C /* BrowserTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0C000C000C000CBB0C000C /* BrowserTileView.swift */; };
+		AA0D000D000D000DAA0D000D /* SpecParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0D000D000D000DBB0D000D /* SpecParser.swift */; };
+		AA0E000E000E000EAA0E000E /* SpecState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0E000E000E000EBB0E000E /* SpecState.swift */; };
+		AA0F000F000F000FAA0F000F /* SpecWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0F000F000F000FBB0F000F /* SpecWatcher.swift */; };
+		AA10001000100010AA100010 /* SpecStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB10001000100010BB100010 /* SpecStripView.swift */; };
+		AA11001100110011AA110011 /* ScrollWheelMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11001100110011BB110011 /* ScrollWheelMonitor.swift */; };
+		AA12001200120012AA120012 /* SmartGuides.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB12001200120012BB120012 /* SmartGuides.swift */; };
+		AA13001300130013AA130013 /* CanvasElementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB13001300130013BB130013 /* CanvasElementView.swift */; };
+		AA14001400140014AA140014 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB14001400140014BB140014 /* RichTextEditor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,9 +104,71 @@
 		CDDE6DF907D1800819FC9F49 /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
 		E0BB662F1E68870408AB79C0 /* StagingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StagingView.swift; sourceTree = "<group>"; };
 		FD6E9C66553BA0289C0B3306 /* GhosttyAppManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyAppManager.swift; sourceTree = "<group>"; };
+		BB01000100010001BB010001 /* TileType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileType.swift; sourceTree = "<group>"; };
+		BB02000200020002BB020002 /* CanvasNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNode.swift; sourceTree = "<group>"; };
+		BB03000300030003BB030003 /* AgentPrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPrompts.swift; sourceTree = "<group>"; };
+		BB04000400040004BB040004 /* ContextManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextManifest.swift; sourceTree = "<group>"; };
+		BB05000500050005BB050005 /* PlanCanvasState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCanvasState.swift; sourceTree = "<group>"; };
+		BB06000600060006BB060006 /* AddTileMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTileMenu.swift; sourceTree = "<group>"; };
+		BB07000700070007BB070007 /* PlanCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCanvasView.swift; sourceTree = "<group>"; };
+		BB08000800080008BB080008 /* TileChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileChrome.swift; sourceTree = "<group>"; };
+		BB09000900090009BB090009 /* TerminalTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTileView.swift; sourceTree = "<group>"; };
+		BB0A000A000A000ABB0A000A /* DocumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTileView.swift; sourceTree = "<group>"; };
+		BB0B000B000B000BBB0B000B /* ImageTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageTileView.swift; sourceTree = "<group>"; };
+		BB0C000C000C000CBB0C000C /* BrowserTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTileView.swift; sourceTree = "<group>"; };
+		BB0D000D000D000DBB0D000D /* SpecParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecParser.swift; sourceTree = "<group>"; };
+		BB0E000E000E000EBB0E000E /* SpecState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecState.swift; sourceTree = "<group>"; };
+		BB0F000F000F000FBB0F000F /* SpecWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecWatcher.swift; sourceTree = "<group>"; };
+		BB10001000100010BB100010 /* SpecStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecStripView.swift; sourceTree = "<group>"; };
+		BB11001100110011BB110011 /* ScrollWheelMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollWheelMonitor.swift; sourceTree = "<group>"; };
+		BB12001200120012BB120012 /* SmartGuides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartGuides.swift; sourceTree = "<group>"; };
+		BB13001300130013BB130013 /* CanvasElementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasElementView.swift; sourceTree = "<group>"; };
+		BB14001400140014BB140014 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		CC01000100010001CC010001 /* Plan */ = {
+			isa = PBXGroup;
+			children = (
+				BB06000600060006BB060006 /* AddTileMenu.swift */,
+				BB03000300030003BB030003 /* AgentPrompts.swift */,
+				BB13001300130013BB130013 /* CanvasElementView.swift */,
+				BB02000200020002BB020002 /* CanvasNode.swift */,
+				BB04000400040004BB040004 /* ContextManifest.swift */,
+				BB05000500050005BB050005 /* PlanCanvasState.swift */,
+				BB07000700070007BB070007 /* PlanCanvasView.swift */,
+				BB11001100110011BB110011 /* ScrollWheelMonitor.swift */,
+				BB12001200120012BB120012 /* SmartGuides.swift */,
+				BB01000100010001BB010001 /* TileType.swift */,
+				CC02000200020002CC020002 /* TileViews */,
+			);
+			path = Plan;
+			sourceTree = "<group>";
+		};
+		CC02000200020002CC020002 /* TileViews */ = {
+			isa = PBXGroup;
+			children = (
+				BB0C000C000C000CBB0C000C /* BrowserTileView.swift */,
+				BB0A000A000A000ABB0A000A /* DocumentTileView.swift */,
+				BB0B000B000B000BBB0B000B /* ImageTileView.swift */,
+				BB14001400140014BB140014 /* RichTextEditor.swift */,
+				BB09000900090009BB090009 /* TerminalTileView.swift */,
+				BB08000800080008BB080008 /* TileChrome.swift */,
+			);
+			path = TileViews;
+			sourceTree = "<group>";
+		};
+		CC03000300030003CC030003 /* Spec */ = {
+			isa = PBXGroup;
+			children = (
+				BB0D000D000D000DBB0D000D /* SpecParser.swift */,
+				BB0E000E000E000EBB0E000E /* SpecState.swift */,
+				BB10001000100010BB100010 /* SpecStripView.swift */,
+				BB0F000F000F000FBB0F000F /* SpecWatcher.swift */,
+			);
+			path = Spec;
+			sourceTree = "<group>";
+		};
 		0C5BF4053C52D9AFBDC72641 /* FileTree */ = {
 			isa = PBXGroup;
 			children = (
@@ -128,8 +210,10 @@
 				E8E5D1300C56FE92CCBFEFAC /* App */,
 				0C5BF4053C52D9AFBDC72641 /* FileTree */,
 				848F1E30DE3DA85ED0FE9D31 /* GitPanel */,
+				CC01000100010001CC010001 /* Plan */,
 				3B8AD3E2C1A5E13CE0FC58D3 /* ProjectPicker */,
 				B41BC2537EB0E2BA710AD4D6 /* Shared */,
+				CC03000300030003CC030003 /* Spec */,
 				FC2E59EAD66DC31D809B0A9B /* Task */,
 				0E59370B0063B24FE5D6F67F /* Terminal */,
 				8C74E17EB9C2654E7B00D312 /* Workspace */,
@@ -305,6 +389,26 @@
 				B42AE7BA6B493E509D9C97AB /* WorkspaceDropdown.swift in Sources */,
 				F91DAF8940F0D4B0F909E8A9 /* WorkspaceState.swift in Sources */,
 				621C5643294FD063C2D34DC0 /* WorkspaceView.swift in Sources */,
+				AA01000100010001AA010001 /* TileType.swift in Sources */,
+				AA02000200020002AA020002 /* CanvasNode.swift in Sources */,
+				AA03000300030003AA030003 /* AgentPrompts.swift in Sources */,
+				AA04000400040004AA040004 /* ContextManifest.swift in Sources */,
+				AA05000500050005AA050005 /* PlanCanvasState.swift in Sources */,
+				AA06000600060006AA060006 /* AddTileMenu.swift in Sources */,
+				AA07000700070007AA070007 /* PlanCanvasView.swift in Sources */,
+				AA08000800080008AA080008 /* TileChrome.swift in Sources */,
+				AA09000900090009AA090009 /* TerminalTileView.swift in Sources */,
+				AA0A000A000A000AAA0A000A /* DocumentTileView.swift in Sources */,
+				AA0B000B000B000BAA0B000B /* ImageTileView.swift in Sources */,
+				AA0C000C000C000CAA0C000C /* BrowserTileView.swift in Sources */,
+				AA0D000D000D000DAA0D000D /* SpecParser.swift in Sources */,
+				AA0E000E000E000EAA0E000E /* SpecState.swift in Sources */,
+				AA0F000F000F000FAA0F000F /* SpecWatcher.swift in Sources */,
+				AA10001000100010AA100010 /* SpecStripView.swift in Sources */,
+				AA11001100110011AA110011 /* ScrollWheelMonitor.swift in Sources */,
+				AA12001200120012AA120012 /* SmartGuides.swift in Sources */,
+				AA13001300130013AA130013 /* CanvasElementView.swift in Sources */,
+				AA14001400140014AA140014 /* RichTextEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -14,33 +14,40 @@ struct WorkspaceView: View {
             Theme.appBackground.ignoresSafeArea()
 
             HStack(spacing: 0) {
-                // ── SIDEBAR ZONE ──
-                HStack(spacing: 0) {
-                    TaskRailView(workspace: state, renameTarget: renameTarget)
+                // ── TASK RAIL ──
+                TaskRailView(workspace: state, renameTarget: renameTarget)
+                    .background(Theme.sidebar)
 
-                    if state.leftPanelVisible {
-                        // Vertical divider between rail and panel
-                        Rectangle()
-                            .fill(Theme.borderSubtle)
-                            .frame(width: 1)
-
-                        LeftPanelView(
-                            state: state,
-                            worktreePath: state.activeTask?.worktreePath ?? state.projectPath
-                        )
-                        .id(state.activeTaskId)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                    }
-                }
-                .background(Theme.sidebar)
-
-                // Sidebar right edge divider
                 Rectangle()
                     .fill(Theme.border)
                     .frame(width: 1)
 
                 // ── CONTENT ZONE ──
-                terminalArea
+                if let task = state.activeTask, task.mode == .plan,
+                   let canvas = task.planCanvas {
+                    // Plan mode: full-width canvas
+                    PlanCanvasView(canvas: canvas)
+                        .clipped()
+                } else {
+                    // Build mode: existing layout
+                    HStack(spacing: 0) {
+                        if state.leftPanelVisible {
+                            LeftPanelView(
+                                state: state,
+                                worktreePath: state.activeTask?.worktreePath ?? state.projectPath
+                            )
+                            .id(state.activeTaskId)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                            .background(Theme.sidebar)
+
+                            Rectangle()
+                                .fill(Theme.border)
+                                .frame(width: 1)
+                        }
+
+                        terminalArea
+                    }
+                }
             }
             .blur(radius: renameTarget != nil ? 2 : 0)
             .animation(.easeOut(duration: 0.15), value: renameTarget != nil)
@@ -86,6 +93,12 @@ struct WorkspaceView: View {
                   let tab = task.tabs.first(where: { $0.id == tabId }) else { return }
             renameText = tab.title
             renameTarget = .tab(taskId: task.id, tabId: tabId)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleTaskMode)) { _ in
+            if let task = state.activeTask {
+                if task.mode == .plan { task.enterBuildMode() }
+                else { task.enterPlanMode() }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .renameTask)) { _ in
             guard let task = state.activeTask else { return }

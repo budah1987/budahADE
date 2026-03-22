@@ -1,13 +1,13 @@
 import SwiftUI
 
 /// SwiftUI wrapper for the Ghostty terminal surface.
+/// Reuses the persistent NSView from TerminalPanel so reparenting
+/// (e.g. dragging into a frame) doesn't destroy the Ghostty Metal surface.
 struct TerminalPanelView: NSViewRepresentable {
     let panel: TerminalPanel
 
     func makeNSView(context: Context) -> TerminalSurfaceView {
-        let view = TerminalSurfaceView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
-        view.terminalSurface = panel.surface
-        return view
+        panel.surfaceView
     }
 
     func updateNSView(_ nsView: TerminalSurfaceView, context: Context) {

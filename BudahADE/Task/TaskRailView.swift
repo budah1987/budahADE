@@ -14,6 +14,22 @@ struct TaskRailView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 6)
 
+            // Plan/Build toggle
+            if let task = workspace.activeTask {
+                PlanBuildToggle(mode: Binding(
+                    get: { task.mode },
+                    set: { newMode in
+                        if newMode == .plan { task.enterPlanMode() }
+                        else { task.enterBuildMode() }
+                    }
+                ))
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
+
+                // Spec progress strip
+                SpecStripView(specState: task.specState)
+            }
+
             // Section header
             HStack(alignment: .firstTextBaseline) {
                 Text("Tasks")
@@ -259,5 +275,40 @@ private struct TaskCardView: View {
         case .working:   return "working"
         case .completed: return "done"
         }
+    }
+}
+
+// MARK: - Plan/Build Toggle
+
+struct PlanBuildToggle: View {
+    @Binding var mode: TaskMode
+
+    var body: some View {
+        HStack(spacing: 0) {
+            toggleButton("Plan", isActive: mode == .plan) { mode = .plan }
+            toggleButton("Build", isActive: mode == .build) { mode = .build }
+        }
+        .padding(2)
+        .background(Theme.surface2)
+        .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Theme.borderSubtle, lineWidth: 0.5)
+        )
+    }
+
+    private func toggleButton(_ label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(Theme.label(11))
+                .foregroundColor(isActive ? Theme.textPrimary : Theme.textMuted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(isActive ? Color.white.opacity(0.08) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
     }
 }

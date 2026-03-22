@@ -5,6 +5,7 @@ struct NewTaskSheet: View {
     @State private var taskName: String = ""
     @State private var branchName: String = ""
     @State private var baseBranch: String = "main"
+    @State private var startWithPlan: Bool = false
     @State private var isCreating: Bool = false
     @FocusState private var focusedField: Field?
 
@@ -81,7 +82,7 @@ struct NewTaskSheet: View {
                         .onSubmit { if isValid { createTask() } }
                 }
 
-                // Base branch
+                // Base branch + plan toggle
                 HStack {
                     Text("Based on")
                         .font(Theme.caption(11))
@@ -92,6 +93,15 @@ struct NewTaskSheet: View {
                         .font(Theme.mono(11))
                         .foregroundColor(Theme.textSecondary)
                         .frame(maxWidth: 80)
+
+                    Spacer()
+
+                    Toggle(isOn: $startWithPlan) {
+                        Text("Start with a plan")
+                            .font(Theme.caption(11))
+                            .foregroundColor(Theme.textMuted)
+                    }
+                    .toggleStyle(.checkbox)
                 }
             }
             .padding(.horizontal, 24)
@@ -151,6 +161,9 @@ struct NewTaskSheet: View {
         let name = taskName.trimmingCharacters(in: .whitespaces)
         let branch = branchName.trimmingCharacters(in: .whitespaces)
         workspace.createTask(name: name, branchName: branch, baseBranch: baseBranch)
+        if startWithPlan, let task = workspace.activeTask {
+            task.enterPlanMode()
+        }
         workspace.showNewTaskSheet = false
     }
 

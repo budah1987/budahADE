@@ -1,6 +1,13 @@
 import Foundation
 import Combine
 
+// MARK: - Task Mode
+
+enum TaskMode: String {
+    case plan
+    case build
+}
+
 // MARK: - Task Status
 
 enum TaskStatus {
@@ -18,9 +25,13 @@ final class TaskState: ObservableObject, Identifiable {
     let worktreePath: String
     let repoPath: String
     @Published var status: TaskStatus = .active
+    @Published var mode: TaskMode = .build
     @Published var tabs: [TabInfo] = []
     @Published var selectedTabId: UUID?
     @Published var terminals: [UUID: TerminalPanel] = [:]
+    @Published var planCanvas: PlanCanvasState?
+    let specState = SpecState()
+    private var specWatcher: SpecWatcher?
     let createdAt: Date = Date()
 
     /// Formatted elapsed time since task creation
@@ -72,6 +83,28 @@ final class TaskState: ObservableObject, Identifiable {
         createTab()
         autoLaunchClaude()
         observeTitleChanges()
+
+        // Start spec watcher
+        specWatcher = SpecWatcher(worktreePath: worktreePath, specState: specState)
+        specWatcher?.startWatching()
+    }
+
+    // MARK: - Plan/Build Mode
+
+    func enterPlanMode() {
+        if planCanvas == nil {
+            planCanvas = PlanCanvasState(
+                worktreePath: worktreePath,
+                taskName: name,
+                branchName: branchName
+            )
+        }
+        mode = .plan
+    }
+
+    func enterBuildMode() {
+        mode = .build
+        focusActiveTerminal()
     }
 
     // MARK: - Tab Management
@@ -149,6 +182,8 @@ final class TaskState: ObservableObject, Identifiable {
         terminals.removeAll()
         tabs.removeAll()
         selectedTabId = nil
+        specWatcher?.stopWatching()
+        planCanvas?.closeAll()
     }
 
     // MARK: - Private
