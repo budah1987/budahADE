@@ -5,6 +5,7 @@ struct NewTaskSheet: View {
     @State private var taskName: String = ""
     @State private var branchName: String = ""
     @State private var baseBranch: String = "main"
+    @State private var availableBranches: [String] = ["main"]
     @State private var startWithPlan: Bool = false
     @State private var isCreating: Bool = false
     @FocusState private var focusedField: Field?
@@ -88,11 +89,24 @@ struct NewTaskSheet: View {
                         .font(Theme.caption(11))
                         .foregroundColor(Theme.textMuted)
 
-                    TextField("main", text: $baseBranch)
-                        .textFieldStyle(.plain)
-                        .font(Theme.mono(11))
-                        .foregroundColor(Theme.textSecondary)
-                        .frame(maxWidth: 80)
+                    Menu {
+                        ForEach(availableBranches, id: \.self) { branch in
+                            Button(branch) {
+                                baseBranch = branch
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(baseBranch)
+                                .font(Theme.mono(11))
+                                .foregroundColor(Theme.textSecondary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 8))
+                                .foregroundColor(Theme.textMuted)
+                        }
+                    }
+                    .menuStyle(.borderlessButton)
+                    .frame(maxWidth: 120)
 
                     Spacer()
 
@@ -150,6 +164,13 @@ struct NewTaskSheet: View {
         .cornerRadius(14)
         .onAppear {
             focusedField = .name
+            Task {
+                let branches = await GitRepository.listBranches(at: workspace.projectPath)
+                availableBranches = branches.isEmpty ? ["main"] : branches
+                if !availableBranches.contains(baseBranch) {
+                    baseBranch = availableBranches.first ?? "main"
+                }
+            }
         }
     }
 
