@@ -41,6 +41,8 @@ struct MarkdownTileView: View {
                             }
                         }
                     }
+                    .background(Color.clear.contentShape(Rectangle()))
+                    .onTapGesture { commitCurrentEdit() }
                 }
 
                 Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
@@ -120,6 +122,12 @@ struct MarkdownTileView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(Theme.surface2.opacity(0.5))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if editingSectionId != nil && editingSectionId != section.id {
+                    commitCurrentEdit()
+                }
+            }
 
             // Section content: edit mode or display mode
             if editingSectionId == section.id {
@@ -189,29 +197,49 @@ struct MarkdownTileView: View {
     // MARK: - Editing
 
     private func startEditing(_ section: MarkdownSection) {
+        if editingSectionId != nil {
+            commitCurrentEdit()
+        }
         editingSectionId = section.id
         editContent = section.body
+    }
+
+    private func commitCurrentEdit() {
+        guard let editingId = editingSectionId,
+              let section = sections.first(where: { $0.id == editingId }) else { return }
+        commitEdit(section)
     }
 
     private func commitEdit(_ section: MarkdownSection) {
         guard editingSectionId == section.id else { return }
         editingSectionId = nil
 
-        // Read file, replace section lines, write back
-        guard let _ = try? String(contentsOfFile: path, encoding: .utf8) else { return }
-        var lines = (try? String(contentsOfFile: path, encoding: .utf8))!
-            .components(separatedBy: .newlines)
-        let range = section.lineRange
-        guard range.lowerBound < lines.count else { return }
+        // Read file fresh — don't rely on stale lineRange
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return }
+        var lines = content.components(separatedBy: .newlines)
 
-        // Replace lines after the heading (keep the ## heading line)
-        let headingLine = lines[range.lowerBound]
+        // Find the heading line in the current file content
+        guard let headingIdx = lines.firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces) == "## \(section.heading)"
+        }) else { return }
+
+        // Find the end of this section (next ## heading or EOF)
+        var endIdx = lines.count
+        for i in (headingIdx + 1)..<lines.count {
+            let trimmed = lines[i].trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("## ") && !trimmed.hasPrefix("### ") {
+                endIdx = i
+                break
+            }
+        }
+
+        // Replace: keep heading line, replace body
+        let headingLine = lines[headingIdx]
         let newLines = [headingLine] + editContent.components(separatedBy: .newlines)
-        let upperBound = min(range.upperBound, lines.count)
-        lines.replaceSubrange(range.lowerBound..<upperBound, with: newLines)
+        lines.replaceSubrange(headingIdx..<endIdx, with: newLines)
 
-        let content = lines.joined(separator: "\n")
-        try? content.write(toFile: path, atomically: true, encoding: .utf8)
+        let newContent = lines.joined(separator: "\n")
+        try? newContent.write(toFile: path, atomically: true, encoding: .utf8)
         reload()
     }
 
@@ -268,7 +296,11 @@ struct MarkdownTileView: View {
 
     private func startPolling() {
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            Task { @MainActor in reload() }
+            Task { @MainActor in
+                // Don't reload while user is editing — would clobber editing state
+                guard editingSectionId == nil else { return }
+                reload()
+            }
         }
     }
 
