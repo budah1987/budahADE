@@ -71,6 +71,11 @@
 		AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB19001900190019BB190019 /* SpecDocumentTileView.swift */; };
 		TE01000100010001TE010001 /* SpecParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01000100010001TF010001 /* SpecParserTests.swift */; };
 		TE02000200020002TE020002 /* CanvasNodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02000200020002TF020003 /* CanvasNodeTests.swift */; };
+		AA1A001A001A001AAA1A001A /* TileResizeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1A001A001A001ABB1A001A /* TileResizeHandler.swift */; };
+		AA1B001B001B001BAA1B001B /* FrameContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1B001B001B001BBB1B001B /* FrameContainerView.swift */; };
+		AA1C001C001C001CAA1C001C /* TileDragHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1C001C001C001CBB1C001C /* TileDragHandler.swift */; };
+		AA1D001D001D001DAA1D001D /* TileSelectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1D001D001D001DBB1D001D /* TileSelectionManager.swift */; };
+		AA1E001E001E001EAA1E001E /* TextContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1E001E001E001EBB1E001E /* TextContentView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -138,6 +143,11 @@
 		BB17001700170017BB170017 /* BuildStatusState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusState.swift; sourceTree = "<group>"; };
 		BB18001800180018BB180018 /* BuildStatusWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusWatcher.swift; sourceTree = "<group>"; };
 		BB19001900190019BB190019 /* SpecDocumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecDocumentTileView.swift; sourceTree = "<group>"; };
+		BB1A001A001A001ABB1A001A /* TileResizeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileResizeHandler.swift; sourceTree = "<group>"; };
+		BB1B001B001B001BBB1B001B /* FrameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameContainerView.swift; sourceTree = "<group>"; };
+		BB1C001C001C001CBB1C001C /* TileDragHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDragHandler.swift; sourceTree = "<group>"; };
+		BB1D001D001D001DBB1D001D /* TileSelectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileSelectionManager.swift; sourceTree = "<group>"; };
+		BB1E001E001E001EBB1E001E /* TextContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextContentView.swift; sourceTree = "<group>"; };
 		TF01000100010001TF010001 /* SpecParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecParserTests.swift; sourceTree = "<group>"; };
 		TF02000200020002TF020003 /* CanvasNodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNodeTests.swift; sourceTree = "<group>"; };
 		TF02000200020002TF020002 /* BudahADETests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudahADETests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -152,10 +162,14 @@
 				BB13001300130013BB130013 /* CanvasElementView.swift */,
 				BB02000200020002BB020002 /* CanvasNode.swift */,
 				BB04000400040004BB040004 /* ContextManifest.swift */,
+				BB1B001B001B001BBB1B001B /* FrameContainerView.swift */,
 				BB05000500050005BB050005 /* PlanCanvasState.swift */,
 				BB07000700070007BB070007 /* PlanCanvasView.swift */,
 				BB11001100110011BB110011 /* ScrollWheelMonitor.swift */,
 				BB12001200120012BB120012 /* SmartGuides.swift */,
+				BB1C001C001C001CBB1C001C /* TileDragHandler.swift */,
+				BB1A001A001A001ABB1A001A /* TileResizeHandler.swift */,
+				BB1D001D001D001DBB1D001D /* TileSelectionManager.swift */,
 				BB01000100010001BB010001 /* TileType.swift */,
 				CC02000200020002CC020002 /* TileViews */,
 			);
@@ -170,6 +184,7 @@
 				BB0B000B000B000BBB0B000B /* ImageTileView.swift */,
 				BB14001400140014BB140014 /* RichTextEditor.swift */,
 				BB19001900190019BB190019 /* SpecDocumentTileView.swift */,
+				BB1E001E001E001EBB1E001E /* TextContentView.swift */,
 				BB09000900090009BB090009 /* TerminalTileView.swift */,
 				BB08000800080008BB080008 /* TileChrome.swift */,
 			);
@@ -484,6 +499,11 @@
 				AA17001700170017AA170017 /* BuildStatusState.swift in Sources */,
 				AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */,
 				AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */,
+				AA1A001A001A001AAA1A001A /* TileResizeHandler.swift in Sources */,
+				AA1B001B001B001BAA1B001B /* FrameContainerView.swift in Sources */,
+				AA1C001C001C001CAA1C001C /* TileDragHandler.swift in Sources */,
+				AA1D001D001D001DAA1D001D /* TileSelectionManager.swift in Sources */,
+				AA1E001E001E001EAA1E001E /* TextContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
