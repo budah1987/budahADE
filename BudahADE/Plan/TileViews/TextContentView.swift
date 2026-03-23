@@ -155,6 +155,7 @@ struct TextStyleToolbar: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+        .fixedSize()  // Escape parent frame constraints — toolbar must not scrunch
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(Theme.surface2)

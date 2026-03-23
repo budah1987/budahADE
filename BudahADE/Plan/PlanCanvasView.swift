@@ -105,13 +105,6 @@ struct PlanCanvasView: View {
             .contextMenu {
                 canvasContextMenu(at: contextMenuPosition)
             }
-            .onTapGesture(count: 2) {
-                if let mouse = mousePosition {
-                    let canvasPos = screenToCanvasLocal(mouse)
-                    let snapped = GridSnap.snapPoint(canvasPos)
-                    canvas.addTerminalTile(agent: .claude, at: snapped)
-                }
-            }
             .onTapGesture {
                 canvas.selectedId = nil
             }
