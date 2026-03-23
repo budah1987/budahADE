@@ -4,6 +4,7 @@ import Carbon.HIToolbox
 enum KeyboardShortcuts {
     // Panel management
     static let toggleLeftPanel = KeyShortcut(.b, modifiers: .command)
+    static let toggleRightPanel = KeyShortcut(.g, modifiers: [.command, .shift])
     static let splitRight = KeyShortcut(.d, modifiers: .command)
     static let splitDown = KeyShortcut(.d, modifiers: [.command, .shift])
 
@@ -41,7 +42,7 @@ struct KeyShortcut {
 }
 
 enum KeyEquivalent {
-    case b, d, n, t, w, o, m
+    case b, d, g, n, t, w, o, m
     case upArrow, downArrow, leftArrow, rightArrow
     case rightBracket, leftBracket
 }

@@ -5,9 +5,7 @@ import Combine
 
 enum LeftPanelTab: String, CaseIterable {
     case files
-    case changes
     case spec
-    case agents
 }
 
 // MARK: - Workspace State
@@ -17,6 +15,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
     let id = UUID()
     @Published var projectPath: String
     @Published var leftPanelVisible: Bool = true
+    @Published var rightPanelVisible: Bool = false
     @Published var activeLeftTab: LeftPanelTab = .files
     @Published var tasks: [TaskState] = []
     @Published var activeTaskId: UUID?
@@ -54,6 +53,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
         let task = TaskState(
             name: name,
             branchName: branchName,
+            baseBranch: baseBranch,
             worktreePath: worktreePath,
             repoPath: projectPath
         )
@@ -73,7 +73,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
         tasks.append(task)
         activeTaskId = task.id
 
-        // Create worktree in background
+        // Create worktree, then start terminal once directory is ready
         Task {
             do {
                 try await GitWorktreeManager.createWorktree(
@@ -82,9 +82,10 @@ final class WorkspaceState: ObservableObject, Identifiable {
                     baseBranch: baseBranch
                 )
             } catch {
-                // Worktree creation failed — task still works from repo root
                 print("Worktree creation failed: \(error.localizedDescription)")
             }
+            // Start terminal even if worktree failed — falls back to worktreePath
+            task.startTerminal()
         }
     }
 

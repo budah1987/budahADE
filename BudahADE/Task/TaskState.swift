@@ -22,6 +22,7 @@ final class TaskState: ObservableObject, Identifiable {
     let id: UUID
     @Published var name: String
     @Published var branchName: String
+    let baseBranch: String
     let worktreePath: String
     let repoPath: String
     @Published var status: TaskStatus = .active
@@ -73,21 +74,25 @@ final class TaskState: ObservableObject, Identifiable {
         id: UUID = UUID(),
         name: String,
         branchName: String,
+        baseBranch: String = "main",
         worktreePath: String,
         repoPath: String
     ) {
         self.id = id
         self.name = name
         self.branchName = branchName
+        self.baseBranch = baseBranch
         self.worktreePath = worktreePath
         self.repoPath = repoPath
 
-        // Create first terminal in the worktree
+        observeTitleChanges()
+    }
+
+    /// Call after the worktree directory is ready on disk.
+    func startTerminal() {
+        guard tabs.isEmpty else { return } // Already started
         createTab()
         autoLaunchClaude()
-        observeTitleChanges()
-
-        // Start spec watcher
         specWatcher = SpecWatcher(worktreePath: worktreePath, specState: specState)
         specWatcher?.startWatching()
     }

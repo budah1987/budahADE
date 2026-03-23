@@ -1,5 +1,8 @@
 import Foundation
 import Combine
+import AppKit
+
+// MARK: - Models
 
 struct GitFileStatus: Identifiable {
     let id = UUID()
@@ -14,6 +17,22 @@ struct GitCommit: Identifiable {
     let date: String
 }
 
+enum GitError: Error, LocalizedError {
+    case commandFailed(String)
+    case noRemote
+    case mergeConflict
+
+    var errorDescription: String? {
+        switch self {
+        case .commandFailed(let msg): return msg
+        case .noRemote: return "No remote configured"
+        case .mergeConflict: return "Merge conflict — resolve in terminal"
+        }
+    }
+}
+
+// MARK: - Git Repository
+
 final class GitRepository: ObservableObject {
     let path: String
 
@@ -22,6 +41,8 @@ final class GitRepository: ObservableObject {
     @Published var stagedFiles: [GitFileStatus] = []
     @Published var unstagedFiles: [GitFileStatus] = []
     @Published var recentCommits: [GitCommit] = []
+    @Published var hasRemote: Bool = false
+    @Published var aheadCount: Int = 0
 
     private var pollTimer: Timer?
 
@@ -34,7 +55,7 @@ final class GitRepository: ObservableObject {
 
     func startPolling() {
         stopPolling()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
             self?.refresh()
         }
     }
@@ -50,6 +71,7 @@ final class GitRepository: ObservableObject {
         parseStatus()
         parseBranches()
         parseLog()
+        parseRemoteStatus()
     }
 
     // MARK: - Git Operations
@@ -91,6 +113,106 @@ final class GitRepository: ObservableObject {
         return runGit(args) ?? ""
     }
 
+    // MARK: - Push
+
+    func push() async throws {
+        let result = try await runGitAsync(["push", "-u", "origin", currentBranch])
+        if result.contains("error") || result.contains("fatal") {
+            throw GitError.commandFailed(result)
+        }
+        DispatchQueue.main.async { self.refresh() }
+    }
+
+    // MARK: - Merge
+
+    func mergeIntoBase(_ baseBranch: String) async throws {
+        // Switch to base branch
+        let checkoutResult = try await runGitAsync(["checkout", baseBranch])
+        if checkoutResult.contains("error") {
+            throw GitError.commandFailed(checkoutResult)
+        }
+
+        // Merge current branch
+        let branchToMerge = currentBranch
+        let mergeResult = try await runGitAsync(["merge", "--no-ff", branchToMerge])
+        if mergeResult.contains("CONFLICT") {
+            // Restore original branch before throwing
+            _ = try? await runGitAsync(["checkout", branchToMerge])
+            throw GitError.mergeConflict
+        }
+
+        // Switch back
+        _ = try? await runGitAsync(["checkout", branchToMerge])
+        DispatchQueue.main.async { self.refresh() }
+    }
+
+    // MARK: - Open PR in Browser
+
+    func openPullRequestURL(baseBranch: String) {
+        guard let remoteURL = runGit(["remote", "get-url", "origin"]) else { return }
+
+        // Convert SSH or HTTPS remote URL to GitHub web URL
+        let webURL: String
+        if remoteURL.hasPrefix("git@github.com:") {
+            let repoPath = remoteURL
+                .replacingOccurrences(of: "git@github.com:", with: "")
+                .replacingOccurrences(of: ".git", with: "")
+            webURL = "https://github.com/\(repoPath)"
+        } else if remoteURL.contains("github.com") {
+            webURL = remoteURL
+                .replacingOccurrences(of: ".git", with: "")
+        } else {
+            return // Not a GitHub remote
+        }
+
+        let compareURL = "\(webURL)/compare/\(baseBranch)...\(currentBranch)?expand=1"
+        if let url = URL(string: compareURL) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - Auto-generate Commit Message
+
+    func generateCommitMessage() -> String {
+        let added = stagedFiles.filter { $0.status == "A" || $0.status == "?" }
+        let modified = stagedFiles.filter { $0.status == "M" }
+        let deleted = stagedFiles.filter { $0.status == "D" }
+        let renamed = stagedFiles.filter { $0.status == "R" }
+
+        // If 3 or fewer total files, name them
+        let total = stagedFiles.count
+        if total == 0 { return "" }
+
+        if total <= 3 {
+            let names = stagedFiles.map { shortName($0.path) }
+            let verb: String
+            if !modified.isEmpty {
+                verb = "Update"
+            } else if !added.isEmpty {
+                verb = "Add"
+            } else if !deleted.isEmpty {
+                verb = "Remove"
+            } else {
+                verb = "Update"
+            }
+            return "\(verb) \(names.joined(separator: ", "))"
+        }
+
+        // More than 3 files: group by operation
+        var parts: [String] = []
+        if !added.isEmpty { parts.append("add \(added.count) file\(added.count == 1 ? "" : "s")") }
+        if !modified.isEmpty { parts.append("update \(modified.count) file\(modified.count == 1 ? "" : "s")") }
+        if !deleted.isEmpty { parts.append("remove \(deleted.count) file\(deleted.count == 1 ? "" : "s")") }
+        if !renamed.isEmpty { parts.append("rename \(renamed.count) file\(renamed.count == 1 ? "" : "s")") }
+
+        let message = parts.joined(separator: ", ")
+        return message.prefix(1).uppercased() + message.dropFirst()
+    }
+
+    private func shortName(_ path: String) -> String {
+        (path as NSString).lastPathComponent
+    }
+
     // MARK: - Parsing
 
     func parseStatus() {
@@ -105,13 +227,11 @@ final class GitRepository: ObservableObject {
 
         for line in output.components(separatedBy: "\n") where !line.isEmpty {
             if line.hasPrefix("1 ") || line.hasPrefix("2 ") {
-                // Ordinary or rename entry: "1 XY sub mH mI mW hH hI path"
                 let parts = line.components(separatedBy: " ")
                 guard parts.count >= 9 else { continue }
                 let xy = parts[1]
                 let filePath: String
                 if line.hasPrefix("2 ") {
-                    // Rename entry has path\ttab\torigPath
                     let pathParts = parts[9...].joined(separator: " ")
                     filePath = pathParts.components(separatedBy: "\t").first ?? pathParts
                 } else {
@@ -129,7 +249,6 @@ final class GitRepository: ObservableObject {
                     unstaged.append(GitFileStatus(status: mapStatusChar(y), path: filePath))
                 }
             } else if line.hasPrefix("? ") {
-                // Untracked file
                 let filePath = String(line.dropFirst(2))
                 unstaged.append(GitFileStatus(status: "?", path: filePath))
             }
@@ -140,12 +259,10 @@ final class GitRepository: ObservableObject {
     }
 
     func parseBranches() {
-        // Current branch
         if let headOutput = runGit(["rev-parse", "--abbrev-ref", "HEAD"]) {
             currentBranch = headOutput.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        // All branches
         guard let output = runGit(["branch", "-a", "--sort=-committerdate"]) else {
             branches = []
             return
@@ -179,6 +296,25 @@ final class GitRepository: ObservableObject {
             }
     }
 
+    func parseRemoteStatus() {
+        // Check if remote exists
+        hasRemote = runGit(["remote", "get-url", "origin"]) != nil
+
+        // Count commits ahead of base
+        if hasRemote, !currentBranch.isEmpty {
+            if let output = runGit(["rev-list", "--count", "origin/\(currentBranch)..HEAD"]) {
+                aheadCount = Int(output) ?? 0
+            } else {
+                // Branch may not exist on remote yet — all commits are "ahead"
+                if let output = runGit(["rev-list", "--count", "HEAD"]) {
+                    aheadCount = Int(output) ?? 0
+                }
+            }
+        } else {
+            aheadCount = 0
+        }
+    }
+
     // MARK: - Private
 
     private func runGit(_ args: [String]) -> String? {
@@ -201,6 +337,39 @@ final class GitRepository: ObservableObject {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func runGitAsync(_ args: [String]) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                process.arguments = args
+                process.currentDirectoryURL = URL(fileURLWithPath: path)
+
+                let stdoutPipe = Pipe()
+                let stderrPipe = Pipe()
+                process.standardOutput = stdoutPipe
+                process.standardError = stderrPipe
+
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                } catch {
+                    continuation.resume(throwing: GitError.commandFailed(error.localizedDescription))
+                    return
+                }
+
+                let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+
+                if process.terminationStatus != 0 {
+                    continuation.resume(throwing: GitError.commandFailed(stderr.isEmpty ? stdout : stderr))
+                } else {
+                    continuation.resume(returning: stdout.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+            }
+        }
     }
 
     private func mapStatusChar(_ char: String) -> String {

@@ -21,6 +21,13 @@ enum GitWorktreeManager {
             withIntermediateDirectories: true
         )
 
+        // Clean up stale worktree directory if it exists
+        if FileManager.default.fileExists(atPath: worktreePath) {
+            // Prune stale worktree entries first, then remove directory
+            _ = try? await runGit(args: ["worktree", "prune"], repoPath: repoPath)
+            try? FileManager.default.removeItem(atPath: worktreePath)
+        }
+
         // Try creating with new branch first; if branch already exists, just check it out
         do {
             try await runGit(

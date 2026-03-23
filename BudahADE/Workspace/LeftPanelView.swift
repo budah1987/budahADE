@@ -36,14 +36,10 @@ struct LeftPanelView: View {
                     switch state.activeLeftTab {
                     case .files:
                         FileTreeView(projectPath: worktreePath)
-                    case .changes:
-                        ChangesPanel(worktreePath: worktreePath)
                     case .spec:
                         if let task = state.activeTask {
                             SpecPanelView(specState: task.specState, buildStatus: task.buildStatus)
                         }
-                    case .agents:
-                        AgentsPanel(workspace: state)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

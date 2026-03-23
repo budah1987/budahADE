@@ -31,14 +31,14 @@ struct WorkspaceView: View {
                         PlanCanvasView(canvas: canvas)
                             .clipped()
                     } else {
-                        // Build mode: sidebar + terminal area
+                        // Build mode: sidebar + terminal area + git panel
                         HStack(spacing: 0) {
                             if state.leftPanelVisible {
                                 LeftPanelView(
                                     state: state,
                                     worktreePath: state.activeTask?.worktreePath ?? state.projectPath
                                 )
-                                .id(state.activeTaskId)
+                                .id("\(state.activeTaskId?.uuidString ?? "")-\(state.activeTask?.tabs.count ?? 0)")
                                 .transition(.move(edge: .leading).combined(with: .opacity))
                                 .background(Theme.sidebar)
 
@@ -48,6 +48,16 @@ struct WorkspaceView: View {
                             }
 
                             terminalArea
+
+                            if state.rightPanelVisible, let task = state.activeTask {
+                                Rectangle()
+                                    .fill(Theme.border)
+                                    .frame(width: 1)
+
+                                GitSidebarView(task: task)
+                                    .id(state.activeTaskId)
+                                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                            }
                         }
                     }
                 }
@@ -62,6 +72,7 @@ struct WorkspaceView: View {
         }
         .coordinateSpace(name: "workspace")
         .animation(.easeInOut(duration: 0.2), value: state.leftPanelVisible)
+        .animation(.easeInOut(duration: 0.2), value: state.rightPanelVisible)
         .animation(.easeOut(duration: 0.15), value: renameTarget != nil)
         .sheet(isPresented: $state.showNewTaskSheet) {
             NewTaskSheet(workspace: state)
@@ -69,6 +80,9 @@ struct WorkspaceView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleLeftPanel)) { _ in
             state.leftPanelVisible.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleRightPanel)) { _ in
+            state.rightPanelVisible.toggle()
         }
         .onReceive(NotificationCenter.default.publisher(for: .newTerminalTab)) { _ in
             state.activeTask?.createTab()
