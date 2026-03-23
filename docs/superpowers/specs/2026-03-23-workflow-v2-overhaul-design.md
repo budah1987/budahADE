@@ -513,6 +513,18 @@ Terminal tiles participate in the connection graph via MCP:
 - Unix domain socket: near-zero latency
 - Socket cleanup on task deletion / app quit
 
+### Phase 5 Verification (check before starting Phase 6)
+
+1. **MCP server starts** — create a task, verify MCP server process spawns. Check `.claude/settings.local.json` is written with correct config. Verify process listens on expected socket path.
+2. **mark_spec_item** — in the builder terminal, call `mark_spec_item("item-1", "complete")`. Verify: spec sidebar checkbox updates instantly (not 1-2s polling delay), spec.md file updates on disk.
+3. **read_spec** — call from terminal. Verify returns current spec.md content accurately.
+4. **notify_status** — call with a status message. Verify sidebar shows "Builder working on: {message}" with live dot.
+5. **File-watching fallback** — manually edit spec.md outside of MCP (e.g., edit in the markdown tile on canvas). Verify sidebar catches the change within 1-2s.
+6. **Build mode layout** — verify spec sidebar sits in existing left panel as a tab (no new panels). Files tab still works. Git sidebar still works. Only main content area changed to terminal.
+7. **Builder auto-launch** — Finalize → Build triggers builder terminal with Opus. Verify CLAUDE.md in worktree instructs agent to use MCP tools.
+8. **Socket cleanup** — delete a task. Verify MCP server process terminates and socket file is removed. Quit app → verify no orphaned processes.
+9. **get_connected_context from build mode** — if connections exist from Plan mode, verify terminal agent can still pull context via MCP even in Build mode.
+
 ---
 
 ## Phase 6: Visual Tiles + Polish
@@ -557,6 +569,16 @@ Terminal tiles participate in the connection graph via MCP:
 1. **Paper export → image tile** — static PNG/SVG. Manual re-export on changes.
 2. **Figma embed → browser tile** — live embed URL. Lazy-loaded. May require Figma auth first time.
 3. **Agent-generated HTML/SVG → browser tile** — via `loadHTMLString`. Includes Mermaid diagrams.
+
+### Phase 6 Verification (final checks)
+
+1. **Mermaid rendering** — generate a flowchart, sequence diagram, and journey map via Mermaid in a browser tile. Verify dark theme, readability at different zoom levels, no JS errors.
+2. **Figma embed** — load a Figma embed URL in a browser tile. Verify it renders (may need Figma login first time). Verify lazy-load: scroll tile offscreen → WKWebView should be replaced with thumbnail. Scroll back → restores.
+3. **WKWebView limit** — open 4+ browser tiles. Verify only 2-3 have active WKWebViews. Others show thumbnails. No memory spike.
+4. **Image tile paste** — Cmd+V with an image on clipboard while no tile is selected. Verify image tile creates at canvas center with the pasted image.
+5. **Image tile drop** — drag a PNG from Finder onto the canvas. Verify image tile creates.
+6. **Spec version diff** — right-click two versions in the dropdown → verify inline diff renders showing additions/removals between versions.
+7. **End-to-end workflow** — run the full cycle: create task → plan mode → add agents → conversations → Send To Spec → edit spec → finalize → build mode → builder executes → checkboxes update → back to plan → verify everything. This is the acceptance test.
 
 ---
 

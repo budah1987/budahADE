@@ -3,7 +3,7 @@ import SwiftUI
 struct AddTileMenu: View {
     let onAddAgent: (AgentMode) -> Void
     let onAddStickyNote: () -> Void
-    let onAddTextBox: () -> Void
+    let onAddTextBox: () -> Void   // Creates ElementKind.text (label with style tools)
     let onAddMarkdown: () -> Void
     let onAddBrowser: () -> Void
     @Environment(\.dismiss) private var dismiss

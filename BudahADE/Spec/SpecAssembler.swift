@@ -147,7 +147,7 @@ enum SpecAssembler {
             }
             return "<!-- \(agent.displayName) agent output pending -->"
 
-        case .stickyNote, .textBox:
+        case .stickyNote:
             return ""
         }
     }

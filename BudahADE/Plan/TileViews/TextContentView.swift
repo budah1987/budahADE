@@ -9,43 +9,73 @@ struct TextContentView: View {
 
     @State private var isEditing = false
     @State private var editContent: String = ""
+    @FocusState private var isFocused: Bool
 
     private var isSelected: Bool { canvas.selectedId == element.id }
 
     var body: some View {
         VStack(spacing: 0) {
             if isEditing {
-                TextField("Type text...", text: $editContent, axis: .vertical)
+                TextField("Type label...", text: $editContent)
                     .textFieldStyle(.plain)
                     .font(textData.font)
                     .foregroundColor(textData.color)
-                    .onSubmit {
-                        commitEdit()
-                    }
-                    .onExitCommand {
-                        commitEdit()
-                    }
+                    .focused($isFocused)
+                    .onSubmit { commitEdit() }
+                    .onExitCommand { commitEdit() }
             } else {
                 Text(textData.content)
                     .font(textData.font)
                     .italic(textData.isItalic)
                     .foregroundColor(textData.color)
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                    .onTapGesture(count: 2) {
+                    .onTapGesture {
                         editContent = textData.content
                         isEditing = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            isFocused = true
+                        }
                     }
             }
         }
         .padding(8)
+        .onAppear {
+            // Auto-start editing for new text elements (content is default "Text")
+            if textData.content == "Text" {
+                editContent = ""
+                isEditing = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isFocused = true
+                }
+            }
+        }
+        .onChange(of: isSelected) { _, selected in
+            if !selected && isEditing { commitEdit() }
+        }
+        .onChange(of: editContent) { _, newValue in
+            updateElementWidth(for: newValue)
+        }
     }
 
     private func commitEdit() {
         isEditing = false
+        isFocused = false
         var updated = textData
-        updated.content = editContent
+        updated.content = editContent.isEmpty ? "Label" : editContent
         canvas.updateText(element.id, data: updated)
+        updateElementWidth(for: updated.content)
+    }
+
+    /// Measure text and auto-fit element width. Height stays fixed for single-line.
+    private func updateElementWidth(for text: String) {
+        let displayText = text.isEmpty ? "Label" : text
+        let attrs: [NSAttributedString.Key: Any] = [.font: textData.nsFont]
+        let textWidth = ceil((displayText as NSString).size(withAttributes: attrs).width)
+        let width = max(textWidth + 24, 80)  // +padding
+        let height = ceil(textData.nsFont.pointSize) + 24
+        canvas.resizeElement(element.id, to: CGSize(width: width, height: height))
     }
 }
 

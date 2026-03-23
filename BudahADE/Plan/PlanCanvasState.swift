@@ -37,7 +37,6 @@ final class PlanCanvasState: ObservableObject {
         // TextBox gets a compact initial size; other tiles use default
         let initialSize: CGSize = {
             switch type {
-            case .textBox: return CGSize(width: 80, height: 40)
             case .stickyNote: return CGSize(width: 200, height: 160)
             default: return CanvasElement.defaultSize
             }
@@ -96,7 +95,6 @@ final class PlanCanvasState: ObservableObject {
         }
 
         // Auto-select text tiles so they start in edit mode
-        if case .textBox = type { selectedId = element.id }
         if case .stickyNote = type { selectedId = element.id }
 
         didMutate()
@@ -210,9 +208,9 @@ final class PlanCanvasState: ObservableObject {
     // MARK: - Resize Element
 
     func resizeElement(_ id: UUID, to newSize: CGSize) {
-        // TextBox labels use a smaller minimum size
+        // Text elements (labels) use a smaller minimum size
         let minSize: CGSize = {
-            if let el = findElement(id), case .tile(.textBox) = el.kind {
+            if let el = findElement(id), case .text = el.kind {
                 return CGSize(width: 60, height: 30)
             }
             return CanvasElement.minSize

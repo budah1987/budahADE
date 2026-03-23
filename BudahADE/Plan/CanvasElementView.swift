@@ -139,11 +139,6 @@ private struct TileContentView: View {
                 canvas.removeElement(elementId)
             }
 
-        case .textBox:
-            TextBoxView(elementId: elementId, canvas: canvas) {
-                canvas.removeElement(elementId)
-            }
-
         case .markdown(let path):
             MarkdownTileView(
                 path: path,

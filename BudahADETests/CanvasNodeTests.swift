@@ -12,11 +12,6 @@ final class TileTypeTests: XCTestCase {
         XCTAssertEqual(tile.displayName, "Sticky Note")
     }
 
-    func testTextBoxDisplayName() {
-        let tile = TileType.textBox
-        XCTAssertEqual(tile.displayName, "Text Box")
-    }
-
     func testMarkdownIconName() {
         let tile = TileType.markdown(path: "/tmp/test.md")
         XCTAssertEqual(tile.iconName, "doc.text")

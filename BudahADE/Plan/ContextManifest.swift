@@ -31,7 +31,7 @@ enum ContextManifest {
                 if let url { urls.append(url.absoluteString) }
             case .terminal(_, let agent):
                 agents.append(agent.displayName)
-            case .stickyNote, .textBox:
+            case .stickyNote:
                 break
             }
         }

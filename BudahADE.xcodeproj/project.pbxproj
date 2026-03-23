@@ -77,7 +77,6 @@
 		AA1D001D001D001DAA1D001D /* TileSelectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1D001D001D001DBB1D001D /* TileSelectionManager.swift */; };
 		AA1E001E001E001EAA1E001E /* TextContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1E001E001E001EBB1E001E /* TextContentView.swift */; };
 		AA1F001F001F001FAA1F001F /* StickyNoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1F001F001F001FBB1F001F /* StickyNoteView.swift */; };
-		AA20002000200020AA200020 /* TextBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB20002000200020BB200020 /* TextBoxView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -151,7 +150,6 @@
 		BB1D001D001D001DBB1D001D /* TileSelectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileSelectionManager.swift; sourceTree = "<group>"; };
 		BB1E001E001E001EBB1E001E /* TextContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextContentView.swift; sourceTree = "<group>"; };
 		BB1F001F001F001FBB1F001F /* StickyNoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickyNoteView.swift; sourceTree = "<group>"; };
-		BB20002000200020BB200020 /* TextBoxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBoxView.swift; sourceTree = "<group>"; };
 		TF01000100010001TF010001 /* SpecParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecParserTests.swift; sourceTree = "<group>"; };
 		TF02000200020002TF020003 /* CanvasNodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNodeTests.swift; sourceTree = "<group>"; };
 		TF02000200020002TF020002 /* BudahADETests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudahADETests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -189,7 +187,6 @@
 				BB21002100210021BB210021 /* MarkdownTileView.swift */,
 				BB1E001E001E001EBB1E001E /* TextContentView.swift */,
 				BB1F001F001F001FBB1F001F /* StickyNoteView.swift */,
-				BB20002000200020BB200020 /* TextBoxView.swift */,
 				BB09000900090009BB090009 /* TerminalTileView.swift */,
 				BB08000800080008BB080008 /* TileChrome.swift */,
 			);
@@ -510,7 +507,6 @@
 				AA1D001D001D001DAA1D001D /* TileSelectionManager.swift in Sources */,
 				AA1E001E001E001EAA1E001E /* TextContentView.swift in Sources */,
 				AA1F001F001F001FAA1F001F /* StickyNoteView.swift in Sources */,
-				AA20002000200020AA200020 /* TextBoxView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

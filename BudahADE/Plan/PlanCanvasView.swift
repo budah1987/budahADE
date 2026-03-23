@@ -301,7 +301,7 @@ struct PlanCanvasView: View {
         }
 
         Button {
-            canvas.addTile(type: .textBox, at: position)
+            canvas.addText(at: position)
         } label: {
             Label("Add Text Box", systemImage: "text.alignleft")
         }
@@ -337,11 +337,6 @@ struct PlanCanvasView: View {
             }
         }
 
-        Button {
-            canvas.addText(at: position)
-        } label: {
-            Label("Add Text", systemImage: "textformat")
-        }
 
         // Spec tagging (only when an element is selected)
         if let selectedId = canvas.selectedId {
