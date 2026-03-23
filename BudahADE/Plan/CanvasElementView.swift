@@ -50,6 +50,27 @@ struct CanvasElementView: View {
                     .overlay(alignment: .topTrailing) {
                         TileSelectionChrome.specSectionBadge(for: element)
                     }
+                    // Close button on hover for text elements (no TileChrome = no built-in X)
+                    .overlay(alignment: .topTrailing) {
+                        if isHovered, case .text = element.kind {
+                            Button {
+                                canvas.removeElement(element.id)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(Theme.textMuted)
+                                    .frame(width: 16, height: 16)
+                                    .background(
+                                        Circle()
+                                            .fill(Theme.surface2)
+                                            .overlay(Circle().strokeBorder(Theme.borderSubtle, lineWidth: 0.5))
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .offset(x: 6, y: -6)
+                            .transition(.opacity)
+                        }
+                    }
                     .overlay {
                         if isSelected, case .tile = element.kind {
                             ResizeHandles(element: element, canvas: canvas)
