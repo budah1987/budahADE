@@ -119,6 +119,11 @@ final class WebViewStore {
         webView?.load(URLRequest(url: url))
     }
 
+    func loadHTML(_ html: String, baseURL: URL? = nil) {
+        ensureWebView()
+        webView?.loadHTMLString(html, baseURL: baseURL)
+    }
+
     func goBack() { webView?.goBack() }
     func goForward() { webView?.goForward() }
     func reload() { webView?.reload() }

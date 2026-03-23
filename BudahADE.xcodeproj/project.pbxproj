@@ -56,6 +56,7 @@
 		AA21002100210021AA210021 /* MarkdownTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB21002100210021BB210021 /* MarkdownTileView.swift */; };
 		AA0B000B000B000BAA0B000B /* ImageTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0B000B000B000BBB0B000B /* ImageTileView.swift */; };
 		AA0C000C000C000CAA0C000C /* BrowserTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0C000C000C000CBB0C000C /* BrowserTileView.swift */; };
+		AA2200220022002200220022 /* MermaidRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB2200220022002200220022 /* MermaidRenderer.swift */; };
 		AA0D000D000D000DAA0D000D /* SpecParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0D000D000D000DBB0D000D /* SpecParser.swift */; };
 		AA0E000E000E000EAA0E000E /* SpecState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0E000E000E000EBB0E000E /* SpecState.swift */; };
 		AA0F000F000F000FAA0F000F /* SpecWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0F000F000F000FBB0F000F /* SpecWatcher.swift */; };
@@ -131,6 +132,7 @@
 		BB21002100210021BB210021 /* MarkdownTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTileView.swift; sourceTree = "<group>"; };
 		BB0B000B000B000BBB0B000B /* ImageTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageTileView.swift; sourceTree = "<group>"; };
 		BB0C000C000C000CBB0C000C /* BrowserTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTileView.swift; sourceTree = "<group>"; };
+		BB2200220022002200220022 /* MermaidRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MermaidRenderer.swift; sourceTree = "<group>"; };
 		BB0D000D000D000DBB0D000D /* SpecParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecParser.swift; sourceTree = "<group>"; };
 		BB0E000E000E000EBB0E000E /* SpecState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecState.swift; sourceTree = "<group>"; };
 		BB0F000F000F000FBB0F000F /* SpecWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecWatcher.swift; sourceTree = "<group>"; };
@@ -182,6 +184,7 @@
 			isa = PBXGroup;
 			children = (
 				BB0C000C000C000CBB0C000C /* BrowserTileView.swift */,
+				BB2200220022002200220022 /* MermaidRenderer.swift */,
 				BB0B000B000B000BBB0B000B /* ImageTileView.swift */,
 				BB21002100210021BB210021 /* MarkdownTileView.swift */,
 				BB1E001E001E001EBB1E001E /* TextContentView.swift */,
@@ -489,6 +492,7 @@
 				AA21002100210021AA210021 /* MarkdownTileView.swift in Sources */,
 				AA0B000B000B000BAA0B000B /* ImageTileView.swift in Sources */,
 				AA0C000C000C000CAA0C000C /* BrowserTileView.swift in Sources */,
+				AA2200220022002200220022 /* MermaidRenderer.swift in Sources */,
 				AA0D000D000D000DAA0D000D /* SpecParser.swift in Sources */,
 				AA0E000E000E000EAA0E000E /* SpecState.swift in Sources */,
 				AA0F000F000F000FAA0F000F /* SpecWatcher.swift in Sources */,
