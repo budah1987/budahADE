@@ -18,6 +18,7 @@ final class PlanCanvasState: ObservableObject {
     @Published var hoveredFrameId: UUID?
     @Published var frameInsertIndex: Int?
     @Published var guides: [AlignmentGuide] = []
+    @Published var mutationCount: Int = 0
 
     let worktreePath: String
     let taskName: String
@@ -529,6 +530,7 @@ final class PlanCanvasState: ObservableObject {
     // MARK: - Private
 
     private func didMutate() {
+        mutationCount += 1
         ContextManifest.write(canvas: self)
     }
 

@@ -55,7 +55,7 @@ struct PlanCanvasView: View {
             .onChange(of: geo.size) { _, new in viewportSize = new }
             .onChange(of: localZoom) { _, _ in debounceCulling() }
             .onChange(of: localPanOffset) { _, _ in debounceCulling() }
-            .onChange(of: canvas.elements.count) { _, _ in debounceCulling() }
+            .onChange(of: canvas.mutationCount) { _, _ in debounceCulling() }
             .background(
                 CanvasInputMonitor(
                     onScroll: { deltaX, deltaY, isZoom, isShiftPan in
