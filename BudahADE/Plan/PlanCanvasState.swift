@@ -37,7 +37,7 @@ final class PlanCanvasState: ObservableObject {
         // TextBox gets a compact initial size; other tiles use default
         let initialSize: CGSize = {
             switch type {
-            case .textBox: return CGSize(width: 120, height: 40)
+            case .textBox: return CGSize(width: 80, height: 40)
             case .stickyNote: return CGSize(width: 200, height: 160)
             default: return CanvasElement.defaultSize
             }

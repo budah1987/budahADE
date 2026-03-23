@@ -10,49 +10,45 @@ struct TextBoxView: View {
     @State private var isEditing: Bool = true  // Start in edit mode
     @FocusState private var isFocused: Bool
 
+    private static let labelFont = NSFont.systemFont(ofSize: 16, weight: .semibold)
+    private static let labelHeight: CGFloat = 40  // Fixed height — single line
+    private static let hPad: CGFloat = 16
+    private static let minWidth: CGFloat = 80
+
     private var isSelected: Bool { canvas.selectedId == elementId }
 
     var body: some View {
         Group {
             if isEditing {
-                TextField("Type label...", text: $content)
+                TextField("Label", text: $content)
                     .textFieldStyle(.plain)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(Theme.textPrimary)
                     .focused($isFocused)
                     .onSubmit { exitEditing() }
                     .onExitCommand { exitEditing() }
-                    .fixedSize()
-                    .frame(minWidth: 80)
             } else {
                 Text(content.isEmpty ? "Label" : content)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(content.isEmpty ? Theme.textMuted : Theme.textPrimary)
                     .lineLimit(1)
-                    .fixedSize()
-                    .frame(minWidth: 80)
                     .contentShape(Rectangle())
                     .onTapGesture { enterEditing() }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .padding(.horizontal, Self.hPad)
         .onAppear {
-            // Auto-focus when first created
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // Auto-focus after SwiftUI settles the view hierarchy
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 isFocused = true
             }
         }
         .onChange(of: isSelected) { _, selected in
             if !selected { exitEditing() }
         }
-        .onChange(of: content) { _, newValue in
-            updateElementSize(for: newValue)
-        }
-        .onChange(of: isEditing) { _, editing in
-            if !editing {
-                updateElementSize(for: content)
-            }
+        .onChange(of: content) { _, _ in
+            updateWidth()
         }
     }
 
@@ -67,17 +63,15 @@ struct TextBoxView: View {
         isEditing = false
         isFocused = false
         if content.isEmpty { content = "Label" }
-        updateElementSize(for: content)
+        updateWidth()
     }
 
-    /// Measure text and resize the canvas element to fit
-    private func updateElementSize(for text: String) {
-        let displayText = text.isEmpty ? "Type label..." : text
-        let font = NSFont.systemFont(ofSize: 16, weight: .semibold)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font]
-        let textSize = (displayText as NSString).size(withAttributes: attrs)
-        let width = max(ceil(textSize.width) + 32, 80)  // +padding
-        let height = ceil(textSize.height) + 24           // +padding
-        canvas.resizeElement(elementId, to: CGSize(width: width, height: height))
+    /// Measure text and resize the canvas element width to fit. Height is fixed.
+    private func updateWidth() {
+        let displayText = content.isEmpty ? "Label" : content
+        let attrs: [NSAttributedString.Key: Any] = [.font: Self.labelFont]
+        let textWidth = ceil((displayText as NSString).size(withAttributes: attrs).width)
+        let width = max(textWidth + Self.hPad * 2, Self.minWidth)
+        canvas.resizeElement(elementId, to: CGSize(width: width, height: Self.labelHeight))
     }
 }
