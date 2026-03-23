@@ -10,6 +10,15 @@ struct LeftPanelView: View {
     private let minWidth: CGFloat = 200
     private let maxWidth: CGFloat = 400
 
+    /// Tabs visible based on current state (spec tab only when spec exists)
+    private var visibleTabs: [LeftPanelTab] {
+        var tabs = LeftPanelTab.allCases
+        if state.activeTask?.specState.hasSpec != true {
+            tabs.removeAll { $0 == .spec }
+        }
+        return tabs
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
@@ -29,6 +38,10 @@ struct LeftPanelView: View {
                         FileTreeView(projectPath: worktreePath)
                     case .changes:
                         ChangesPanel(worktreePath: worktreePath)
+                    case .spec:
+                        if let task = state.activeTask {
+                            SpecPanelView(specState: task.specState, buildStatus: task.buildStatus)
+                        }
                     case .agents:
                         AgentsPanel(workspace: state)
                     }
@@ -47,7 +60,7 @@ struct LeftPanelView: View {
 
     private var tabBar: some View {
         HStack(spacing: 2) {
-            ForEach(LeftPanelTab.allCases, id: \.self) { tab in
+            ForEach(visibleTabs, id: \.self) { tab in
                 Button {
                     withAnimation(.easeInOut(duration: 0.12)) {
                         state.activeLeftTab = tab

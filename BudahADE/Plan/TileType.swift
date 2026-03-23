@@ -54,6 +54,7 @@ enum TileType: Equatable {
     case document(path: String)
     case image(path: String)
     case browser(url: URL?)
+    case specDocument(path: String)
 
     var displayName: String {
         switch self {
@@ -61,6 +62,7 @@ enum TileType: Equatable {
         case .document:               return "Document"
         case .image:                  return "Image"
         case .browser:                return "Browser"
+        case .specDocument:           return "Spec"
         }
     }
 
@@ -70,6 +72,7 @@ enum TileType: Equatable {
         case .document:               return "doc.text"
         case .image:                  return "photo"
         case .browser:                return "globe"
+        case .specDocument:           return "doc.badge.gearshape"
         }
     }
 }

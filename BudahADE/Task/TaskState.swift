@@ -29,9 +29,12 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var tabs: [TabInfo] = []
     @Published var selectedTabId: UUID?
     @Published var terminals: [UUID: TerminalPanel] = [:]
-    @Published var planCanvas: PlanCanvasState?
+    @Published var planCanvas: PlanCanvasState?  // Legacy — kept for existing canvas references
+    @Published var planTabId: UUID?  // Dedicated plan conversation tab
     let specState = SpecState()
+    let buildStatus = BuildStatusState()
     private var specWatcher: SpecWatcher?
+    private var buildStatusWatcher: BuildStatusWatcher?
     let createdAt: Date = Date()
 
     /// Formatted elapsed time since task creation
@@ -105,19 +108,66 @@ final class TaskState: ObservableObject, Identifiable {
     func enterBuildMode() {
         mode = .build
         focusActiveTerminal()
+        // Start build status watcher if we have a spec
+        if specState.hasSpec && buildStatusWatcher == nil {
+            buildStatusWatcher = BuildStatusWatcher(worktreePath: worktreePath, buildStatus: buildStatus)
+            buildStatusWatcher?.startWatching()
+        }
     }
 
     // MARK: - Tab Management
 
     @discardableResult
-    func createTab() -> UUID {
+    func createTab(launchAgent: Bool = false, agent: AgentMode? = nil) -> UUID {
         let panel = TerminalPanel(workingDirectory: worktreePath)
         let id = panel.id
         let tab = TabInfo(id: id, title: "Terminal", isRunning: false)
         tabs.append(tab)
         terminals[id] = panel
         selectedTabId = id
+
+        if launchAgent {
+            launchClaudeInTab(id, agent: agent)
+        }
+
         return id
+    }
+
+    /// Launch Claude in a specific tab with spec awareness
+    func launchClaudeInTab(_ tabId: UUID, agent: AgentMode? = nil) {
+        guard let panel = terminals[tabId] else { return }
+
+        let specPath = specState.activeSpec?.filePath
+        let progress: (completed: Int, total: Int)? = specState.activeSpec.map {
+            (completed: $0.completedCount, total: $0.totalCount)
+        }
+
+        let command: String
+        if let specPath, let progress, agent == nil {
+            // Builder mode: spec-focused execution
+            command = AgentPrompts.builderLaunchCommand(
+                taskName: name,
+                branchName: branchName,
+                worktreePath: worktreePath,
+                specFilePath: specPath,
+                specProgress: progress
+            )
+        } else {
+            // Agent mode or no spec: use role prompt with optional spec context
+            command = AgentPrompts.launchCommand(
+                agent: agent ?? .claude,
+                taskName: name,
+                branchName: branchName,
+                worktreePath: worktreePath,
+                panelId: panel.id,
+                specFilePath: specPath,
+                specProgress: progress
+            )
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            panel.sendCommand(command)
+        }
     }
 
     func closeTab(_ id: UUID) {
@@ -125,6 +175,10 @@ final class TaskState: ObservableObject, Identifiable {
         terminals[id]?.close()
         terminals.removeValue(forKey: id)
         tabs.remove(at: index)
+
+        if planTabId == id {
+            planTabId = nil
+        }
 
         if selectedTabId == id {
             if !tabs.isEmpty {
@@ -183,18 +237,15 @@ final class TaskState: ObservableObject, Identifiable {
         tabs.removeAll()
         selectedTabId = nil
         specWatcher?.stopWatching()
+        buildStatusWatcher?.stopWatching()
         planCanvas?.closeAll()
     }
 
     // MARK: - Private
 
     private func autoLaunchClaude() {
-        guard let firstTabId = tabs.first?.id,
-              let panel = terminals[firstTabId] else { return }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            panel.sendCommand("claude")
-        }
+        guard let firstTabId = tabs.first?.id else { return }
+        launchClaudeInTab(firstTabId)
     }
 
     private func observeTitleChanges() {

@@ -387,6 +387,135 @@ final class PlanCanvasState: ObservableObject {
         return result
     }
 
+    // MARK: - Spec Tagging
+
+    func tagElement(_ id: UUID, section: String) {
+        if let idx = elements.firstIndex(where: { $0.id == id }) {
+            elements[idx].specSection = section
+            didMutate()
+            return
+        }
+        // Check inside frames
+        for i in elements.indices {
+            if case .frame(var frameData) = elements[i].kind {
+                if let j = frameData.children.firstIndex(where: { $0.id == id }) {
+                    frameData.children[j].specSection = section
+                    elements[i].kind = .frame(frameData)
+                    didMutate()
+                    return
+                }
+            }
+        }
+    }
+
+    func untagElement(_ id: UUID) {
+        if let idx = elements.firstIndex(where: { $0.id == id }) {
+            elements[idx].specSection = nil
+            didMutate()
+            return
+        }
+        for i in elements.indices {
+            if case .frame(var frameData) = elements[i].kind {
+                if let j = frameData.children.firstIndex(where: { $0.id == id }) {
+                    frameData.children[j].specSection = nil
+                    elements[i].kind = .frame(frameData)
+                    didMutate()
+                    return
+                }
+            }
+        }
+    }
+
+    /// Assemble spec from tagged elements, returns path and auto-adds spec tile
+    func assembleSpec() -> String? {
+        guard let path = SpecAssembler.assemble(
+            canvas: self,
+            taskName: taskName,
+            worktreePath: worktreePath
+        ) else { return nil }
+
+        // Auto-add a spec document tile to the canvas if one doesn't exist
+        let hasSpecTile = elements.contains { el in
+            if case .tile(.specDocument) = el.kind { return true }
+            return false
+        }
+        if !hasSpecTile {
+            let position = nextFreePosition(size: CGSize(width: 400, height: 500))
+            addTile(type: .specDocument(path: path), at: position)
+        }
+
+        return path
+    }
+
+    // MARK: - Detach / Merge
+
+    /// Extract a spec section into a new document tile for editing
+    func detachSpecSection(specTileId: UUID, sectionId: String, specPath: String) {
+        guard let spec = SpecParser.parse(fileAt: specPath),
+              let section = spec.sections.first(where: { $0.id == sectionId }) else { return }
+
+        // Create a temp file with the section content
+        let dir = (worktreePath as NSString).appendingPathComponent(".budahade/sections")
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let filename = "\(sectionId).md"
+        let filePath = (dir as NSString).appendingPathComponent(filename)
+
+        // Write section content with header
+        let content = "## \(section.title)\n\n\(section.content)"
+        try? content.write(toFile: filePath, atomically: true, encoding: .utf8)
+
+        // Find the spec tile position to place the new tile nearby
+        let specPos = findElement(specTileId)?.position ?? .zero
+        let specSize = findElement(specTileId)?.size ?? CanvasElement.defaultSize
+        let newPos = CGPoint(x: specPos.x + specSize.width + 24, y: specPos.y)
+
+        // Create document tile, auto-tagged with the section
+        var element = CanvasElement(
+            kind: .tile(.document(path: filePath)),
+            position: newPos,
+            size: CGSize(width: 400, height: 300),
+            title: "Edit: \(section.title)",
+            specSection: section.title
+        )
+        elements.append(element)
+        selectedId = element.id
+        didMutate()
+    }
+
+    /// Merge a detached section tile back into the spec file
+    func mergeIntoSpec(tileId: UUID, specPath: String) {
+        guard let tile = findElement(tileId),
+              case .tile(.document(let docPath)) = tile.kind,
+              let sectionName = tile.specSection else { return }
+
+        // Read the edited content
+        guard let editedContent = try? String(contentsOfFile: docPath, encoding: .utf8) else { return }
+
+        // Read the spec file
+        guard var specContent = try? String(contentsOfFile: specPath, encoding: .utf8) else { return }
+        guard let spec = SpecParser.parse(fileAt: specPath),
+              let section = spec.sections.first(where: { $0.title == sectionName }) else { return }
+
+        // Replace the section in the spec file using line range
+        var lines = specContent.components(separatedBy: .newlines)
+        let range = section.lineRange
+        guard range.lowerBound < lines.count else { return }
+        let upperBound = min(range.upperBound, lines.count)
+
+        // Replace the section lines with the edited content
+        let editedLines = editedContent.components(separatedBy: .newlines)
+        lines.replaceSubrange(range.lowerBound..<upperBound, with: editedLines)
+
+        specContent = lines.joined(separator: "\n")
+        try? specContent.write(toFile: specPath, atomically: true, encoding: .utf8)
+
+        // Remove the detached tile
+        removeElement(tileId)
+
+        // Clean up the temp file
+        try? FileManager.default.removeItem(atPath: docPath)
+    }
+
     // MARK: - Cleanup
 
     func closeAll() {
@@ -490,7 +619,8 @@ final class PlanCanvasState: ObservableObject {
                 agent: agent,
                 taskName: self.taskName,
                 branchName: self.branchName,
-                worktreePath: self.worktreePath
+                worktreePath: self.worktreePath,
+                panelId: panel.id
             )
             panel.sendCommand(command)
         }

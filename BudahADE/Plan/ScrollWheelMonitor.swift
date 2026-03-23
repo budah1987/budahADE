@@ -1,23 +1,18 @@
 import SwiftUI
 
 struct CanvasInputMonitor: NSViewRepresentable {
-    let onScroll: (_ deltaX: CGFloat, _ deltaY: CGFloat, _ isZoom: Bool) -> Void
+    let onScroll: (_ deltaX: CGFloat, _ deltaY: CGFloat, _ isZoom: Bool, _ isShiftPan: Bool) -> Void
     let onPanDrag: (_ deltaX: CGFloat, _ deltaY: CGFloat) -> Void
     let onSpaceStateChanged: (_ isHeld: Bool) -> Void
     let onEscape: () -> Void
 
     func makeNSView(context: Context) -> CanvasInputNSView {
-        let view = CanvasInputNSView(
+        CanvasInputNSView(
             onScroll: onScroll,
             onPanDrag: onPanDrag,
             onSpaceStateChanged: onSpaceStateChanged,
             onEscape: onEscape
         )
-        // Ensure we can receive key events
-        DispatchQueue.main.async {
-            view.window?.makeFirstResponder(view)
-        }
-        return view
     }
 
     func updateNSView(_ nsView: CanvasInputNSView, context: Context) {
@@ -28,7 +23,7 @@ struct CanvasInputMonitor: NSViewRepresentable {
     }
 
     class CanvasInputNSView: NSView {
-        var onScroll: (_ deltaX: CGFloat, _ deltaY: CGFloat, _ isZoom: Bool) -> Void
+        var onScroll: (_ deltaX: CGFloat, _ deltaY: CGFloat, _ isZoom: Bool, _ isShiftPan: Bool) -> Void
         var onPanDrag: (_ deltaX: CGFloat, _ deltaY: CGFloat) -> Void
         var onSpaceStateChanged: (_ isHeld: Bool) -> Void
         var onEscape: () -> Void
@@ -36,11 +31,13 @@ struct CanvasInputMonitor: NSViewRepresentable {
         private var isSpaceHeld = false
         private var lastDragPoint: NSPoint?
         private var scrollMonitor: Any?
+        private var keyDownMonitor: Any?
+        private var keyUpMonitor: Any?
 
         override var acceptsFirstResponder: Bool { true }
 
         init(
-            onScroll: @escaping (_ deltaX: CGFloat, _ deltaY: CGFloat, _ isZoom: Bool) -> Void,
+            onScroll: @escaping (_ deltaX: CGFloat, _ deltaY: CGFloat, _ isZoom: Bool, _ isShiftPan: Bool) -> Void,
             onPanDrag: @escaping (_ deltaX: CGFloat, _ deltaY: CGFloat) -> Void,
             onSpaceStateChanged: @escaping (_ isHeld: Bool) -> Void,
             onEscape: @escaping () -> Void
@@ -56,65 +53,95 @@ struct CanvasInputMonitor: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            window?.makeFirstResponder(self)
 
-            // Install/remove Shift+scroll monitor with window lifecycle
-            if window != nil && scrollMonitor == nil {
-                scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-                    guard let self else { return event }
-                    // Cmd+scroll → zoom (even over tiles)
-                    if event.modifierFlags.contains(.command) {
-                        self.onScroll(event.scrollingDeltaX, event.scrollingDeltaY, true)
-                        return nil
-                    }
-                    // Shift+scroll → canvas pan (even over tiles)
-                    if event.modifierFlags.contains(.shift) {
-                        self.onScroll(event.scrollingDeltaX, event.scrollingDeltaY, false)
-                        return nil
-                    }
-                    return event
-                }
-            } else if window == nil, let monitor = scrollMonitor {
-                NSEvent.removeMonitor(monitor)
-                scrollMonitor = nil
+            if window != nil {
+                installMonitors()
+            } else {
+                removeMonitors()
             }
         }
 
         override func removeFromSuperview() {
-            if let monitor = scrollMonitor {
-                NSEvent.removeMonitor(monitor)
-                scrollMonitor = nil
-            }
+            removeMonitors()
             super.removeFromSuperview()
+        }
+
+        /// Whether the current first responder is a terminal surface (or child of one)
+        private func terminalHasFocus() -> Bool {
+            guard let responder = window?.firstResponder as? NSView else { return false }
+            var view: NSView? = responder
+            while let v = view {
+                if v is TerminalSurfaceView { return true }
+                view = v.superview
+            }
+            return false
+        }
+
+        private func installMonitors() {
+            guard scrollMonitor == nil else { return }
+
+            // Scroll monitor: Cmd+scroll → zoom, Shift+scroll → pan (even over tiles)
+            scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                guard let self else { return event }
+                if event.modifierFlags.contains(.command) {
+                    self.onScroll(event.scrollingDeltaX, event.scrollingDeltaY, true, false)
+                    return nil
+                }
+                if event.modifierFlags.contains(.shift) {
+                    self.onScroll(event.scrollingDeltaX, event.scrollingDeltaY, false, true)
+                    return nil
+                }
+                return event
+            }
+
+            // Key-down monitor: only handle space/escape when terminal doesn't have focus
+            keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return event }
+                // If a terminal has focus, let ALL keys pass through
+                if self.terminalHasFocus() { return event }
+
+                if event.keyCode == 53 {  // Escape
+                    self.onEscape()
+                    return nil
+                } else if event.keyCode == 49 && !event.isARepeat {  // Spacebar
+                    self.isSpaceHeld = true
+                    NSCursor.openHand.push()
+                    self.onSpaceStateChanged(true)
+                    return nil
+                }
+                return event
+            }
+
+            // Key-up monitor: match space release
+            keyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
+                guard let self else { return event }
+                if self.terminalHasFocus() { return event }
+
+                if event.keyCode == 49 {
+                    self.isSpaceHeld = false
+                    NSCursor.pop()
+                    self.onSpaceStateChanged(false)
+                    return nil
+                }
+                return event
+            }
+        }
+
+        private func removeMonitors() {
+            if let m = scrollMonitor { NSEvent.removeMonitor(m); scrollMonitor = nil }
+            if let m = keyDownMonitor { NSEvent.removeMonitor(m); keyDownMonitor = nil }
+            if let m = keyUpMonitor { NSEvent.removeMonitor(m); keyUpMonitor = nil }
         }
 
         // MARK: - Scroll Wheel (zoom + pan)
 
         override func scrollWheel(with event: NSEvent) {
             let isZoom = event.modifierFlags.contains(.command)
-            onScroll(event.scrollingDeltaX, event.scrollingDeltaY, isZoom)
+            onScroll(event.scrollingDeltaX, event.scrollingDeltaY, isZoom, false)
         }
 
-        // MARK: - Spacebar tracking
-
-        override func keyDown(with event: NSEvent) {
-            if event.keyCode == 53 {  // 53 = Escape
-                onEscape()
-            } else if event.keyCode == 49 && !event.isARepeat {  // 49 = spacebar
-                isSpaceHeld = true
-                NSCursor.openHand.push()
-                onSpaceStateChanged(true)
-            }
-            // Don't call super — prevents system beep for unhandled keys
-        }
-
-        override func keyUp(with event: NSEvent) {
-            if event.keyCode == 49 {
-                isSpaceHeld = false
-                NSCursor.pop()
-                onSpaceStateChanged(false)
-            }
-        }
+        // Key handling moved to local monitors (installMonitors)
+        // so terminal tiles receive Cmd/Opt key combos normally
 
         // MARK: - Mouse drag for space-panning
 

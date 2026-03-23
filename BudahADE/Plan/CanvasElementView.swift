@@ -27,6 +27,9 @@ struct CanvasElementView: View {
                                 lineWidth: isSelected ? 1.5 : 0.5
                             )
                     )
+                    .overlay(alignment: .topTrailing) {
+                        specSectionBadge
+                    }
                     .overlay {
                         if isSelected, case .tile = element.kind {
                             FrameChildResizeHandle(element: element, canvas: canvas)
@@ -44,6 +47,9 @@ struct CanvasElementView: View {
                     .background(elementBackground)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(selectionBorder)
+                    .overlay(alignment: .topTrailing) {
+                        specSectionBadge
+                    }
                     .overlay {
                         if isSelected, case .tile = element.kind {
                             ResizeHandles(element: element, canvas: canvas)
@@ -84,6 +90,33 @@ struct CanvasElementView: View {
                     }
                     .gesture(borderDragGesture)
             }
+        }
+    }
+
+    // MARK: - Spec Section Badge
+
+    @ViewBuilder
+    private var specSectionBadge: some View {
+        if let section = element.specSection,
+           let kind = SpecSectionKind.allCases.first(where: { $0.rawValue == section }) {
+            HStack(spacing: 3) {
+                Image(systemName: kind.iconName)
+                    .font(.system(size: 8, weight: .bold))
+                Text(kind.displayName)
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundColor(Color(hex: kind.badgeColor))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                Capsule()
+                    .fill(Color(hex: kind.badgeColor).opacity(0.15))
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color(hex: kind.badgeColor).opacity(0.3), lineWidth: 0.5)
+                    )
+            )
+            .padding(6)
         }
     }
 
@@ -285,6 +318,15 @@ private struct TileContentView: View {
 
         case .browser(let url):
             BrowserTileView(url: url) {
+                canvas.removeElement(elementId)
+            }
+
+        case .specDocument(let path):
+            SpecDocumentTileView(
+                path: path,
+                canvas: canvas,
+                elementId: elementId
+            ) {
                 canvas.removeElement(elementId)
             }
         }

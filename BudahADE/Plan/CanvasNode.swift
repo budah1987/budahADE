@@ -8,23 +8,63 @@ struct CanvasElement: Identifiable, Equatable {
     var position: CGPoint
     var size: CGSize
     var title: String
+    var specSection: String?
+    var specOrder: Int = 0
 
     init(
         id: UUID = UUID(),
         kind: ElementKind,
         position: CGPoint = .zero,
         size: CGSize = CanvasElement.defaultSize,
-        title: String = ""
+        title: String = "",
+        specSection: String? = nil,
+        specOrder: Int = 0
     ) {
         self.id = id
         self.kind = kind
         self.position = position
         self.size = size
         self.title = title
+        self.specSection = specSection
+        self.specOrder = specOrder
     }
 
     static let defaultSize = CGSize(width: 480, height: 360)
     static let minSize = CGSize(width: 200, height: 150)
+}
+
+// MARK: - Spec Section Definitions
+
+enum SpecSectionKind: String, CaseIterable, Identifiable {
+    case problem = "Problem"
+    case goals = "Goals"
+    case architecture = "Architecture"
+    case edgeCases = "Edge Cases"
+    case tasks = "Tasks"
+
+    var id: String { rawValue }
+
+    var displayName: String { rawValue }
+
+    var iconName: String {
+        switch self {
+        case .problem:      return "exclamationmark.triangle"
+        case .goals:        return "target"
+        case .architecture: return "building.2"
+        case .edgeCases:    return "bolt.trianglebadge.exclamationmark"
+        case .tasks:        return "checklist"
+        }
+    }
+
+    var badgeColor: UInt32 {
+        switch self {
+        case .problem:      return 0xE06C75
+        case .goals:        return 0x61AFEF
+        case .architecture: return 0xC678DD
+        case .edgeCases:    return 0xE5C07B
+        case .tasks:        return 0x98C379
+        }
+    }
 }
 
 // MARK: - Element Kind

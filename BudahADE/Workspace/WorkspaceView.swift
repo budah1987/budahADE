@@ -23,29 +23,32 @@ struct WorkspaceView: View {
                     .frame(width: 1)
 
                 // ── CONTENT ZONE ──
-                if let task = state.activeTask, task.mode == .plan,
-                   let canvas = task.planCanvas {
-                    // Plan mode: full-width canvas
-                    PlanCanvasView(canvas: canvas)
-                        .clipped()
-                } else {
-                    // Build mode: existing layout
-                    HStack(spacing: 0) {
-                        if state.leftPanelVisible {
-                            LeftPanelView(
-                                state: state,
-                                worktreePath: state.activeTask?.worktreePath ?? state.projectPath
-                            )
-                            .id(state.activeTaskId)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                            .background(Theme.sidebar)
+                VStack(spacing: 0) {
+                    // Content
+                    if let task = state.activeTask, task.mode == .plan,
+                       let canvas = task.planCanvas {
+                        // Plan mode: full-width canvas
+                        PlanCanvasView(canvas: canvas)
+                            .clipped()
+                    } else {
+                        // Build mode: sidebar + terminal area
+                        HStack(spacing: 0) {
+                            if state.leftPanelVisible {
+                                LeftPanelView(
+                                    state: state,
+                                    worktreePath: state.activeTask?.worktreePath ?? state.projectPath
+                                )
+                                .id(state.activeTaskId)
+                                .transition(.move(edge: .leading).combined(with: .opacity))
+                                .background(Theme.sidebar)
 
-                            Rectangle()
-                                .fill(Theme.border)
-                                .frame(width: 1)
+                                Rectangle()
+                                    .fill(Theme.border)
+                                    .frame(width: 1)
+                            }
+
+                            terminalArea
                         }
-
-                        terminalArea
                     }
                 }
             }
@@ -130,6 +133,16 @@ struct WorkspaceView: View {
                     onCloseTab: { task.closeTab($0) },
                     onNewTab: { task.createTab() }
                 )
+
+                // Inline spec strip (only when spec exists)
+                if task.specState.hasSpec {
+                    SpecStripView(specState: task.specState, buildStatus: task.buildStatus, variant: .inline)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+
+                    Rectangle()
+                        .fill(Theme.borderSubtle)
+                        .frame(height: 0.5)
+                }
             }
 
             ZStack {
@@ -311,3 +324,4 @@ enum RenameTarget: Equatable {
         return nil
     }
 }
+

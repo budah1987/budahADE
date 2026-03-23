@@ -6,6 +6,7 @@ import Combine
 enum LeftPanelTab: String, CaseIterable {
     case files
     case changes
+    case spec
     case agents
 }
 
@@ -92,6 +93,11 @@ final class WorkspaceState: ObservableObject, Identifiable {
         activeTask?.unfocusAllTerminals()
         activeTaskId = id
         activeTask?.focusActiveTerminal()
+
+        // Reset left panel if spec tab selected but new task has no spec
+        if activeLeftTab == .spec, activeTask?.specState.hasSpec != true {
+            activeLeftTab = .files
+        }
     }
 
     func selectTaskByIndex(_ index: Int) {

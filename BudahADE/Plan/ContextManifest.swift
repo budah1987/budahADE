@@ -31,6 +31,8 @@ enum ContextManifest {
                 if let url { urls.append(url.absoluteString) }
             case .terminal(_, let agent):
                 agents.append(agent.displayName)
+            case .specDocument(let path):
+                documents.append(path)
             }
         }
 

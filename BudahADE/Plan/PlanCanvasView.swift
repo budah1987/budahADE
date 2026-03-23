@@ -50,7 +50,7 @@ struct PlanCanvasView: View {
             .onChange(of: geo.size) { _, new in viewportSize = new }
             .background(
                 CanvasInputMonitor(
-                    onScroll: { deltaX, deltaY, isZoom in
+                    onScroll: { deltaX, deltaY, isZoom, isShiftPan in
                         if isZoom {
                             let newZoom = (localZoom + deltaY * 0.01).clamped(to: 0.1...3.0)
                             if let anchor = mousePosition {
@@ -60,8 +60,9 @@ struct PlanCanvasView: View {
                             }
                             commitViewportToCanvas()
                         } else {
+                            let horizontalMultiplier: CGFloat = isShiftPan ? 3.0 : 1.0
                             localPanOffset = CGSize(
-                                width: localPanOffset.width + deltaX,
+                                width: localPanOffset.width + deltaX * horizontalMultiplier,
                                 height: localPanOffset.height + deltaY
                             )
                             commitViewportToCanvas()
@@ -304,14 +305,70 @@ struct PlanCanvasView: View {
         } label: {
             Label("Add Text", systemImage: "textformat")
         }
+
+        // Spec tagging (only when an element is selected)
+        if let selectedId = canvas.selectedId {
+            Divider()
+
+            let currentTag = canvas.elements.first(where: { $0.id == selectedId })?.specSection
+
+            Menu("Tag for Spec") {
+                ForEach(SpecSectionKind.allCases) { section in
+                    Button {
+                        canvas.tagElement(selectedId, section: section.rawValue)
+                    } label: {
+                        HStack {
+                            Label(section.displayName, systemImage: section.iconName)
+                            if currentTag == section.rawValue {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+
+                if currentTag != nil {
+                    Divider()
+                    Button("Remove Tag") {
+                        canvas.untagElement(selectedId)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - HUD Overlay
 
+    @State private var assembleResult: String?
+
     private var hudOverlay: some View {
         VStack {
+            // Assembly success banner
+            if let path = assembleResult {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(Theme.success)
+                    Text("Spec assembled: \((path as NSString).lastPathComponent)")
+                        .font(Theme.label(12))
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Theme.surface2.opacity(0.95))
+                )
+                .padding(.top, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        withAnimation { assembleResult = nil }
+                    }
+                }
+            }
+
             Spacer()
-            HStack {
+
+            HStack(alignment: .bottom) {
                 // Zoom indicator
                 Text("\(Int(localZoom * 100))%")
                     .font(Theme.mono(11))
@@ -325,9 +382,47 @@ struct PlanCanvasView: View {
                     .padding(12)
 
                 Spacer()
+
+                // Assemble Spec button
+                if hasTaggedElements {
+                    Button {
+                        if let path = canvas.assembleSpec() {
+                            withAnimation { assembleResult = path }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.badge.gearshape")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("Assemble Spec")
+                                .font(Theme.label(12))
+                        }
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Theme.accent.opacity(0.2))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .strokeBorder(Theme.accent.opacity(0.4), lineWidth: 0.5)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(12)
+                }
             }
         }
-        .allowsHitTesting(false)
+    }
+
+    private var hasTaggedElements: Bool {
+        canvas.elements.contains(where: { $0.specSection != nil }) ||
+        canvas.elements.contains(where: {
+            if case .frame(let data) = $0.kind {
+                return data.children.contains(where: { $0.specSection != nil })
+            }
+            return false
+        })
     }
 
     // MARK: - Empty Canvas

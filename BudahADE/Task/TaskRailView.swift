@@ -27,7 +27,7 @@ struct TaskRailView: View {
                 .padding(.bottom, 6)
 
                 // Spec progress strip
-                SpecStripView(specState: task.specState)
+                SpecStripView(specState: task.specState, buildStatus: task.buildStatus)
             }
 
             // Section header

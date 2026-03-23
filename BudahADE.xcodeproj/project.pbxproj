@@ -63,6 +63,11 @@
 		AA12001200120012AA120012 /* SmartGuides.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB12001200120012BB120012 /* SmartGuides.swift */; };
 		AA13001300130013AA130013 /* CanvasElementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB13001300130013BB130013 /* CanvasElementView.swift */; };
 		AA14001400140014AA140014 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB14001400140014BB140014 /* RichTextEditor.swift */; };
+		AA15001500150015AA150015 /* SpecPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB15001500150015BB150015 /* SpecPanelView.swift */; };
+		AA16001600160016AA160016 /* SpecAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB16001600160016BB160016 /* SpecAssembler.swift */; };
+		AA17001700170017AA170017 /* BuildStatusState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB17001700170017BB170017 /* BuildStatusState.swift */; };
+		AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB18001800180018BB180018 /* BuildStatusWatcher.swift */; };
+		AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB19001900190019BB190019 /* SpecDocumentTileView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -124,6 +129,11 @@
 		BB12001200120012BB120012 /* SmartGuides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartGuides.swift; sourceTree = "<group>"; };
 		BB13001300130013BB130013 /* CanvasElementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasElementView.swift; sourceTree = "<group>"; };
 		BB14001400140014BB140014 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
+		BB15001500150015BB150015 /* SpecPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecPanelView.swift; sourceTree = "<group>"; };
+		BB16001600160016BB160016 /* SpecAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecAssembler.swift; sourceTree = "<group>"; };
+		BB17001700170017BB170017 /* BuildStatusState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusState.swift; sourceTree = "<group>"; };
+		BB18001800180018BB180018 /* BuildStatusWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusWatcher.swift; sourceTree = "<group>"; };
+		BB19001900190019BB190019 /* SpecDocumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecDocumentTileView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -152,6 +162,7 @@
 				BB0A000A000A000ABB0A000A /* DocumentTileView.swift */,
 				BB0B000B000B000BBB0B000B /* ImageTileView.swift */,
 				BB14001400140014BB140014 /* RichTextEditor.swift */,
+				BB19001900190019BB190019 /* SpecDocumentTileView.swift */,
 				BB09000900090009BB090009 /* TerminalTileView.swift */,
 				BB08000800080008BB080008 /* TileChrome.swift */,
 			);
@@ -161,6 +172,8 @@
 		CC03000300030003CC030003 /* Spec */ = {
 			isa = PBXGroup;
 			children = (
+				BB16001600160016BB160016 /* SpecAssembler.swift */,
+				BB15001500150015BB150015 /* SpecPanelView.swift */,
 				BB0D000D000D000DBB0D000D /* SpecParser.swift */,
 				BB0E000E000E000EBB0E000E /* SpecState.swift */,
 				BB10001000100010BB100010 /* SpecStripView.swift */,
@@ -286,6 +299,8 @@
 		FC2E59EAD66DC31D809B0A9B /* Task */ = {
 			isa = PBXGroup;
 			children = (
+				BB17001700170017BB170017 /* BuildStatusState.swift */,
+				BB18001800180018BB180018 /* BuildStatusWatcher.swift */,
 				8A658A83DDCAA7B7F63B1827 /* GitWorktreeManager.swift */,
 				C08E0CF750B2777728F76B48 /* NewTaskSheet.swift */,
 				29BDC02274A627217646433F /* TaskCompletionSheet.swift */,
@@ -409,6 +424,11 @@
 				AA12001200120012AA120012 /* SmartGuides.swift in Sources */,
 				AA13001300130013AA130013 /* CanvasElementView.swift in Sources */,
 				AA14001400140014AA140014 /* RichTextEditor.swift in Sources */,
+				AA15001500150015AA150015 /* SpecPanelView.swift in Sources */,
+				AA16001600160016AA160016 /* SpecAssembler.swift in Sources */,
+				AA17001700170017AA170017 /* BuildStatusState.swift in Sources */,
+				AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */,
+				AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
