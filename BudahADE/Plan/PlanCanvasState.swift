@@ -471,7 +471,7 @@ final class PlanCanvasState: ObservableObject {
         let newPos = CGPoint(x: specPos.x + specSize.width + 24, y: specPos.y)
 
         // Create document tile, auto-tagged with the section
-        var element = CanvasElement(
+        let element = CanvasElement(
             kind: .tile(.markdown(path: filePath)),
             position: newPos,
             size: CGSize(width: 400, height: 300),

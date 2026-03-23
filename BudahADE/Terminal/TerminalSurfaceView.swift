@@ -195,7 +195,7 @@ final class TerminalSurfaceView: NSView {
 
     override func scrollWheel(with event: NSEvent) {
         guard let surface = terminalSurface?.surface else { return }
-        var mods: Int32 = 0
+        let mods: Int32 = 0
         // Scroll mods is a packed int, not modifier flags
         ghostty_surface_mouse_scroll(surface, event.scrollingDeltaX, event.scrollingDeltaY, mods)
     }

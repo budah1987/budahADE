@@ -120,7 +120,7 @@ final class GitRepository: ObservableObject {
         if result.contains("error") || result.contains("fatal") {
             throw GitError.commandFailed(result)
         }
-        DispatchQueue.main.async { self.refresh() }
+        await MainActor.run { refresh() }
     }
 
     // MARK: - Merge
@@ -143,7 +143,7 @@ final class GitRepository: ObservableObject {
 
         // Switch back
         _ = try? await runGitAsync(["checkout", branchToMerge])
-        DispatchQueue.main.async { self.refresh() }
+        await MainActor.run { refresh() }
     }
 
     // MARK: - Open PR in Browser
@@ -368,12 +368,13 @@ final class GitRepository: ObservableObject {
     }
 
     private func runGitAsync(_ args: [String]) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { [self] in
+        let repoPath = path
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
                 process.arguments = args
-                process.currentDirectoryURL = URL(fileURLWithPath: path)
+                process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
 
                 let stdoutPipe = Pipe()
                 let stderrPipe = Pipe()
