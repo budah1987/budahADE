@@ -34,10 +34,19 @@ final class PlanCanvasState: ObservableObject {
 
     @discardableResult
     func addTile(type: TileType, at position: CGPoint, parentFrameId: UUID? = nil) -> UUID {
+        // TextBox gets a compact initial size; other tiles use default
+        let initialSize: CGSize = {
+            switch type {
+            case .textBox: return CGSize(width: 120, height: 40)
+            case .stickyNote: return CGSize(width: 200, height: 160)
+            default: return CanvasElement.defaultSize
+            }
+        }()
+
         var element = CanvasElement(
             kind: .tile(type),
             position: position,
-            size: CanvasElement.defaultSize,
+            size: initialSize,
             title: type.displayName
         )
 
@@ -85,6 +94,10 @@ final class PlanCanvasState: ObservableObject {
         } else {
             elements.append(element)
         }
+
+        // Auto-select text tiles so they start in edit mode
+        if case .textBox = type { selectedId = element.id }
+        if case .stickyNote = type { selectedId = element.id }
 
         didMutate()
         return element.id
@@ -197,9 +210,16 @@ final class PlanCanvasState: ObservableObject {
     // MARK: - Resize Element
 
     func resizeElement(_ id: UUID, to newSize: CGSize) {
+        // TextBox labels use a smaller minimum size
+        let minSize: CGSize = {
+            if let el = findElement(id), case .tile(.textBox) = el.kind {
+                return CGSize(width: 60, height: 30)
+            }
+            return CanvasElement.minSize
+        }()
         let clamped = CGSize(
-            width: max(newSize.width, CanvasElement.minSize.width),
-            height: max(newSize.height, CanvasElement.minSize.height)
+            width: max(newSize.width, minSize.width),
+            height: max(newSize.height, minSize.height)
         )
 
         // Check root level
