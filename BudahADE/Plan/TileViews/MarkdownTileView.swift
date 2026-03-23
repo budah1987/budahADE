@@ -1,0 +1,279 @@
+import SwiftUI
+
+struct MarkdownTileView: View {
+    let path: String
+    @ObservedObject var canvas: PlanCanvasState
+    let elementId: UUID
+    let onClose: () -> Void
+
+    @State private var spec: SpecParseResult?
+    @State private var sections: [MarkdownSection] = []
+    @State private var editingSectionId: String?
+    @State private var editContent: String = ""
+    @State private var pollTimer: Timer?
+
+    private var filename: String { (path as NSString).lastPathComponent }
+    private var hasCheckboxes: Bool { sections.contains { !$0.checkboxItems.isEmpty } }
+
+    var body: some View {
+        TileChrome(
+            title: spec?.title ?? filename,
+            icon: hasCheckboxes ? "doc.badge.gearshape" : "doc.text",
+            onClose: onClose
+        ) {
+            VStack(spacing: 0) {
+                // Progress bar (only if has checkboxes)
+                if let spec, spec.totalCount > 0 {
+                    progressBar(spec)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                    Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+                }
+
+                // Sections
+                if sections.isEmpty {
+                    emptyState
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(sections) { section in
+                                sectionView(section)
+                            }
+                        }
+                    }
+                }
+
+                Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+
+                // Footer
+                tileFooter
+            }
+        }
+        .onAppear { reload(); startPolling() }
+        .onDisappear { stopPolling() }
+    }
+
+    // MARK: - Progress Bar
+
+    private func progressBar(_ spec: SpecParseResult) -> some View {
+        HStack(spacing: 8) {
+            Text("\(spec.completedCount)/\(spec.totalCount)")
+                .font(Theme.mono(10))
+                .foregroundColor(spec.progress >= 1.0 ? Theme.success : Theme.textSecondary)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(spec.progress >= 1.0 ? Theme.success : Theme.accent)
+                        .frame(width: geo.size.width * spec.progress, height: 3)
+                        .animation(.easeOut(duration: 0.3), value: spec.progress)
+                }
+            }
+            .frame(height: 3)
+        }
+    }
+
+    // MARK: - Section View
+
+    private func sectionView(_ section: MarkdownSection) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Section header
+            HStack(spacing: 6) {
+                Text(section.heading)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
+
+                // Source attribution
+                if let sourceId = section.sourceId {
+                    HStack(spacing: 3) {
+                        Circle().fill(Theme.accent).frame(width: 5, height: 5)
+                        Text("from \(sourceId)")
+                            .font(Theme.caption(9))
+                            .foregroundColor(Theme.textMuted)
+                    }
+                }
+
+                if !section.checkboxItems.isEmpty {
+                    let done = section.checkboxItems.filter(\.isCompleted).count
+                    Text("\(done)/\(section.checkboxItems.count)")
+                        .font(Theme.mono(9))
+                        .foregroundColor(done == section.checkboxItems.count ? Theme.success : Theme.textMuted)
+                }
+
+                Spacer()
+
+                // Detach button
+                Button {
+                    canvas.detachSpecSection(specTileId: elementId, sectionId: section.id, specPath: path)
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Theme.textMuted)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help("Detach section to canvas tile")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Theme.surface2.opacity(0.5))
+
+            // Section content: edit mode or display mode
+            if editingSectionId == section.id {
+                // Edit mode
+                TextEditor(text: $editContent)
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textPrimary)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 60)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .onExitCommand { commitEdit(section) }
+            } else {
+                // Display mode: show checkboxes or content preview
+                if section.checkboxItems.isEmpty {
+                    // Non-task section: content preview (clickable to edit)
+                    let preview = section.body
+                        .components(separatedBy: .newlines)
+                        .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                        .prefix(5)
+                        .joined(separator: "\n")
+                    if !preview.isEmpty {
+                        Text(preview)
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.textMuted)
+                            .lineLimit(5)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                            .onTapGesture { startEditing(section) }
+                    }
+                } else {
+                    // Task section: show checkboxes
+                    ForEach(section.checkboxItems) { task in
+                        taskRow(task)
+                    }
+                }
+            }
+
+            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+        }
+    }
+
+    // MARK: - Task Row
+
+    private func taskRow(_ task: SpecTask) -> some View {
+        Button { toggleTask(task) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: task.isCompleted ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 13))
+                    .foregroundColor(task.isCompleted ? Theme.success : Theme.textMuted)
+                Text(task.title)
+                    .font(.system(size: 11, weight: task.isCompleted ? .regular : .medium))
+                    .foregroundColor(task.isCompleted ? Theme.textMuted : Theme.textPrimary)
+                    .strikethrough(task.isCompleted, color: Theme.textMuted)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Editing
+
+    private func startEditing(_ section: MarkdownSection) {
+        editingSectionId = section.id
+        editContent = section.body
+    }
+
+    private func commitEdit(_ section: MarkdownSection) {
+        guard editingSectionId == section.id else { return }
+        editingSectionId = nil
+
+        // Read file, replace section lines, write back
+        guard let _ = try? String(contentsOfFile: path, encoding: .utf8) else { return }
+        var lines = (try? String(contentsOfFile: path, encoding: .utf8))!
+            .components(separatedBy: .newlines)
+        let range = section.lineRange
+        guard range.lowerBound < lines.count else { return }
+
+        // Replace lines after the heading (keep the ## heading line)
+        let headingLine = lines[range.lowerBound]
+        let newLines = [headingLine] + editContent.components(separatedBy: .newlines)
+        let upperBound = min(range.upperBound, lines.count)
+        lines.replaceSubrange(range.lowerBound..<upperBound, with: newLines)
+
+        let content = lines.joined(separator: "\n")
+        try? content.write(toFile: path, atomically: true, encoding: .utf8)
+        reload()
+    }
+
+    // MARK: - Toggle Checkbox
+
+    private func toggleTask(_ task: SpecTask) {
+        guard var content = try? String(contentsOfFile: path, encoding: .utf8) else { return }
+        content = SpecParser.toggleCheckbox(in: content, at: task.id)
+        try? content.write(toFile: path, atomically: true, encoding: .utf8)
+        reload()
+    }
+
+    // MARK: - Footer
+
+    private var tileFooter: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 9))
+                .foregroundColor(Theme.textMuted)
+            Text(filename)
+                .font(Theme.mono(9))
+                .foregroundColor(Theme.textMuted)
+            Spacer()
+            Text("\(sections.count) sections")
+                .font(Theme.caption(9))
+                .foregroundColor(Theme.textMuted)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 24))
+                .foregroundColor(Theme.textMuted)
+            Text("Empty document")
+                .font(Theme.body(13))
+                .foregroundColor(Theme.textMuted)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - File Loading
+
+    private func reload() {
+        spec = SpecParser.parse(fileAt: path)
+        if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+            sections = SpecParser.parseMarkdownSections(from: content)
+        }
+    }
+
+    private func startPolling() {
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task { @MainActor in reload() }
+        }
+    }
+
+    private func stopPolling() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+    }
+}

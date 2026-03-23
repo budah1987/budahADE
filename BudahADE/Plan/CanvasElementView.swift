@@ -145,8 +145,11 @@ private struct TileContentView: View {
             }
 
         case .markdown(let path):
-            // Temporarily use SpecDocumentTileView until Task 6 replaces it
-            SpecDocumentTileView(path: path, canvas: canvas, elementId: elementId) {
+            MarkdownTileView(
+                path: path,
+                canvas: canvas,
+                elementId: elementId
+            ) {
                 canvas.removeElement(elementId)
             }
 
