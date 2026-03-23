@@ -306,8 +306,15 @@ private struct TileContentView: View {
                 }
             }
 
-        case .document(let path):
-            DocumentTileView(path: path) {
+        case .stickyNote:
+            Text("Sticky Note - TODO")
+
+        case .textBox:
+            Text("Text Box - TODO")
+
+        case .markdown(let path):
+            // Temporarily use SpecDocumentTileView until Task 6 replaces it
+            SpecDocumentTileView(path: path, canvas: canvas, elementId: elementId) {
                 canvas.removeElement(elementId)
             }
 
@@ -318,15 +325,6 @@ private struct TileContentView: View {
 
         case .browser(let url):
             BrowserTileView(url: url) {
-                canvas.removeElement(elementId)
-            }
-
-        case .specDocument(let path):
-            SpecDocumentTileView(
-                path: path,
-                canvas: canvas,
-                elementId: elementId
-            ) {
                 canvas.removeElement(elementId)
             }
         }

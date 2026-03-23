@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AddTileMenu: View {
     let onAddAgent: (AgentMode) -> Void
-    let onAddDocument: () -> Void
+    let onAddMarkdown: () -> Void
     let onAddBrowser: () -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -51,11 +51,11 @@ struct AddTileMenu: View {
 
             utilityRow(
                 icon: "doc.text",
-                name: "Document",
+                name: "Markdown",
                 description: "Markdown notes",
                 key: "doc"
             ) {
-                onAddDocument()
+                onAddMarkdown()
                 dismiss()
             }
 

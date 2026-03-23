@@ -51,28 +51,31 @@ enum AgentMode: String, CaseIterable, Identifiable {
 
 enum TileType: Equatable {
     case terminal(panelId: UUID, agent: AgentMode)
-    case document(path: String)
+    case stickyNote
+    case textBox
+    case markdown(path: String)
     case image(path: String)
     case browser(url: URL?)
-    case specDocument(path: String)
 
     var displayName: String {
         switch self {
         case .terminal(_, let agent): return agent.displayName
-        case .document:               return "Document"
+        case .stickyNote:             return "Sticky Note"
+        case .textBox:                return "Text Box"
+        case .markdown:               return "Markdown"
         case .image:                  return "Image"
         case .browser:                return "Browser"
-        case .specDocument:           return "Spec"
         }
     }
 
     var iconName: String {
         switch self {
         case .terminal(_, let agent): return agent.iconName
-        case .document:               return "doc.text"
+        case .stickyNote:             return "note.text"
+        case .textBox:                return "text.alignleft"
+        case .markdown:               return "doc.text"
         case .image:                  return "photo"
         case .browser:                return "globe"
-        case .specDocument:           return "doc.badge.gearshape"
         }
     }
 }

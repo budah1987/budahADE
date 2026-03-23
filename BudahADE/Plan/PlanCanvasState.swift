@@ -436,12 +436,12 @@ final class PlanCanvasState: ObservableObject {
 
         // Auto-add a spec document tile to the canvas if one doesn't exist
         let hasSpecTile = elements.contains { el in
-            if case .tile(.specDocument) = el.kind { return true }
+            if case .tile(.markdown) = el.kind { return true }
             return false
         }
         if !hasSpecTile {
             let position = nextFreePosition(size: CGSize(width: 400, height: 500))
-            addTile(type: .specDocument(path: path), at: position)
+            addTile(type: .markdown(path: path), at: position)
         }
 
         return path
@@ -471,7 +471,7 @@ final class PlanCanvasState: ObservableObject {
 
         // Create document tile, auto-tagged with the section
         var element = CanvasElement(
-            kind: .tile(.document(path: filePath)),
+            kind: .tile(.markdown(path: filePath)),
             position: newPos,
             size: CGSize(width: 400, height: 300),
             title: "Edit: \(section.title)",
@@ -485,7 +485,7 @@ final class PlanCanvasState: ObservableObject {
     /// Merge a detached section tile back into the spec file
     func mergeIntoSpec(tileId: UUID, specPath: String) {
         guard let tile = findElement(tileId),
-              case .tile(.document(let docPath)) = tile.kind,
+              case .tile(.markdown(let docPath)) = tile.kind,
               let sectionName = tile.specSection else { return }
 
         // Read the edited content

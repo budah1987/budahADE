@@ -127,7 +127,7 @@ enum SpecAssembler {
         canvas: PlanCanvasState
     ) -> String {
         switch tileType {
-        case .document(let path):
+        case .markdown(let path):
             return (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
 
         case .browser(let url):
@@ -147,8 +147,8 @@ enum SpecAssembler {
             }
             return "<!-- \(agent.displayName) agent output pending -->"
 
-        case .specDocument(let path):
-            return (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
+        case .stickyNote, .textBox:
+            return ""
         }
     }
 

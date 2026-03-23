@@ -25,14 +25,14 @@ enum ContextManifest {
             switch tileType {
             case .image(let path):
                 images.append(path)
-            case .document(let path):
+            case .markdown(let path):
                 documents.append(path)
             case .browser(let url):
                 if let url { urls.append(url.absoluteString) }
             case .terminal(_, let agent):
                 agents.append(agent.displayName)
-            case .specDocument(let path):
-                documents.append(path)
+            case .stickyNote, .textBox:
+                break
             }
         }
 

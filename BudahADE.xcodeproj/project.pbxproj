@@ -70,6 +70,7 @@
 		AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB18001800180018BB180018 /* BuildStatusWatcher.swift */; };
 		AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB19001900190019BB190019 /* SpecDocumentTileView.swift */; };
 		TE01000100010001TE010001 /* SpecParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01000100010001TF010001 /* SpecParserTests.swift */; };
+		TE02000200020002TE020002 /* CanvasNodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02000200020002TF020003 /* CanvasNodeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -138,6 +139,7 @@
 		BB18001800180018BB180018 /* BuildStatusWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusWatcher.swift; sourceTree = "<group>"; };
 		BB19001900190019BB190019 /* SpecDocumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecDocumentTileView.swift; sourceTree = "<group>"; };
 		TF01000100010001TF010001 /* SpecParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecParserTests.swift; sourceTree = "<group>"; };
+		TF02000200020002TF020003 /* CanvasNodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNodeTests.swift; sourceTree = "<group>"; };
 		TF02000200020002TF020002 /* BudahADETests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudahADETests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -252,6 +254,7 @@
 			isa = PBXGroup;
 			children = (
 				TF01000100010001TF010001 /* SpecParserTests.swift */,
+				TF02000200020002TF020003 /* CanvasNodeTests.swift */,
 			);
 			path = BudahADETests;
 			sourceTree = "<group>";
@@ -489,6 +492,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				TE01000100010001TE010001 /* SpecParserTests.swift in Sources */,
+				TE02000200020002TE020002 /* CanvasNodeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

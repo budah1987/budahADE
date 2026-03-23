@@ -275,9 +275,9 @@ struct PlanCanvasView: View {
             if !FileManager.default.fileExists(atPath: path) {
                 FileManager.default.createFile(atPath: path, contents: nil)
             }
-            canvas.addTile(type: .document(path: path), at: position)
+            canvas.addTile(type: .markdown(path: path), at: position)
         } label: {
-            Label("Add Document", systemImage: "doc.text")
+            Label("Add Markdown", systemImage: "doc.text")
         }
 
         Button {
@@ -477,7 +477,7 @@ struct PlanCanvasView: View {
                         if imageExts.contains(ext) {
                             canvas.addTile(type: .image(path: url.path), at: position)
                         } else if ext == "md" || ext == "txt" {
-                            canvas.addTile(type: .document(path: url.path), at: position)
+                            canvas.addTile(type: .markdown(path: url.path), at: position)
                         }
                     }
                 }
