@@ -1,42 +1,43 @@
 import SwiftUI
 
-/// Multi-line plain text, user-sized. For longer notes that need explicit dimensions.
+/// Single-line headline/label tile. Auto-width to text content. Enter exits edit mode.
 struct TextBoxView: View {
     let elementId: UUID
     @ObservedObject var canvas: PlanCanvasState
     let onClose: () -> Void
 
-    @State private var content: String = ""
+    @State private var content: String = "Label"
     @State private var isEditing: Bool = false
     @FocusState private var isFocused: Bool
 
     private var isSelected: Bool { canvas.selectedId == elementId }
 
     var body: some View {
-        TileChrome(
-            title: "Text Box",
-            icon: "text.alignleft",
-            onClose: onClose
-        ) {
-            Group {
-                if isEditing {
-                    TextEditor(text: $content)
-                        .font(.system(size: 13))
-                        .foregroundColor(Theme.textPrimary)
-                        .scrollContentBackground(.hidden)
-                        .focused($isFocused)
-                        .onExitCommand { exitEditing() }
-                } else {
-                    Text(content.isEmpty ? "Click to type..." : content)
-                        .font(.system(size: 13))
-                        .foregroundColor(content.isEmpty ? Theme.textMuted : Theme.textPrimary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .contentShape(Rectangle())
-                        .onTapGesture { enterEditing() }
-                }
+        Group {
+            if isEditing {
+                TextField("Type label...", text: $content)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
+                    .focused($isFocused)
+                    .onSubmit { exitEditing() }
+                    .onExitCommand { exitEditing() }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            } else {
+                Text(content.isEmpty ? "Label" : content)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(content.isEmpty ? Theme.textMuted : Theme.textPrimary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture { enterEditing() }
             }
-            .padding(8)
         }
+        .background(Theme.contentBg)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .fixedSize(horizontal: true, vertical: true)
         .onChange(of: isSelected) { _, selected in
             if !selected { exitEditing() }
         }
