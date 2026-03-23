@@ -18,6 +18,10 @@ struct PlanCanvasView: View {
     // Debounced commit to canvas state
     @State private var commitTask: DispatchWorkItem?
 
+    // Viewport culling cache
+    @State private var cachedVisibleIds: Set<UUID> = []
+    @State private var cullingDebounce: DispatchWorkItem?
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -46,8 +50,12 @@ struct PlanCanvasView: View {
             .onAppear {
                 viewportSize = geo.size
                 syncFromCanvas()
+                debounceCulling()
             }
             .onChange(of: geo.size) { _, new in viewportSize = new }
+            .onChange(of: localZoom) { _, _ in debounceCulling() }
+            .onChange(of: localPanOffset) { _, _ in debounceCulling() }
+            .onChange(of: canvas.elements.count) { _, _ in debounceCulling() }
             .background(
                 CanvasInputMonitor(
                     onScroll: { deltaX, deltaY, isZoom, isShiftPan in
@@ -234,24 +242,41 @@ struct PlanCanvasView: View {
         .offset(localPanOffset)
     }
 
-    /// Only render elements whose screen-space rect intersects the viewport
+    /// Only render elements whose screen-space rect intersects the viewport.
+    /// Uses a debounced cache to avoid recomputing on every gesture frame.
     private var visibleElements: [CanvasElement] {
-        guard viewportSize.width > 0 else { return canvas.elements }
-        let margin: CGFloat = 100  // render slightly outside viewport for smooth scrolling
-        let viewport = CGRect(
-            x: -margin, y: -margin,
-            width: viewportSize.width + margin * 2,
-            height: viewportSize.height + margin * 2
-        )
-        return canvas.elements.filter { el in
-            let screenRect = CGRect(
-                x: el.position.x * localZoom + localPanOffset.width,
-                y: el.position.y * localZoom + localPanOffset.height,
-                width: el.size.width * localZoom,
-                height: el.size.height * localZoom
-            )
-            return viewport.intersects(screenRect)
+        if cachedVisibleIds.isEmpty {
+            return canvas.elements // first render before debounce fires
         }
+        return canvas.elements.filter { cachedVisibleIds.contains($0.id) }
+    }
+
+    private func debounceCulling() {
+        cullingDebounce?.cancel()
+        let zoom = localZoom
+        let offset = localPanOffset
+        let vpSize = viewportSize
+        let elements = canvas.elements
+        let task = DispatchWorkItem {
+            let margin: CGFloat = 100
+            let viewport = CGRect(
+                x: -margin, y: -margin,
+                width: vpSize.width + margin * 2,
+                height: vpSize.height + margin * 2
+            )
+            let ids = Set(elements.filter { el in
+                let screenRect = CGRect(
+                    x: el.position.x * zoom + offset.width,
+                    y: el.position.y * zoom + offset.height,
+                    width: el.size.width * zoom,
+                    height: el.size.height * zoom
+                )
+                return viewport.intersects(screenRect)
+            }.map(\.id))
+            cachedVisibleIds = ids
+        }
+        cullingDebounce = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: task)
     }
 
     // MARK: - Context Menu

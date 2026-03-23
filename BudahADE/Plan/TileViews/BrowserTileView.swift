@@ -6,13 +6,15 @@ import WebKit
 struct BrowserTileView: View {
     let initialURL: URL?
     let onClose: () -> Void
+    var isVisible: Bool = true  // when false, replaces WKWebView with a lightweight placeholder
 
     @State private var urlText: String
     @State private var webViewStore = WebViewStore()
 
-    init(url: URL?, onClose: @escaping () -> Void) {
+    init(url: URL?, onClose: @escaping () -> Void, isVisible: Bool = true) {
         self.initialURL = url
         self.onClose = onClose
+        self.isVisible = isVisible
         _urlText = State(initialValue: url?.absoluteString ?? "")
     }
 
@@ -64,8 +66,23 @@ struct BrowserTileView: View {
 
                 Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
 
-                // WebView
-                WebViewRepresentable(store: webViewStore)
+                // WebView or lightweight placeholder when offscreen
+                if isVisible {
+                    WebViewRepresentable(store: webViewStore)
+                } else {
+                    VStack(spacing: 8) {
+                        Image(systemName: "globe")
+                            .font(.system(size: 24))
+                            .foregroundColor(Theme.textMuted)
+                        if let url = initialURL {
+                            Text(url.host ?? url.absoluteString)
+                                .font(Theme.caption(11))
+                                .foregroundColor(Theme.textMuted)
+                                .lineLimit(1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
         .onAppear {

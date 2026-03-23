@@ -159,9 +159,9 @@ private struct TileContentView: View {
             }
 
         case .browser(let url):
-            BrowserTileView(url: url) {
+            BrowserTileView(url: url, onClose: {
                 canvas.removeElement(elementId)
-            }
+            }, isVisible: true)
         }
     }
 }
