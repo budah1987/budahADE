@@ -270,6 +270,18 @@ struct PlanCanvasView: View {
         }
 
         Button {
+            canvas.addTile(type: .stickyNote, at: position)
+        } label: {
+            Label("Add Sticky Note", systemImage: "note.text")
+        }
+
+        Button {
+            canvas.addTile(type: .textBox, at: position)
+        } label: {
+            Label("Add Text Box", systemImage: "text.alignleft")
+        }
+
+        Button {
             let name = "plan-notes-\(UUID().uuidString.prefix(4)).md"
             let path = (canvas.worktreePath as NSString).appendingPathComponent(name)
             if !FileManager.default.fileExists(atPath: path) {

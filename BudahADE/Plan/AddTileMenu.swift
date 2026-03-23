@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AddTileMenu: View {
     let onAddAgent: (AgentMode) -> Void
+    let onAddStickyNote: () -> Void
+    let onAddTextBox: () -> Void
     let onAddMarkdown: () -> Void
     let onAddBrowser: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -50,10 +52,30 @@ struct AddTileMenu: View {
                 .padding(.vertical, 4)
 
             utilityRow(
+                icon: "note.text",
+                name: "Sticky Note",
+                description: "Quick note, auto-sizes",
+                key: "sticky"
+            ) {
+                onAddStickyNote()
+                dismiss()
+            }
+
+            utilityRow(
+                icon: "text.alignleft",
+                name: "Text Box",
+                description: "Multi-line text, user-sized",
+                key: "textbox"
+            ) {
+                onAddTextBox()
+                dismiss()
+            }
+
+            utilityRow(
                 icon: "doc.text",
                 name: "Markdown",
-                description: "Markdown notes",
-                key: "doc"
+                description: "Section-based document",
+                key: "markdown"
             ) {
                 onAddMarkdown()
                 dismiss()
