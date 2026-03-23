@@ -9,6 +9,8 @@ struct TextBoxView: View {
     @State private var content: String = ""
     @FocusState private var isFocused: Bool
 
+    private var isSelected: Bool { canvas.selectedId == elementId }
+
     var body: some View {
         TileChrome(
             title: "Text Box",
@@ -21,6 +23,11 @@ struct TextBoxView: View {
                 .scrollContentBackground(.hidden)
                 .focused($isFocused)
                 .padding(8)
+                .onExitCommand { isFocused = false }
+        }
+        // Blur when tile is deselected on canvas
+        .onChange(of: isSelected) { _, selected in
+            if !selected { isFocused = false }
         }
     }
 }

@@ -66,13 +66,18 @@ struct CanvasInputMonitor: NSViewRepresentable {
             super.removeFromSuperview()
         }
 
-        /// Whether the current first responder is a terminal surface (or child of one)
-        private func terminalHasFocus() -> Bool {
-            guard let responder = window?.firstResponder as? NSView else { return false }
-            var view: NSView? = responder
-            while let v = view {
-                if v is TerminalSurfaceView { return true }
-                view = v.superview
+        /// Whether the current first responder is a text input (terminal, TextEditor, or any NSTextView)
+        private func textInputHasFocus() -> Bool {
+            guard let responder = window?.firstResponder else { return false }
+            // NSTextView is the underlying view for SwiftUI TextEditor and TextField
+            if responder is NSTextView { return true }
+            // Also check the view hierarchy for terminal surfaces
+            if let view = responder as? NSView {
+                var current: NSView? = view
+                while let v = current {
+                    if v is TerminalSurfaceView { return true }
+                    current = v.superview
+                }
             }
             return false
         }
@@ -98,7 +103,7 @@ struct CanvasInputMonitor: NSViewRepresentable {
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard let self else { return event }
                 // If a terminal has focus, let ALL keys pass through
-                if self.terminalHasFocus() { return event }
+                if self.textInputHasFocus() { return event }
 
                 if event.keyCode == 53 {  // Escape
                     self.onEscape()
@@ -115,7 +120,7 @@ struct CanvasInputMonitor: NSViewRepresentable {
             // Key-up monitor: match space release
             keyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
                 guard let self else { return event }
-                if self.terminalHasFocus() { return event }
+                if self.textInputHasFocus() { return event }
 
                 if event.keyCode == 49 {
                     self.isSpaceHeld = false
