@@ -41,8 +41,40 @@ final class MarkdownSectionParserTests: XCTestCase {
     }
 
     func testCheckboxToggleRewrite() {
-        let original = "- [ ] unchecked task"
+        // Checkbox must be inside a ## section to be toggled
+        let original = """
+        ## Tasks
+        - [ ] unchecked task
+        """
         let toggled = SpecParser.toggleCheckbox(in: original, at: 0)
-        XCTAssertEqual(toggled, "- [x] unchecked task")
+        XCTAssertTrue(toggled.contains("- [x] unchecked task"))
+    }
+
+    func testDuplicateHeadingsGetUniqueIds() {
+        let md = """
+        ## Design
+        First design section.
+
+        ## Design
+        Second design section.
+        """
+        let result = SpecParser.parseMarkdownSections(from: md)
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].id, "design")
+        XCTAssertEqual(result[1].id, "design-2")
+    }
+
+    func testToggleCheckboxIgnoresOrphanCheckboxes() {
+        let md = """
+        - [ ] orphan checkbox
+
+        ## Tasks
+        - [ ] real task A
+        - [ ] real task B
+        """
+        // Toggle task at index 0 should toggle "real task A", not the orphan
+        let toggled = SpecParser.toggleCheckbox(in: md, at: 0)
+        XCTAssertTrue(toggled.contains("- [x] real task A"))
+        XCTAssertTrue(toggled.contains("- [ ] orphan checkbox"))  // orphan untouched
     }
 }

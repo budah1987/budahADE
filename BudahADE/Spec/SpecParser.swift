@@ -205,8 +205,20 @@ extension SpecParser {
             guard let heading = currentHeading else { return }
             let body = currentLines.joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Deduplicate section IDs
+            var sectionId = slugify(heading)
+            let existingIds = sections.map(\.id)
+            if existingIds.contains(sectionId) {
+                var suffix = 2
+                while existingIds.contains("\(sectionId)-\(suffix)") {
+                    suffix += 1
+                }
+                sectionId = "\(sectionId)-\(suffix)"
+            }
+
             sections.append(MarkdownSection(
-                id: slugify(heading),
+                id: sectionId,
                 heading: heading,
                 body: body,
                 sourceId: currentSourceId,
@@ -266,8 +278,15 @@ extension SpecParser {
         let lines = content.components(separatedBy: .newlines)
         var newLines = lines
         var counter = 0
+        var insideSection = false
         for (i, line) in lines.enumerated() {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
+            // Track section boundaries (same logic as parseMarkdownSections)
+            if trimmed.hasPrefix("## ") && !trimmed.hasPrefix("### ") {
+                insideSection = true
+                continue
+            }
+            guard insideSection else { continue }
             if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") ||
                trimmed.hasPrefix("- [ ] ") {
                 if counter == taskIndex {
