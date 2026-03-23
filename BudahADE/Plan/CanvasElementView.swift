@@ -135,10 +135,14 @@ private struct TileContentView: View {
             }
 
         case .stickyNote:
-            Text("Sticky Note - TODO")
+            StickyNoteView(elementId: elementId, canvas: canvas) {
+                canvas.removeElement(elementId)
+            }
 
         case .textBox:
-            Text("Text Box - TODO")
+            TextBoxView(elementId: elementId, canvas: canvas) {
+                canvas.removeElement(elementId)
+            }
 
         case .markdown(let path):
             // Temporarily use SpecDocumentTileView until Task 6 replaces it
