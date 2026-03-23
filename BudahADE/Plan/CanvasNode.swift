@@ -84,6 +84,20 @@ struct FrameData: Equatable {
     var padding: CGFloat = 48
     var headerHeight: CGFloat = 40
 
+    init(
+        axis: Axis = .horizontal,
+        children: [CanvasElement] = [],
+        gap: CGFloat = 32,
+        padding: CGFloat = 48,
+        headerHeight: CGFloat = 40
+    ) {
+        self.axis = axis
+        self.children = children
+        self.gap = gap
+        self.padding = padding
+        self.headerHeight = headerHeight
+    }
+
     /// Computed size from children
     var computedSize: CGSize {
         guard !children.isEmpty else {
@@ -144,6 +158,24 @@ struct TextData: Equatable {
     var colorHex: UInt32 = 0xe5e5e5
     var isBold: Bool = false
     var isItalic: Bool = false
+
+    init(
+        content: String = "Text",
+        fontSize: CGFloat = 16,
+        weight: TextWeight = .regular,
+        fontFamily: TextFontFamily = .system,
+        colorHex: UInt32 = 0xe5e5e5,
+        isBold: Bool = false,
+        isItalic: Bool = false
+    ) {
+        self.content = content
+        self.fontSize = fontSize
+        self.weight = weight
+        self.fontFamily = fontFamily
+        self.colorHex = colorHex
+        self.isBold = isBold
+        self.isItalic = isItalic
+    }
 
     var color: Color { Color(hex: colorHex) }
 
