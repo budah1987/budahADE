@@ -53,7 +53,7 @@
 		AA07000700070007AA070007 /* PlanCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB07000700070007BB070007 /* PlanCanvasView.swift */; };
 		AA08000800080008AA080008 /* TileChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB08000800080008BB080008 /* TileChrome.swift */; };
 		AA09000900090009AA090009 /* TerminalTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB09000900090009BB090009 /* TerminalTileView.swift */; };
-		AA0A000A000A000AAA0A000A /* DocumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0A000A000A000ABB0A000A /* DocumentTileView.swift */; };
+		AA21002100210021AA210021 /* MarkdownTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB21002100210021BB210021 /* MarkdownTileView.swift */; };
 		AA0B000B000B000BAA0B000B /* ImageTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0B000B000B000BBB0B000B /* ImageTileView.swift */; };
 		AA0C000C000C000CAA0C000C /* BrowserTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0C000C000C000CBB0C000C /* BrowserTileView.swift */; };
 		AA0D000D000D000DAA0D000D /* SpecParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0D000D000D000DBB0D000D /* SpecParser.swift */; };
@@ -63,12 +63,11 @@
 		AA11001100110011AA110011 /* ScrollWheelMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11001100110011BB110011 /* ScrollWheelMonitor.swift */; };
 		AA12001200120012AA120012 /* SmartGuides.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB12001200120012BB120012 /* SmartGuides.swift */; };
 		AA13001300130013AA130013 /* CanvasElementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB13001300130013BB130013 /* CanvasElementView.swift */; };
-		AA14001400140014AA140014 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB14001400140014BB140014 /* RichTextEditor.swift */; };
+		TE03000300030003TE030003 /* MarkdownSectionParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF03000300030003TF030003 /* MarkdownSectionParserTests.swift */; };
 		AA15001500150015AA150015 /* SpecPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB15001500150015BB150015 /* SpecPanelView.swift */; };
 		AA16001600160016AA160016 /* SpecAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB16001600160016BB160016 /* SpecAssembler.swift */; };
 		AA17001700170017AA170017 /* BuildStatusState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB17001700170017BB170017 /* BuildStatusState.swift */; };
 		AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB18001800180018BB180018 /* BuildStatusWatcher.swift */; };
-		AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB19001900190019BB190019 /* SpecDocumentTileView.swift */; };
 		TE01000100010001TE010001 /* SpecParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01000100010001TF010001 /* SpecParserTests.swift */; };
 		TE02000200020002TE020002 /* CanvasNodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02000200020002TF020003 /* CanvasNodeTests.swift */; };
 		AA1A001A001A001AAA1A001A /* TileResizeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1A001A001A001ABB1A001A /* TileResizeHandler.swift */; };
@@ -129,7 +128,7 @@
 		BB07000700070007BB070007 /* PlanCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCanvasView.swift; sourceTree = "<group>"; };
 		BB08000800080008BB080008 /* TileChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileChrome.swift; sourceTree = "<group>"; };
 		BB09000900090009BB090009 /* TerminalTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTileView.swift; sourceTree = "<group>"; };
-		BB0A000A000A000ABB0A000A /* DocumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTileView.swift; sourceTree = "<group>"; };
+		BB21002100210021BB210021 /* MarkdownTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTileView.swift; sourceTree = "<group>"; };
 		BB0B000B000B000BBB0B000B /* ImageTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageTileView.swift; sourceTree = "<group>"; };
 		BB0C000C000C000CBB0C000C /* BrowserTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTileView.swift; sourceTree = "<group>"; };
 		BB0D000D000D000DBB0D000D /* SpecParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecParser.swift; sourceTree = "<group>"; };
@@ -139,12 +138,11 @@
 		BB11001100110011BB110011 /* ScrollWheelMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollWheelMonitor.swift; sourceTree = "<group>"; };
 		BB12001200120012BB120012 /* SmartGuides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartGuides.swift; sourceTree = "<group>"; };
 		BB13001300130013BB130013 /* CanvasElementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasElementView.swift; sourceTree = "<group>"; };
-		BB14001400140014BB140014 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
+		TF03000300030003TF030003 /* MarkdownSectionParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownSectionParserTests.swift; sourceTree = "<group>"; };
 		BB15001500150015BB150015 /* SpecPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecPanelView.swift; sourceTree = "<group>"; };
 		BB16001600160016BB160016 /* SpecAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecAssembler.swift; sourceTree = "<group>"; };
 		BB17001700170017BB170017 /* BuildStatusState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusState.swift; sourceTree = "<group>"; };
 		BB18001800180018BB180018 /* BuildStatusWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusWatcher.swift; sourceTree = "<group>"; };
-		BB19001900190019BB190019 /* SpecDocumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecDocumentTileView.swift; sourceTree = "<group>"; };
 		BB1A001A001A001ABB1A001A /* TileResizeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileResizeHandler.swift; sourceTree = "<group>"; };
 		BB1B001B001B001BBB1B001B /* FrameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameContainerView.swift; sourceTree = "<group>"; };
 		BB1C001C001C001CBB1C001C /* TileDragHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDragHandler.swift; sourceTree = "<group>"; };
@@ -184,10 +182,8 @@
 			isa = PBXGroup;
 			children = (
 				BB0C000C000C000CBB0C000C /* BrowserTileView.swift */,
-				BB0A000A000A000ABB0A000A /* DocumentTileView.swift */,
 				BB0B000B000B000BBB0B000B /* ImageTileView.swift */,
-				BB14001400140014BB140014 /* RichTextEditor.swift */,
-				BB19001900190019BB190019 /* SpecDocumentTileView.swift */,
+				BB21002100210021BB210021 /* MarkdownTileView.swift */,
 				BB1E001E001E001EBB1E001E /* TextContentView.swift */,
 				BB1F001F001F001FBB1F001F /* StickyNoteView.swift */,
 				BB20002000200020BB200020 /* TextBoxView.swift */,
@@ -276,6 +272,7 @@
 			children = (
 				TF01000100010001TF010001 /* SpecParserTests.swift */,
 				TF02000200020002TF020003 /* CanvasNodeTests.swift */,
+				TF03000300030003TF030003 /* MarkdownSectionParserTests.swift */,
 			);
 			path = BudahADETests;
 			sourceTree = "<group>";
@@ -489,7 +486,7 @@
 				AA07000700070007AA070007 /* PlanCanvasView.swift in Sources */,
 				AA08000800080008AA080008 /* TileChrome.swift in Sources */,
 				AA09000900090009AA090009 /* TerminalTileView.swift in Sources */,
-				AA0A000A000A000AAA0A000A /* DocumentTileView.swift in Sources */,
+				AA21002100210021AA210021 /* MarkdownTileView.swift in Sources */,
 				AA0B000B000B000BAA0B000B /* ImageTileView.swift in Sources */,
 				AA0C000C000C000CAA0C000C /* BrowserTileView.swift in Sources */,
 				AA0D000D000D000DAA0D000D /* SpecParser.swift in Sources */,
@@ -499,12 +496,10 @@
 				AA11001100110011AA110011 /* ScrollWheelMonitor.swift in Sources */,
 				AA12001200120012AA120012 /* SmartGuides.swift in Sources */,
 				AA13001300130013AA130013 /* CanvasElementView.swift in Sources */,
-				AA14001400140014AA140014 /* RichTextEditor.swift in Sources */,
 				AA15001500150015AA150015 /* SpecPanelView.swift in Sources */,
 				AA16001600160016AA160016 /* SpecAssembler.swift in Sources */,
 				AA17001700170017AA170017 /* BuildStatusState.swift in Sources */,
 				AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */,
-				AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */,
 				AA1A001A001A001AAA1A001A /* TileResizeHandler.swift in Sources */,
 				AA1B001B001B001BAA1B001B /* FrameContainerView.swift in Sources */,
 				AA1C001C001C001CAA1C001C /* TileDragHandler.swift in Sources */,
@@ -521,6 +516,7 @@
 			files = (
 				TE01000100010001TE010001 /* SpecParserTests.swift in Sources */,
 				TE02000200020002TE020002 /* CanvasNodeTests.swift in Sources */,
+				TE03000300030003TE030003 /* MarkdownSectionParserTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

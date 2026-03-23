@@ -170,10 +170,119 @@ enum SpecParser {
 
     // MARK: - Helpers
 
-    private static func slugify(_ text: String) -> String {
+    static func slugify(_ text: String) -> String {
         text.lowercased()
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: "-")
+    }
+}
+
+// MARK: - Markdown Section (for section-based editing in MarkdownTileView)
+
+struct MarkdownSection: Identifiable, Equatable {
+    let id: String          // slugified heading
+    let heading: String
+    let body: String
+    var sourceId: String?   // from <!-- source: xxx --> comment
+    let checkboxItems: [SpecTask]
+    let lineRange: Range<Int>
+}
+
+extension SpecParser {
+    /// Split markdown content by ## headings into editable sections.
+    static func parseMarkdownSections(from content: String) -> [MarkdownSection] {
+        let lines = content.components(separatedBy: .newlines)
+        var sections: [MarkdownSection] = []
+        var currentHeading: String?
+        var currentStartLine: Int = 0
+        var currentLines: [String] = []
+        var currentSourceId: String?
+        var currentTasks: [SpecTask] = []
+        var taskIndex = 0
+
+        func flush(endLine: Int) {
+            guard let heading = currentHeading else { return }
+            let body = currentLines.joined(separator: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            sections.append(MarkdownSection(
+                id: slugify(heading),
+                heading: heading,
+                body: body,
+                sourceId: currentSourceId,
+                checkboxItems: currentTasks,
+                lineRange: currentStartLine..<endLine
+            ))
+            currentHeading = nil
+            currentLines = []
+            currentSourceId = nil
+            currentTasks = []
+        }
+
+        for (idx, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.hasPrefix("## ") && !trimmed.hasPrefix("### ") {
+                flush(endLine: idx)
+                currentHeading = String(trimmed.dropFirst(3))
+                currentStartLine = idx
+                continue
+            }
+
+            if currentHeading != nil {
+                // Check for source attribution
+                if trimmed.hasPrefix("<!-- source:"),
+                   let end = trimmed.range(of: "-->") {
+                    let start = trimmed.index(trimmed.startIndex, offsetBy: 13)
+                    currentSourceId = String(trimmed[start..<end.lowerBound])
+                        .trimmingCharacters(in: .whitespaces)
+                }
+
+                // Check for checkboxes
+                let sectionSlug = currentHeading.map { slugify($0) }
+                if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
+                    currentTasks.append(SpecTask(
+                        id: taskIndex, title: String(trimmed.dropFirst(6)),
+                        isCompleted: true, sectionId: sectionSlug
+                    ))
+                    taskIndex += 1
+                } else if trimmed.hasPrefix("- [ ] ") {
+                    currentTasks.append(SpecTask(
+                        id: taskIndex, title: String(trimmed.dropFirst(6)),
+                        isCompleted: false, sectionId: sectionSlug
+                    ))
+                    taskIndex += 1
+                }
+
+                currentLines.append(line)
+            }
+        }
+        flush(endLine: lines.count)
+        return sections
+    }
+
+    /// Toggle a checkbox at the given task index in the content string
+    static func toggleCheckbox(in content: String, at taskIndex: Int) -> String {
+        let lines = content.components(separatedBy: .newlines)
+        var newLines = lines
+        var counter = 0
+        for (i, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") ||
+               trimmed.hasPrefix("- [ ] ") {
+                if counter == taskIndex {
+                    if trimmed.hasPrefix("- [ ] ") {
+                        newLines[i] = line.replacingOccurrences(of: "- [ ] ", with: "- [x] ")
+                    } else {
+                        newLines[i] = line
+                            .replacingOccurrences(of: "- [x] ", with: "- [ ] ")
+                            .replacingOccurrences(of: "- [X] ", with: "- [ ] ")
+                    }
+                    break
+                }
+                counter += 1
+            }
+        }
+        return newLines.joined(separator: "\n")
     }
 }
