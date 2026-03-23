@@ -69,6 +69,7 @@
 		AA17001700170017AA170017 /* BuildStatusState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB17001700170017BB170017 /* BuildStatusState.swift */; };
 		AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB18001800180018BB180018 /* BuildStatusWatcher.swift */; };
 		AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB19001900190019BB190019 /* SpecDocumentTileView.swift */; };
+		TE01000100010001TE010001 /* SpecParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01000100010001TF010001 /* SpecParserTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -136,6 +137,8 @@
 		BB17001700170017BB170017 /* BuildStatusState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusState.swift; sourceTree = "<group>"; };
 		BB18001800180018BB180018 /* BuildStatusWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusWatcher.swift; sourceTree = "<group>"; };
 		BB19001900190019BB190019 /* SpecDocumentTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecDocumentTileView.swift; sourceTree = "<group>"; };
+		TF01000100010001TF010001 /* SpecParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecParserTests.swift; sourceTree = "<group>"; };
+		TF02000200020002TF020002 /* BudahADETests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudahADETests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -240,8 +243,17 @@
 			isa = PBXGroup;
 			children = (
 				48861AC41D7638D9CD762F7F /* BudahADE */,
+				TG01000100010001TG010001 /* BudahADETests */,
 				9CD0DA9E2298F2C80E0E493F /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		TG01000100010001TG010001 /* BudahADETests */ = {
+			isa = PBXGroup;
+			children = (
+				TF01000100010001TF010001 /* SpecParserTests.swift */,
+			);
+			path = BudahADETests;
 			sourceTree = "<group>";
 		};
 		848F1E30DE3DA85ED0FE9D31 /* GitPanel */ = {
@@ -276,6 +288,7 @@
 			isa = PBXGroup;
 			children = (
 				2A59DA8E22324BFF54BB447C /* BudahADE.app */,
+				TF02000200020002TF020002 /* BudahADETests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -333,6 +346,36 @@
 			productReference = 2A59DA8E22324BFF54BB447C /* BudahADE.app */;
 			productType = "com.apple.product-type.application";
 		};
+		TT01000100010001TT010001 /* BudahADETests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = TL01000100010001TL010001 /* Build configuration list for PBXNativeTarget "BudahADETests" */;
+			buildPhases = (
+				TS01000100010001TS010001 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TD01000100010001TD010001 /* PBXTargetDependency */,
+			);
+			name = BudahADETests;
+			packageProductDependencies = (
+			);
+			productName = BudahADETests;
+			productReference = TF02000200020002TF020002 /* BudahADETests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		TD01000100010001TD010001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5AA795CBC1C1159DB2C4AF8B /* BudahADE */;
+			targetProxy = TP01000100010001TP010001 /* PBXContainerItemProxy */;
+		};
+		TP01000100010001TP010001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D56FDD81D25CA8B1F7FDA90C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5AA795CBC1C1159DB2C4AF8B;
+			remoteInfo = BudahADE;
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -344,6 +387,10 @@
 				TargetAttributes = {
 					5AA795CBC1C1159DB2C4AF8B = {
 						ProvisioningStyle = Automatic;
+					};
+					TT01000100010001TT010001 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 5AA795CBC1C1159DB2C4AF8B;
 					};
 				};
 			};
@@ -362,6 +409,7 @@
 			projectRoot = "";
 			targets = (
 				5AA795CBC1C1159DB2C4AF8B /* BudahADE */,
+				TT01000100010001TT010001 /* BudahADETests */,
 			);
 		};
 /* End PBXProject section */
@@ -433,6 +481,14 @@
 				AA17001700170017AA170017 /* BuildStatusState.swift in Sources */,
 				AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */,
 				AA19001900190019AA190019 /* SpecDocumentTileView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TS01000100010001TS010001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TE01000100010001TE010001 /* SpecParserTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -652,6 +708,36 @@
 			};
 			name = Debug;
 		};
+		TC01000100010001TC010001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.budah.ade.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BudahADE.app/Contents/MacOS/BudahADE";
+			};
+			name = Debug;
+		};
+		TC02000200020002TC020002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.budah.ade.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BudahADE.app/Contents/MacOS/BudahADE";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -669,6 +755,15 @@
 			buildConfigurations = (
 				A37AE9AC43ECE6427C5B65B1 /* Debug */,
 				3F21C4C89EED6AB202B6526A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		TL01000100010001TL010001 /* Build configuration list for PBXNativeTarget "BudahADETests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TC01000100010001TC010001 /* Debug */,
+				TC02000200020002TC020002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
