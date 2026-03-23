@@ -78,6 +78,11 @@ struct WorkspaceView: View {
                 state.activeTask?.closeTab(id)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .closeTask)) { _ in
+            if let task = state.activeTask {
+                state.deleteTask(task.id)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .selectTabByIndex)) { notification in
             guard !appState.isWorkspaceSwitcherOpen,
                   let index = notification.userInfo?["index"] as? Int else { return }

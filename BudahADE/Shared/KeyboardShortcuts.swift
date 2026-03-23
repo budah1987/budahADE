@@ -26,6 +26,7 @@ enum KeyboardShortcuts {
 
     // Tasks
     static let newTask = KeyShortcut(.n, modifiers: .command)
+    static let closeTask = KeyShortcut(.w, modifiers: [.command, .shift])
     // selectTaskByIndex: Ctrl+1..9 — handled via menu commands in BudahADEApp
 }
 

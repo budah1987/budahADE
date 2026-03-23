@@ -32,6 +32,11 @@ struct BudahADEApp: App {
                 }
                 .keyboardShortcut("w", modifiers: .command)
 
+                Button("Close Task") {
+                    NotificationCenter.default.post(name: .closeTask, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
+
                 Button("Rename Tab") {
                     NotificationCenter.default.post(name: .renameTab, object: nil)
                 }
@@ -218,4 +223,5 @@ extension Notification.Name {
     static let toggleTaskMode = Notification.Name("budahADE.toggleTaskMode")
     static let canvasResetZoom = Notification.Name("budahADE.canvasResetZoom")
     static let canvasZoomToFit = Notification.Name("budahADE.canvasZoomToFit")
+    static let closeTask = Notification.Name("budahADE.closeTask")
 }
