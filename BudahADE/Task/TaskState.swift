@@ -135,7 +135,8 @@ final class TaskState: ObservableObject, Identifiable {
     func createTab(launchAgent: Bool = false, agent: AgentMode? = nil) -> UUID {
         let panel = TerminalPanel(workingDirectory: worktreePath)
         let id = panel.id
-        var tab = TabInfo(id: id, title: "Terminal", isRunning: false)
+        var tab = TabInfo(id: id, title: "Claude", isRunning: false)
+        tab.restoredTitle = "Claude"  // Protect from shell/path title overwrites
         tab.agentMode = agent
         tabs.append(tab)
         terminals[id] = panel
