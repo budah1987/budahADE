@@ -75,13 +75,23 @@ final class TerminalSurfaceView: NSView {
             return
         }
 
-        // Shift+Enter → send kitty keyboard protocol sequence directly.
-        // tmux strips Shift from Enter in legacy mode; bypass by writing CSI u sequence.
+        // Shift+Enter → use tmux send-keys to pass Shift+Enter through tmux.
+        // tmux strips Shift from Enter in legacy mode and CSI u sequences aren't
+        // interpreted by tmux's input parser. tmux send-keys handles it correctly.
         if event.keyCode == 36 && event.modifierFlags.contains(.shift) {
-            // \e[13;2u = CR (13) with Shift (modifier 2) in CSI u format
-            let seq = "\u{1b}[13;2u"
-            seq.withCString { ptr in
-                ghostty_surface_text(surface, ptr, UInt(seq.utf8.count))
+            if let tmuxSession = findTmuxSession() {
+                TmuxSessionManager.sendKeys(session: tmuxSession, keys: "S-Enter")
+            } else {
+                // No tmux — send normally (works without tmux)
+                var keyEvent = ghostty_input_key_s()
+                keyEvent.action = GHOSTTY_ACTION_PRESS
+                keyEvent.keycode = UInt32(event.keyCode)
+                keyEvent.mods = modsFromEvent(event)
+                keyEvent.consumed_mods = GHOSTTY_MODS_NONE
+                keyEvent.text = nil
+                keyEvent.unshifted_codepoint = 0
+                keyEvent.composing = false
+                _ = ghostty_surface_key(surface, keyEvent)
             }
             return
         }
@@ -359,6 +369,16 @@ final class TerminalSurfaceView: NSView {
         }
         return codes
     }()
+
+    /// Find the tmux session name for this terminal view's surface.
+    private func findTmuxSession() -> String? {
+        guard let surfaceId = terminalSurface?.id else { return nil }
+        // Walk up the responder chain to find TaskState or check NotificationCenter
+        // Simpler: check all running tmux sessions and match by surface ID prefix
+        let sessions = TmuxSessionManager.listSessions()
+        let prefix = "budahade-\(surfaceId.uuidString.prefix(8).lowercased())"
+        return sessions.first(where: { $0 == prefix }) ?? sessions.first
+    }
 
     // MARK: - Helpers
 

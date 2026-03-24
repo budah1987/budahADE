@@ -98,6 +98,21 @@ enum TmuxSessionManager {
         "\(tmuxPath) attach-session -t \(name) 2>/dev/null || \(tmuxPath) new-session -s \(name) -c '\(workingDirectory)'"
     }
 
+    // MARK: - Send Keys
+
+    /// Send keys to a tmux session (bypasses terminal encoding issues).
+    static func sendKeys(session: String, keys: String) {
+        DispatchQueue.global(qos: .userInteractive).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: tmuxPath)
+            process.arguments = ["send-keys", "-t", session, keys]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try? process.run()
+            process.waitUntilExit()
+        }
+    }
+
     // MARK: - Cleanup
 
     /// Kill a tmux session (e.g. when user closes a tab).
