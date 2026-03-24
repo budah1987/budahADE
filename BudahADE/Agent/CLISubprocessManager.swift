@@ -95,7 +95,7 @@ final class CLISubprocessManager: ObservableObject {
         var command = [
             "claude",
             "-p", prompt,
-            "--output-format", "stream-json",
+            "--output-format", "stream-json", "--verbose",
             "--model", model.cliFlag,
             "--system-prompt-file", systemPromptPath,
             "--dangerously-skip-permissions"
