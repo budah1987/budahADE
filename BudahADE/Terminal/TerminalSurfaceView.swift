@@ -75,26 +75,54 @@ final class TerminalSurfaceView: NSView {
             return
         }
 
-        let mods = modsFromEvent(event)
+        let rawMods = modsFromEvent(event)
 
-        // Filter out characters in the Unicode private-use area (U+F700–U+F8FF).
-        // Arrow keys, function keys, Home/End etc. produce these special characters
-        // which must NOT be sent as text — only the keycode matters for those keys.
+        // Ask Ghostty to translate mods per config (e.g. macos-option-as-alt).
+        // This returns the mods that should be used for *text translation* only —
+        // the original rawMods are kept as keyEvent.mods so Ghostty sees ALT.
+        let translatedMods = ghostty_surface_key_translation_mods(surface, rawMods)
+        let translatedFlags = eventModifierFlags(from: translatedMods)
+
+        // If translation stripped Option (macos-option-as-alt = true), use the base
+        // character instead of the macOS dead-key result (e.g. 'p' instead of 'π').
+        let optionConsumed = event.modifierFlags.contains(.option)
+            && !translatedFlags.contains(.option)
+
         let text: String? = {
-            guard let chars = event.characters, !chars.isEmpty else { return nil }
+            let chars: String?
+            if optionConsumed {
+                chars = event.charactersIgnoringModifiers
+            } else {
+                chars = event.characters
+            }
+            guard let chars, !chars.isEmpty else { return nil }
             if let scalar = chars.unicodeScalars.first,
                scalar.value >= 0xF700, scalar.value <= 0xF8FF {
-                return nil
+                return nil  // Filter private-use area (arrow keys, function keys)
             }
             return chars
         }()
 
+        // Unshifted codepoint: the character the key produces with NO modifiers.
+        let unshiftedCodepoint: UInt32 = {
+            if let chars = event.charactersIgnoringModifiers,
+               let scalar = chars.unicodeScalars.first,
+               scalar.value < 0xF700 || scalar.value > 0xF8FF {
+                return scalar.value
+            }
+            return 0
+        }()
+
+        // consumed_mods = NONE: let Ghostty handle all modifier semantics.
+        // The key fix is sending the correct text ('p' not 'π') and unshifted_codepoint.
+        let consumedMods = GHOSTTY_MODS_NONE
+
         var keyEvent = ghostty_input_key_s()
         keyEvent.action = GHOSTTY_ACTION_PRESS
         keyEvent.keycode = UInt32(event.keyCode)
-        keyEvent.mods = mods
-        keyEvent.consumed_mods = GHOSTTY_MODS_NONE
-        keyEvent.unshifted_codepoint = 0
+        keyEvent.mods = rawMods              // Original mods (WITH Alt if held)
+        keyEvent.consumed_mods = consumedMods // What the OS consumed for translation
+        keyEvent.unshifted_codepoint = unshiftedCodepoint
         keyEvent.composing = false
 
         let handled: Bool
@@ -119,13 +147,22 @@ final class TerminalSurfaceView: NSView {
             return
         }
 
+        let unshiftedCodepoint: UInt32 = {
+            if let chars = event.charactersIgnoringModifiers,
+               let scalar = chars.unicodeScalars.first,
+               scalar.value < 0xF700 || scalar.value > 0xF8FF {
+                return scalar.value
+            }
+            return 0
+        }()
+
         var keyEvent = ghostty_input_key_s()
         keyEvent.action = GHOSTTY_ACTION_RELEASE
         keyEvent.keycode = UInt32(event.keyCode)
         keyEvent.mods = modsFromEvent(event)
         keyEvent.consumed_mods = GHOSTTY_MODS_NONE
         keyEvent.text = nil
-        keyEvent.unshifted_codepoint = 0
+        keyEvent.unshifted_codepoint = unshiftedCodepoint
         keyEvent.composing = false
         _ = ghostty_surface_key(surface, keyEvent)
     }
@@ -303,7 +340,11 @@ final class TerminalSurfaceView: NSView {
     // MARK: - Helpers
 
     private func modsFromEvent(_ event: NSEvent) -> ghostty_input_mods_e {
-        let flags = event.modifierFlags
+        return modsFromFlags(event.modifierFlags)
+    }
+
+    /// Convert NSEvent.ModifierFlags → Ghostty modifier enum.
+    private func modsFromFlags(_ flags: NSEvent.ModifierFlags) -> ghostty_input_mods_e {
         var mods = GHOSTTY_MODS_NONE.rawValue
         if flags.contains(.shift) { mods |= GHOSTTY_MODS_SHIFT.rawValue }
         if flags.contains(.control) { mods |= GHOSTTY_MODS_CTRL.rawValue }
@@ -311,5 +352,16 @@ final class TerminalSurfaceView: NSView {
         if flags.contains(.command) { mods |= GHOSTTY_MODS_SUPER.rawValue }
         if flags.contains(.capsLock) { mods |= GHOSTTY_MODS_CAPS.rawValue }
         return ghostty_input_mods_e(rawValue: mods)
+    }
+
+    /// Convert Ghostty modifier enum → NSEvent.ModifierFlags (reverse of modsFromFlags).
+    private func eventModifierFlags(from mods: ghostty_input_mods_e) -> NSEvent.ModifierFlags {
+        var flags = NSEvent.ModifierFlags()
+        if mods.rawValue & GHOSTTY_MODS_SHIFT.rawValue != 0 { flags.insert(.shift) }
+        if mods.rawValue & GHOSTTY_MODS_CTRL.rawValue != 0 { flags.insert(.control) }
+        if mods.rawValue & GHOSTTY_MODS_ALT.rawValue != 0 { flags.insert(.option) }
+        if mods.rawValue & GHOSTTY_MODS_SUPER.rawValue != 0 { flags.insert(.command) }
+        if mods.rawValue & GHOSTTY_MODS_CAPS.rawValue != 0 { flags.insert(.capsLock) }
+        return flags
     }
 }
