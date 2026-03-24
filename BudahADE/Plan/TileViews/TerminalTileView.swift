@@ -12,7 +12,7 @@ struct TerminalTileView: View {
             dotColor: agent.dotColor,
             onClose: onClose
         ) {
-            RestoredTerminalView(panel: panel)
+            TerminalPanelView(panel: panel)
         }
     }
 }

@@ -168,7 +168,7 @@ struct WorkspaceView: View {
                 ForEach(state.tasks) { task in
                     ForEach(task.tabs) { tab in
                         if let panel = task.terminals[tab.id] {
-                            RestoredTerminalView(panel: panel)
+                            TerminalPanelView(panel: panel)
                                 .opacity(task.id == state.activeTaskId && tab.id == task.selectedTabId ? 1 : 0)
                                 .allowsHitTesting(task.id == state.activeTaskId && tab.id == task.selectedTabId)
                         }

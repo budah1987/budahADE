@@ -277,15 +277,6 @@ final class TaskState: ObservableObject, Identifiable {
             // Note: TerminalPanel.id is derived from TerminalSurface.id, so we use the new panel.id
             // but track the tab with the panel's actual id
             let tabId = panel.id
-
-            // Load and store scrollback from previous session
-            if let scrollbackPath = tabSnapshot.scrollbackPath {
-                panel.restoredScrollback = SessionPersistence.loadScrollback(
-                    relativePath: scrollbackPath,
-                    from: worktreePath
-                )
-            }
-
             panel.title = tabSnapshot.title
 
             var tab = TabInfo(id: tabId, title: tabSnapshot.title, isRunning: false)
@@ -409,7 +400,7 @@ final class TaskState: ObservableObject, Identifiable {
         let projectSlug = worktreePath
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: " ", with: "-")
-            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: ".", with: "-")
         let claudeProjectDir = (NSHomeDirectory() as NSString)
             .appendingPathComponent(".claude/projects/\(projectSlug)")
 
