@@ -93,7 +93,9 @@ Zero Xcode warnings. Fixed Sendable captures in GitRepository, var→let for non
 
 ---
 
-## Phase 2: CLI Subprocess Agent System + Chat UI Tile
+## Phase 2: CLI Subprocess Agent System + Chat UI Tile ✅ SHIPPED
+
+**Shipped:** CLISubprocessManager (claude -p --output-format stream-json --verbose), AgentSession, ChatMessage with stream parsing, ChatTileView with full chat UI, 4 agent roles (Claude/Researcher/Ideator/Developer) with per-role tool restrictions and max-turns, Send To (stages content as primary subject), model switching (session fork), image paste (Cmd+V clipboard + file picker), token tracking, animated thinking dots, tool call accordion, Opt+P model selector in terminal tiles (Ghostty key translation fix), cursor state fixes (push/pop → set). 90 tests, 0 failures.
 
 ### Required Reading (read before implementing)
 - `Plan/AgentPrompts.swift` (212 LOC) — existing agent system prompts. Extend with role system. Contains `builderLaunchCommand()` pattern for constructing CLI commands.
@@ -291,7 +293,9 @@ claude -p "{prompt}" \
 
 ---
 
-## Phase 2.5: Canvas State Persistence
+## Phase 2.5: Canvas State Persistence ✅ SHIPPED
+
+**Shipped:** CanvasPersistence (save/load to `.budahade/canvas.json`), debounced 1s save on mutation, immediate save on task switch and app quit, Codable conformance for all canvas types (CanvasElement, ElementKind, FrameData, TextData, TileType, AgentMode), chat message persistence, terminal tiles restore as empty shells. Graceful degradation on missing/corrupted files.
 
 ### Problem
 
@@ -745,12 +749,13 @@ Terminal tiles participate in the connection graph via MCP:
 | `BudahADETests/SpecParserTests.swift` | 1 | SpecParser unit tests (6 tests) | ✅ |
 | `BudahADETests/CanvasNodeTests.swift` | 1 | TileType, FrameData, TextData tests (8 tests) | ✅ |
 | `BudahADETests/MarkdownSectionParserTests.swift` | 1 | MarkdownSection parser tests (6 tests) | ✅ |
-| `Agent/CLISubprocessManager.swift` | 2 | CLI subprocess lifecycle |
-| `Agent/AgentSession.swift` | 2 | Session model + message parsing |
-| `Agent/ChatMessage.swift` | 2 | Message data model |
-| `Agent/AgentRole.swift` | 2 | Role definitions |
-| `Plan/TileViews/ChatTileView.swift` | 2 | Chat agent canvas tile |
-| `Plan/TileViews/SendToMenu.swift` | 2 | Send to dropdown component |
+| `Agent/CLISubprocessManager.swift` | 2 | CLI subprocess lifecycle | ✅ |
+| `Agent/AgentSession.swift` | 2 | Session model + message parsing | ✅ |
+| `Agent/ChatMessage.swift` | 2 | Message data model | ✅ |
+| `Agent/AgentRole.swift` | 2 | Role definitions | ✅ |
+| `Plan/TileViews/ChatTileView.swift` | 2 | Chat agent canvas tile | ✅ |
+| `Plan/TileViews/SendToMenu.swift` | 2 | Send to dropdown component | ✅ |
+| `Plan/CanvasPersistence.swift` | 2.5 | Canvas save/load to `.budahade/canvas.json` | ✅ |
 | `Plan/ConnectionsLayer.swift` | 3 | Arrow rendering via Canvas API |
 | `Plan/TileConnection.swift` | 3 | Connection data model |
 | `Plan/TileOutputProvider.swift` | 3 | Protocol + TileOutput enum |
@@ -781,8 +786,23 @@ Terminal tiles participate in the connection graph via MCP:
 | `GitPanel/GitRepository.swift` | 1 | listBranches static method, Sendable fixes | ✅ |
 | `Terminal/TerminalSurfaceView.swift` | 1 | var→let warning fix | ✅ |
 | `Plan/ScrollWheelMonitor.swift` | 1 | textInputHasFocus check for spacebar/escape passthrough | ✅ |
-| `Plan/AgentPrompts.swift` | 2 | Extend with role system | |
-| `Task/TaskState.swift` | 2-5 | CLI subprocess integration, MCP lifecycle | |
+| `Plan/AgentPrompts.swift` | 2 | Extend with role system | ✅ |
+| `Plan/TileType.swift` | 2 | Add `.chatAgent`, `AgentMode` tools/turns, Codable | ✅ |
+| `Plan/CanvasNode.swift` | 2.5 | Codable for CanvasElement, ElementKind, FrameData, TextData | ✅ |
+| `Plan/CanvasElementView.swift` | 2 | Chat agent dispatch, cursor fix (push/pop → set) | ✅ |
+| `Plan/PlanCanvasState.swift` | 2-2.5 | Chat sessions, persistence (save/load/restore) | ✅ |
+| `Plan/PlanCanvasView.swift` | 2 | Add Chat Agent context menu | ✅ |
+| `Plan/AddTileMenu.swift` | 2 | Chat agent section | ✅ |
+| `Plan/TileResizeHandler.swift` | 2 | Cursor fix (push/pop → set) | ✅ |
+| `Plan/TileViews/TileChrome.swift` | 2 | Font bumps, cursor fix on X button | ✅ |
+| `Plan/TileViews/MarkdownTileView.swift` | 2 | Font bumps | ✅ |
+| `Plan/TileViews/StickyNoteView.swift` | 2 | Font bump | ✅ |
+| `Terminal/TerminalSurfaceView.swift` | 2 | Opt+P fix (translation_mods, unshifted_codepoint) | ✅ |
+| `Terminal/TerminalSurface.swift` | 2 | Matching key event fixes | ✅ |
+| `Terminal/GhosttyAppManager.swift` | 2 | macos-option-as-alt config override | ✅ |
+| `Task/TaskState.swift` | 2-5 | Canvas persistence on task switch, MCP lifecycle | ✅ (Phase 2) |
+| `App/BudahADEApp.swift` | 2.5 | Save canvases on app quit | ✅ |
+| `Task/GitWorktreeManager.swift` | 2 | Prune stale refs, force-add, remove stale .git/worktrees | ✅ |
 | `Workspace/WorkspaceState.swift` | 5 | MCP server lifecycle per task | |
 | `Spec/SpecPanelView.swift` | 5 | Upgrade checklist UI for build mode | |
 | `Spec/SpecState.swift` | 4-5 | Versioning, MCP integration | |
