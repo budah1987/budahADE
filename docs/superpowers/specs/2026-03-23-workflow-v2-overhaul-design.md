@@ -336,9 +336,85 @@ Canvas state is in-memory only. Quitting BudahADE loses all tiles, positions, an
 2. **Restore on relaunch** — quit app, reopen, open same task. Canvas should restore: tile positions, sizes, text content, zoom level, pan offset.
 3. **Task switching** — switch between tasks. Each task's canvas restores independently.
 4. **Chat tile persistence** — create a chat agent, have a conversation. Quit app, reopen. Chat messages should be there. Session should resume on next send.
-5. **Terminal tiles** — terminal tiles restore as empty shells (no crash). User relaunches Claude manually. This is expected and acceptable.
+5. **Terminal tiles** — terminal tiles restore as empty shells with scrollback snapshot (see Phase 2.75). Claude relaunches with `--resume`.
 6. **Empty canvas** — new task with no canvas.json starts with blank canvas. No errors.
 7. **Corrupted file** — delete or corrupt canvas.json. App should start with empty canvas, not crash.
+
+---
+
+## Phase 2.75: Session Persistence (Build Mode + Terminal Tiles)
+
+### Problem
+
+Quitting BudahADE loses all terminal sessions — Build mode tabs and canvas terminal tiles. PTY processes can't survive app quit (this is a terminal limitation, not a BudahADE issue). But the user expects to pick up where they left off. BudahADE should feel like coming back to your desk, not starting fresh.
+
+### Required Reading (read before implementing)
+- `Task/TaskState.swift` — tab management, terminal lifecycle. Persist tab list + session IDs here.
+- `Terminal/TerminalSurface.swift` — Ghostty surface wrapper. Need to extract scrollback text before quit.
+- `Terminal/TerminalPanel.swift` — terminal container. Add scrollback snapshot capture.
+- `Terminal/TerminalSurfaceView.swift` — NSView host. Scrollback snapshot view inserts above the new terminal.
+- `Agent/CLISubprocessManager.swift` — `claudeSessionId` persistence for `--resume` on chat tiles.
+- `GhosttyAppManager.swift` — check if Ghostty exposes API to read terminal text content from surface.
+
+### Design
+
+**What to persist per terminal tab (saved to `.budahade/sessions/`):**
+- Tab name and agent role
+- Working directory
+- Claude `--session-id` (for `--resume`)
+- Scrollback text snapshot (raw text from terminal surface)
+- Tab order and which tab was active
+
+**Scrollback snapshot capture:**
+On app quit (`NSApplication.willTerminateNotification`) and task switch:
+1. For each open terminal tab, read the current text content from Ghostty's surface
+2. Save as `.budahade/sessions/{tabId}-scrollback.txt`
+3. Save tab metadata to `.budahade/sessions/tabs.json`
+
+**On relaunch:**
+1. Read `tabs.json` — recreate tab bar with the same tabs in the same order
+2. For each tab, display scrollback snapshot as a **read-only static text view** (monospace, terminal-styled, slightly faded) above the terminal area
+3. Launch fresh Ghostty terminal below the snapshot
+4. Relaunch Claude with `--resume {sessionId}` so Claude has full conversation context
+5. Show a "Session resumed" divider between snapshot and live terminal
+
+**Visual layout on restore:**
+```
+┌─ Builder ──────────────────────────────────┐
+│                                            │
+│  [Previous session - read only, faded]     │
+│  > Implement the auth spec...              │
+│  ✓ mark_spec_item("read-token")            │
+│  Working on Keychain manager...            │
+│                                            │
+│  ──── Session resumed ────                 │
+│                                            │
+│  [Live terminal - Ghostty, interactive]    │
+│  > █                                       │
+│                                            │
+└────────────────────────────────────────────┘
+```
+
+**Chat tile `claudeSessionId` persistence:**
+- Persist `claudeSessionId` in `canvas.json` per chat agent tile
+- On restore, `--resume {sessionId}` continues the server-side conversation
+- Chat messages display from `canvas.json`, Claude has full context via resume
+
+**Ghostty scrollback extraction:**
+- Check if `ghostty_surface_*` API exposes text content. If so, read it directly.
+- If not, alternative: capture the terminal's `NSView` as a rendered image (screenshot) instead of raw text. Less ideal (not searchable, larger file) but guaranteed to work.
+- Fallback: if neither works, skip scrollback snapshot — just relaunch with `--resume` and no visual history. Still valuable.
+
+### Phase 2.75 Verification
+
+1. **Build mode tabs persist** — open 3 builder tabs. Quit app, reopen. All 3 tabs recreate with correct names and order.
+2. **Scrollback snapshot** — previous terminal output visible as read-only text above the fresh terminal. Scroll up to see it.
+3. **Session resumed divider** — clear visual separator between old snapshot and new live terminal.
+4. **Claude --resume works** — send a follow-up message after relaunch. Claude remembers the prior conversation context.
+5. **Chat tile claudeSessionId** — quit with a chat agent on canvas, reopen. Send a message — Claude resumes, doesn't start fresh.
+6. **Canvas terminal tiles** — same scrollback + resume behavior as Build mode tabs.
+7. **Tab order** — tabs restore in the same order. Active tab is re-selected.
+8. **No scrollback available** — if Ghostty doesn't expose text content, gracefully skip snapshot. Terminal relaunches with just `--resume`, no crash.
 
 ---
 
