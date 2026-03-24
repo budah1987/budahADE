@@ -2,6 +2,8 @@ import AppKit
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     static private(set) weak var shared: AppDelegate?
+    /// Set by BudahADEApp so we can save state before Ghostty shuts down
+    weak var appState: AppState?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
@@ -19,6 +21,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Save all state BEFORE Ghostty shutdown destroys surfaces
+        appState?.saveAllState()
         GhosttyAppManager.shared.shutdown()
     }
 

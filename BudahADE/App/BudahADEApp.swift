@@ -12,11 +12,13 @@ struct BudahADEApp: App {
                 .frame(minWidth: 900, minHeight: 600)
                 .background(Theme.appBackground)
                 .preferredColorScheme(.dark)
-                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    appState.saveAllState()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { _ in
-                    appState.saveAllState()
+                .onAppear {
+                    // Wire AppState to AppDelegate so it can save before Ghostty shutdown
+                    appDelegate.appState = appState
+                    // Restore previous session on launch
+                    if appState.hasNoWorkspaces {
+                        _ = appState.restoreFromSavedState()
+                    }
                 }
         }
         .windowStyle(.hiddenTitleBar)
