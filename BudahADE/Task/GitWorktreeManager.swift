@@ -21,23 +21,33 @@ enum GitWorktreeManager {
             withIntermediateDirectories: true
         )
 
+        // Always prune stale worktree entries first (clears dangling refs)
+        _ = try? await runGit(args: ["worktree", "prune"], repoPath: repoPath)
+
         // Clean up stale worktree directory if it exists
         if FileManager.default.fileExists(atPath: worktreePath) {
-            // Prune stale worktree entries first, then remove directory
-            _ = try? await runGit(args: ["worktree", "prune"], repoPath: repoPath)
             try? FileManager.default.removeItem(atPath: worktreePath)
         }
 
+        // Also remove stale git worktree ref if it still exists after prune
+        let repoGitDir = (repoPath as NSString).appendingPathComponent(".git/worktrees")
+        let slug = branchName.replacingOccurrences(of: "/", with: "-").lowercased()
+        let staleRef = (repoGitDir as NSString).appendingPathComponent(slug)
+        if FileManager.default.fileExists(atPath: staleRef) {
+            try? FileManager.default.removeItem(atPath: staleRef)
+        }
+
         // Try creating with new branch first; if branch already exists, just check it out
+        // Use -f (force) to override any remaining stale registrations
         do {
             try await runGit(
-                args: ["worktree", "add", "-b", branchName, worktreePath, baseBranch],
+                args: ["worktree", "add", "-f", "-b", branchName, worktreePath, baseBranch],
                 repoPath: repoPath
             )
         } catch {
             // Branch may already exist — try without -b
             try await runGit(
-                args: ["worktree", "add", worktreePath, branchName],
+                args: ["worktree", "add", "-f", worktreePath, branchName],
                 repoPath: repoPath
             )
         }
