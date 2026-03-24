@@ -141,6 +141,10 @@ final class TaskState: ObservableObject, Identifiable {
         tabs.append(tab)
         terminals[id] = panel
         selectedTabId = id
+        // Focus the new tab — deferred so SwiftUI has time to render the view first
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.terminals[id]?.focus()
+        }
 
         if launchAgent {
             launchClaudeInTab(id, agent: agent)
@@ -342,6 +346,11 @@ final class TaskState: ObservableObject, Identifiable {
             selectedTabId = tabs[index].id
         } else {
             selectedTabId = tabs.first?.id
+        }
+
+        // Focus the restored active tab after SwiftUI renders all the terminal views
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.focusActiveTerminal()
         }
 
         return true

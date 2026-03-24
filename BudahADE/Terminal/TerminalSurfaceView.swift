@@ -38,10 +38,15 @@ final class TerminalSurfaceView: NSView {
         layer?.contentsScale = window.backingScaleFactor
         CATransaction.commit()
 
-        // Ensure the terminal view grabs first responder so keyboard input works immediately
+        // Only claim first responder when nothing else has it yet.
+        // If we unconditionally grab here, every newly-added tab view steals focus
+        // from whichever tab the user intended to be active.
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.window != nil else { return }
-            self.window?.makeFirstResponder(self)
+            guard let self, let window = self.window else { return }
+            // window.firstResponder == window means no view has explicit focus yet.
+            if window.firstResponder == nil || window.firstResponder === window {
+                window.makeFirstResponder(self)
+            }
         }
     }
 
