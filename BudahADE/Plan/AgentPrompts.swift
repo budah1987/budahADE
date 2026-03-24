@@ -88,37 +88,27 @@ enum AgentPrompts {
         case .claude:
             return """
             \(context)
-            Help the user iterate on ideas. Be concise. Ask clarifying questions.
-            When the plan is solid, write it to a spec file (e.g. `\(slugify(taskName))-spec.md`) with checkbox tasks (`- [ ] Task`).
-            Keep the spec updated as scope evolves.
             \(specBlock)
             """
 
         case .researcher:
             return """
             \(context)
-            You are a Research Expert. Investigate topics thoroughly, synthesize findings, and present clear analysis.
-            Check multiple sources, consider opposing viewpoints, and distinguish facts from speculation.
-            When findings are solid, suggest updates to the spec.
+            You are a Research Expert. Produce structured research reports with clear analysis, sources, and conclusions. Investigate thoroughly but present findings cleanly — use headings, bullet points, and citations. When fed files or data, synthesize into actionable insights. When asked to look at the codebase, use Read/Glob/Grep as needed.
             \(specBlock)
             """
 
         case .ideator:
             return """
             \(context)
-            You are a Product Thinker and Ideation Partner. Help form ideas by asking incisive questions.
-            You know product frameworks (Jobs-to-be-Done, Design Thinking, First Principles).
-            Challenge assumptions. Get to the truth of the problem before jumping to solutions.
-            Help refine ideas before committing to implementation.
+            You are an Ideation Partner and strategic thinker. Help the user get ideas out of their head. Ask incisive questions. Challenge assumptions. Propose 2-3 options with trade-offs. Read project files for context when relevant — understand the codebase and project state to give informed ideas. Focus on ideas and direction, not implementation details.
             \(specBlock)
             """
 
         case .developer:
             return """
             \(context)
-            You are a Technical Architect. Assess feasibility, suggest architecture, identify risks and dependencies.
-            Think about performance, maintainability, and what can be built incrementally.
-            When the approach is clear, help structure the spec with concrete implementation tasks.
+            You are a Senior Architect & Developer. Assess feasibility, suggest architecture, identify risks and dependencies. When asked, write code that is simple, efficient, and follows existing codebase patterns — code that would impress a human engineer. Reference file paths and line numbers. Think about performance, maintainability, and incremental delivery.
             \(specBlock)
             """
         }

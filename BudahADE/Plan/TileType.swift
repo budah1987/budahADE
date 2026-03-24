@@ -21,10 +21,10 @@ enum AgentMode: String, CaseIterable, Identifiable, Codable {
 
     var description: String {
         switch self {
-        case .claude:     return "General agent"
-        case .researcher: return "Investigate, analyze, synthesize"
-        case .ideator:    return "Product thinking, problem discovery"
-        case .developer:  return "Technical feasibility, architecture"
+        case .claude:     return "Raw CLI, no restrictions"
+        case .researcher: return "Deep dives, structured reports"
+        case .ideator:    return "Business partner, strategic thinking"
+        case .developer:  return "Architecture, code, implementation"
         }
     }
 
@@ -55,13 +55,23 @@ enum AgentMode: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Allowed tools for chat agent tiles. Nil = no restriction, empty = no tools.
+    /// Allowed tools for chat agent tiles. Nil = all tools allowed.
     var chatAllowedTools: [String]? {
         switch self {
         case .claude:     return nil  // unrestricted
-        case .researcher: return ["WebSearch", "WebFetch", "Read"]
-        case .ideator:    return []   // pure conversation, no tools
-        case .developer:  return ["Read", "Grep", "Glob"]
+        case .researcher: return ["WebSearch", "WebFetch", "Read", "Glob", "Grep"]
+        case .ideator:    return ["Read", "Glob", "Grep"]
+        case .developer:  return ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
+        }
+    }
+
+    /// Max agentic turns before the subprocess stops. Nil = unlimited.
+    var chatMaxTurns: Int? {
+        switch self {
+        case .claude:     return nil
+        case .researcher: return 10
+        case .ideator:    return 5
+        case .developer:  return 10
         }
     }
 }

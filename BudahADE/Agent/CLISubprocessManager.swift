@@ -44,7 +44,8 @@ final class CLISubprocessManager: ObservableObject {
             model: session.model,
             systemPromptPath: systemPromptPath,
             sessionId: session.claudeSessionId,
-            allowedTools: session.agentMode?.chatAllowedTools
+            allowedTools: session.agentMode?.chatAllowedTools,
+            maxTurns: session.agentMode?.chatMaxTurns
         )
 
         Task {
@@ -92,7 +93,8 @@ final class CLISubprocessManager: ObservableObject {
         model: AgentModel,
         systemPromptPath: String,
         sessionId: String?,
-        allowedTools: [String]? = nil
+        allowedTools: [String]? = nil,
+        maxTurns: Int? = nil
     ) -> [String] {
         var command = [
             "claude",
@@ -100,18 +102,20 @@ final class CLISubprocessManager: ObservableObject {
             "--output-format", "stream-json", "--verbose",
             "--model", model.cliFlag,
             "--system-prompt-file", systemPromptPath,
+            "--dangerously-skip-permissions",
         ]
 
         if let tools = allowedTools {
             if tools.isEmpty {
-                // No tools — pure conversation
                 command += ["--allowedTools", ""]
             } else {
                 command += ["--allowedTools"] + tools
             }
         }
-        // If no allowedTools specified, don't restrict (but also don't skip permissions)
-        // This means the agent will ask for permission per-tool, which is safe for chat tiles.
+
+        if let maxTurns {
+            command += ["--max-turns", "\(maxTurns)"]
+        }
 
         if let sessionId = sessionId {
             command += ["--resume", sessionId]
