@@ -55,7 +55,10 @@ struct TileChrome<Content: View>: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .onHover { isCloseHovered = $0 }
+                .onHover { hovering in
+                    isCloseHovered = hovering
+                    if hovering { NSCursor.arrow.set() }
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)

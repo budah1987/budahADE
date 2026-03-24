@@ -103,10 +103,8 @@ struct CanvasElementView: View {
                     }
                     .onHover { hovering in
                         isHovered = hovering
-                        if hovering && !isSelected {
-                            NSCursor.openHand.push()
-                        } else if !hovering {
-                            NSCursor.pop()
+                        if !hovering {
+                            NSCursor.arrow.set()
                         }
                     }
                     .gesture(tileDragGesture(element: element, canvas: canvas, dragOffset: $dragOffset))

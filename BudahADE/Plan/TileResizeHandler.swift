@@ -157,9 +157,9 @@ struct FrameChildResizeHandle: View {
             .onHover { hovering in
                 isHovered = hovering
                 if hovering {
-                    ResizeCorner.bottomRight.cursor.push()
+                    ResizeCorner.bottomRight.cursor.set()
                 } else {
-                    NSCursor.pop()
+                    NSCursor.arrow.set()
                 }
             }
     }
@@ -244,9 +244,9 @@ struct CornerHandle: View {
             .onHover { hovering in
                 isHovered = hovering
                 if hovering {
-                    corner.cursor.push()
+                    corner.cursor.set()
                 } else {
-                    NSCursor.pop()
+                    NSCursor.arrow.set()
                 }
             }
     }
@@ -361,9 +361,9 @@ struct EdgeHandle: View {
                 .onHover { hovering in
                     isHovered = hovering
                     if hovering {
-                        edge.cursor.push()
+                        edge.cursor.set()
                     } else {
-                        NSCursor.pop()
+                        NSCursor.arrow.set()
                     }
                 }
         }
