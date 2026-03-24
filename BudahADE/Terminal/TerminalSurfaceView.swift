@@ -99,10 +99,9 @@ final class TerminalSurfaceView: NSView {
         keyEvent.action = GHOSTTY_ACTION_PRESS
         keyEvent.keycode = UInt32(event.keyCode)
         keyEvent.mods = translatedMods
-        // Tell Ghostty that Alt was consumed for Option→Meta translation
-        keyEvent.consumed_mods = optionConsumed
-            ? ghostty_input_mods_e(rawValue: GHOSTTY_MODS_ALT.rawValue)
-            : GHOSTTY_MODS_NONE
+        // Don't mark Alt as consumed — Ghostty needs to see it to generate
+        // the ESC+char sequence for the PTY
+        keyEvent.consumed_mods = GHOSTTY_MODS_NONE
         keyEvent.unshifted_codepoint = 0
         keyEvent.composing = false
 
