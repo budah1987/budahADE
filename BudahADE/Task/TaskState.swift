@@ -327,12 +327,16 @@ final class TaskState: ObservableObject, Identifiable {
                     scrollbackPath = try? SessionPersistence.saveScrollback(
                         text, tabId: tab.id, to: worktreePath
                     )
-                    // Extract Claude session ID from scrollback if not already tracked.
-                    // Claude prints: https://claude.ai/code/session_XXXXX
+                    // Extract Claude session ID from scrollback if not already tracked
                     if sessionId == nil {
                         sessionId = Self.extractSessionId(from: text)
                     }
                 }
+            }
+
+            // Fallback: scan .claude/projects/ for the most recent session file
+            if sessionId == nil {
+                sessionId = Self.findLatestClaudeSessionId(worktreePath: worktreePath)
             }
 
             tabSnapshots.append(TabSnapshot(
@@ -392,11 +396,44 @@ final class TaskState: ObservableObject, Identifiable {
     /// Extract Claude session ID from terminal scrollback text.
     /// Claude prints: https://claude.ai/code/session_XXXXX
     private static func extractSessionId(from text: String) -> String? {
-        // Search from the end (most recent session) backwards
         guard let range = text.range(of: "session_[A-Za-z0-9]+", options: [.regularExpression, .backwards]) else {
             return nil
         }
         return String(text[range])
+    }
+
+    /// Find the most recent Claude session ID by scanning the .claude/projects/ directory.
+    /// Claude stores sessions as JSONL files; the session_XXXXX ID is inside.
+    private static func findLatestClaudeSessionId(worktreePath: String) -> String? {
+        // Claude project dir is the worktree path with / replaced by -
+        let projectSlug = worktreePath
+            .replacingOccurrences(of: "/", with: "-")
+        let claudeProjectDir = (NSHomeDirectory() as NSString)
+            .appendingPathComponent(".claude/projects/\(projectSlug)")
+
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: claudeProjectDir) else { return nil }
+
+        // Find the most recently modified .jsonl file
+        guard let files = try? fm.contentsOfDirectory(atPath: claudeProjectDir) else { return nil }
+        let jsonlFiles = files.filter { $0.hasSuffix(".jsonl") }
+            .compactMap { filename -> (String, Date)? in
+                let path = (claudeProjectDir as NSString).appendingPathComponent(filename)
+                guard let attrs = try? fm.attributesOfItem(atPath: path),
+                      let modified = attrs[.modificationDate] as? Date else { return nil }
+                return (path, modified)
+            }
+            .sorted { $0.1 > $1.1 }  // Most recent first
+
+        guard let mostRecent = jsonlFiles.first else { return nil }
+
+        // Read first line and extract session_XXXXX
+        guard let data = fm.contents(atPath: mostRecent.0),
+              let content = String(data: data, encoding: .utf8) else { return nil }
+        guard let range = content.range(of: "session_[A-Za-z0-9]+", options: .regularExpression) else { return nil }
+        let sessionId = String(content[range])
+        print("[SessionPersistence] Found Claude session: \(sessionId) from \(mostRecent.0)")
+        return sessionId
     }
 
     /// Map terminal title patterns to agent status.
