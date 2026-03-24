@@ -1831,6 +1831,7 @@
 				<string>CC02000200020002CC020002</string>
 				<string>TC22222222222222TC222222</string>
 				<string>CL05000500050005CL050005</string>
+				<string>CS01000100010001CS010001</string>
 			</array>
 			<key>isa</key>
 			<string>PBXGroup</string>
@@ -1942,6 +1943,42 @@
 		<dict>
 			<key>fileRef</key>
 			<string>CL05000500050005CL050005</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
+		<key>CS01000100010001CS010001</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>ConnectionSummaryManager.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>CS02000200020002CS020002</key>
+		<dict>
+			<key>fileRef</key>
+			<string>CS01000100010001CS010001</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
+		<key>CST01000100010001CST00100</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>ConnectionSummaryTests.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>CST02000200020002CST00200</key>
+		<dict>
+			<key>fileRef</key>
+			<string>CST01000100010001CST00100</string>
 			<key>isa</key>
 			<string>PBXBuildFile</string>
 		</dict>
@@ -2199,6 +2236,7 @@
 				<string>TM22222222222222TM222222</string>
 				<string>TC11111111111111TC111111</string>
 				<string>CL05000500050006CL050006</string>
+				<string>CS02000200020002CS020002</string>
 			</array>
 			<key>isa</key>
 			<string>PBXSourcesBuildPhase</string>
@@ -2613,6 +2651,7 @@
 				<string>TCL001000100010001TCL00100</string>
 				<string>FF44444444444444FF444444</string>
 				<string>TCTESTS22222222TCTESTS222</string>
+				<string>CST01000100010001CST00100</string>
 			</array>
 			<key>isa</key>
 			<string>PBXGroup</string>
@@ -2681,6 +2720,7 @@
 				<string>TCL002000200020002TCL00200</string>
 				<string>FF33333333333333FF333333</string>
 				<string>TCTESTS11111111TCTESTS111</string>
+				<string>CST02000200020002CST00200</string>
 			</array>
 			<key>isa</key>
 			<string>PBXSourcesBuildPhase</string>

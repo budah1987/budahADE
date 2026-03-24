@@ -12,6 +12,7 @@ final class PlanCanvasState: ObservableObject {
     // Chat agent sessions
     @Published var chatSessions: [UUID: AgentSession] = [:]
     let chatManager = CLISubprocessManager()
+    let summaryManager = ConnectionSummaryManager()
 
     // Viewport
     @Published var zoom: CGFloat = 1.0
@@ -39,6 +40,7 @@ final class PlanCanvasState: ObservableObject {
         self.worktreePath = worktreePath
         self.taskName = taskName
         self.branchName = branchName
+        summaryManager.canvas = self
     }
 
     // MARK: - Add Tile (unified)

@@ -177,7 +177,7 @@ final class CLISubprocessManager: ObservableObject {
     /// Resolve the `claude` executable path. GUI apps don't inherit shell PATH,
     /// so we search common install locations explicitly.
     /// (nonisolated to avoid MainActor isolation inherited from the class)
-    private nonisolated static let claudePath: String = {
+    nonisolated(unsafe) static let claudePath: String = {
         let candidates = [
             "\(NSHomeDirectory())/.local/bin/claude",
             "\(NSHomeDirectory())/.superset/bin/claude",
