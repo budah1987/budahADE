@@ -31,6 +31,9 @@ final class CLISubprocessManager: ObservableObject {
     func send(sessionId: UUID, prompt: String, model: AgentModel? = nil) {
         guard let session = sessions[sessionId] else { return }
 
+        // Detect model change — if user switched models, fork the session
+        // so the new model is actually used (--resume locks to original model)
+        let modelChanged = model != nil && model != session.model
         if let model = model {
             session.model = model
         }
@@ -39,11 +42,19 @@ final class CLISubprocessManager: ObservableObject {
         session.status = .streaming
 
         let systemPromptPath = writeSystemPrompt(session: session)
+        let resumeId: String?
+        if modelChanged {
+            // Model changed — don't resume, start fresh subprocess
+            // (Claude CLI --resume uses the original session's model)
+            resumeId = nil
+        } else {
+            resumeId = session.claudeSessionId
+        }
         let command = buildCommand(
             prompt: prompt,
             model: session.model,
             systemPromptPath: systemPromptPath,
-            sessionId: session.claudeSessionId,
+            sessionId: resumeId,
             allowedTools: session.agentMode?.chatAllowedTools,
             maxTurns: session.agentMode?.chatMaxTurns
         )

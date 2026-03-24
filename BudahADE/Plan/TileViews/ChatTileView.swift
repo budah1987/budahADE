@@ -312,6 +312,15 @@ struct ChatTileView: View {
             }
 
             HStack(spacing: 6) {
+                // Paste image from clipboard button
+                Button(action: pasteImageFromClipboard) {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 14))
+                        .foregroundColor(Theme.textMuted)
+                }
+                .buttonStyle(.plain)
+                .help("Paste image from clipboard")
+
                 TextField(
                     session.stagedContent != nil
                         ? "What should \(role.name) do with this?"
@@ -411,6 +420,28 @@ struct ChatTileView: View {
         session.totalOutputTokens = 0
         session.status = .idle
         session.currentStreamingText = ""
+    }
+
+    private func pasteImageFromClipboard() {
+        let pb = NSPasteboard.general
+        // Check for image data on the clipboard
+        guard let imageData = pb.data(forType: .png)
+                ?? pb.data(forType: .tiff) else { return }
+        guard let image = NSImage(data: imageData) else { return }
+        // Convert TIFF to PNG for consistent storage
+        let pngData: Data
+        if let png = pb.data(forType: .png) {
+            pngData = png
+        } else if let tiffRep = NSBitmapImageRep(data: imageData),
+                  let converted = tiffRep.representation(using: .png, properties: [:]) {
+            pngData = converted
+        } else {
+            return
+        }
+        if let path = saveImage(data: pngData) {
+            pendingImage = image
+            pendingImagePath = path
+        }
     }
 
     private func sendToSpec(_ content: String) {
