@@ -75,19 +75,28 @@ final class TerminalSurfaceView: NSView {
             return
         }
 
-        let rawMods = modsFromEvent(event)
-        // Ask Ghostty to translate mods (applies macos-option-as-alt config)
-        let translatedMods = ghostty_surface_key_translation_mods(surface, rawMods)
+        let mods = modsFromEvent(event)
+        let isOptionHeld = event.modifierFlags.contains(.option)
 
-        // If Ghostty translated the mods (e.g., Option → Alt), use the
-        // unmodified characters so the app receives 'p' not 'π'
-        let optionConsumed = rawMods.rawValue != translatedMods.rawValue
-            && event.modifierFlags.contains(.option)
+        // Option+key: write ESC+char directly to the PTY as the Alt sequence.
+        // Ghostty's embedded API doesn't handle macos-option-as-alt the same
+        // way standalone Ghostty does, so we handle it ourselves.
+        if isOptionHeld, let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
+            // Filter out function keys (private-use area)
+            if let scalar = chars.unicodeScalars.first,
+               scalar.value >= 0xF700, scalar.value <= 0xF8FF {
+                // Fall through to normal handling for function keys
+            } else {
+                let escSeq = "\u{1b}" + chars
+                escSeq.withCString { ptr in
+                    ghostty_surface_text(surface, ptr, UInt(escSeq.utf8.count))
+                }
+                return
+            }
+        }
+
         let text: String? = {
-            let chars = optionConsumed
-                ? event.charactersIgnoringModifiers
-                : event.characters
-            guard let chars, !chars.isEmpty else { return nil }
+            guard let chars = event.characters, !chars.isEmpty else { return nil }
             if let scalar = chars.unicodeScalars.first,
                scalar.value >= 0xF700, scalar.value <= 0xF8FF {
                 return nil
@@ -98,9 +107,7 @@ final class TerminalSurfaceView: NSView {
         var keyEvent = ghostty_input_key_s()
         keyEvent.action = GHOSTTY_ACTION_PRESS
         keyEvent.keycode = UInt32(event.keyCode)
-        keyEvent.mods = translatedMods
-        // Don't mark Alt as consumed — Ghostty needs to see it to generate
-        // the ESC+char sequence for the PTY
+        keyEvent.mods = mods
         keyEvent.consumed_mods = GHOSTTY_MODS_NONE
         keyEvent.unshifted_codepoint = 0
         keyEvent.composing = false
