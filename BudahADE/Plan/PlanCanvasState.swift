@@ -714,7 +714,8 @@ final class PlanCanvasState: ObservableObject {
             panOffsetHeight: panOffset.height,
             chatMessages: chatMessages,
             claudeSessionIds: sessionIds.isEmpty ? nil : sessionIds,
-            terminalTmuxSessions: terminalTmuxSessions.isEmpty ? nil : terminalTmuxSessions
+            terminalTmuxSessions: terminalTmuxSessions.isEmpty ? nil : terminalTmuxSessions,
+            connections: connections
         )
     }
 
@@ -722,6 +723,7 @@ final class PlanCanvasState: ObservableObject {
         elements = snapshot.elements
         zoom = snapshot.zoom
         panOffset = CGSize(width: snapshot.panOffsetWidth, height: snapshot.panOffsetHeight)
+        connections = snapshot.connections
 
         // Restore chat agent sessions from persisted messages
         for element in allTiles {

@@ -333,4 +333,42 @@ final class CanvasPersistenceTests: XCTestCase {
         XCTAssertEqual(loaded.chatMessages[sessionId]?.count, 2)
         XCTAssertEqual(loaded.chatMessages[sessionId]?[1].content, "Hi there")
     }
+
+    // MARK: - Connection Persistence
+
+    func testConnectionSnapshotCodable() throws {
+        let sourceId = UUID()
+        let destId = UUID()
+        let conn = TileConnection(sourceId: sourceId, destinationId: destId, cachedSummary: "summary", sourceVersion: 2)
+        let snapshot = CanvasSnapshot(
+            elements: [], zoom: 1.0, panOffsetWidth: 0, panOffsetHeight: 0,
+            chatMessages: [:], claudeSessionIds: nil, terminalTmuxSessions: nil,
+            connections: [conn]
+        )
+        let data = try JSONEncoder().encode(snapshot)
+        let decoded = try JSONDecoder().decode(CanvasSnapshot.self, from: data)
+        XCTAssertEqual(decoded.connections.count, 1)
+        XCTAssertEqual(decoded.connections.first?.sourceId, sourceId)
+        XCTAssertEqual(decoded.connections.first?.destinationId, destId)
+        XCTAssertEqual(decoded.connections.first?.cachedSummary, "summary")
+        XCTAssertEqual(decoded.connections.first?.sourceVersion, 2)
+    }
+
+    func testConnectionSnapshotBackwardCompatible() throws {
+        // Build a valid snapshot without connections and strip the connections key from JSON
+        let baseline = CanvasSnapshot(
+            elements: [], zoom: 1.5, panOffsetWidth: 10, panOffsetHeight: -5,
+            chatMessages: [:], claudeSessionIds: nil, terminalTmuxSessions: nil,
+            connections: []
+        )
+        var dict = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(baseline), options: []
+        ) as! [String: Any]
+        dict.removeValue(forKey: "connections")
+        let dataWithoutConnections = try JSONSerialization.data(withJSONObject: dict)
+
+        let decoded = try JSONDecoder().decode(CanvasSnapshot.self, from: dataWithoutConnections)
+        XCTAssertEqual(decoded.connections.count, 0, "Missing connections field should decode as empty array")
+        XCTAssertEqual(decoded.zoom, 1.5)
+    }
 }

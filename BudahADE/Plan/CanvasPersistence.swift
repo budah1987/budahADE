@@ -8,6 +8,39 @@ struct CanvasSnapshot: Codable {
     let chatMessages: [UUID: [ChatMessage]]  // sessionId → messages
     let claudeSessionIds: [UUID: String]?  // sessionId → claude session ID for --resume
     let terminalTmuxSessions: [UUID: String]?  // panelId → tmux session name
+    let connections: [TileConnection]
+
+    init(
+        elements: [CanvasElement],
+        zoom: CGFloat,
+        panOffsetWidth: CGFloat,
+        panOffsetHeight: CGFloat,
+        chatMessages: [UUID: [ChatMessage]],
+        claudeSessionIds: [UUID: String]?,
+        terminalTmuxSessions: [UUID: String]?,
+        connections: [TileConnection] = []
+    ) {
+        self.elements = elements
+        self.zoom = zoom
+        self.panOffsetWidth = panOffsetWidth
+        self.panOffsetHeight = panOffsetHeight
+        self.chatMessages = chatMessages
+        self.claudeSessionIds = claudeSessionIds
+        self.terminalTmuxSessions = terminalTmuxSessions
+        self.connections = connections
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        elements = try container.decode([CanvasElement].self, forKey: .elements)
+        zoom = try container.decode(CGFloat.self, forKey: .zoom)
+        panOffsetWidth = try container.decode(CGFloat.self, forKey: .panOffsetWidth)
+        panOffsetHeight = try container.decode(CGFloat.self, forKey: .panOffsetHeight)
+        chatMessages = try container.decode([UUID: [ChatMessage]].self, forKey: .chatMessages)
+        claudeSessionIds = try container.decodeIfPresent([UUID: String].self, forKey: .claudeSessionIds)
+        terminalTmuxSessions = try container.decodeIfPresent([UUID: String].self, forKey: .terminalTmuxSessions)
+        connections = try container.decodeIfPresent([TileConnection].self, forKey: .connections) ?? []
+    }
 }
 
 enum CanvasPersistence {
