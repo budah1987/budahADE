@@ -215,10 +215,11 @@ final class TaskState: ObservableObject, Identifiable {
                 panel.sendCommandWhenReady(claudeCommand)
             }
 
-            // Track tmux session on the tab
+            // Track tmux session on the tab and panel
             if let idx = self.tabs.firstIndex(where: { $0.id == tabId }) {
                 self.tabs[idx].tmuxSession = sessionName
             }
+            terminals[tabId]?.tmuxSession = sessionName
         } else {
             // No tmux — launch Claude directly
             panel.sendCommandWhenReady(claudeCommand)
@@ -255,6 +256,8 @@ final class TaskState: ObservableObject, Identifiable {
         if tabs[index].agentStatus == .completed {
             tabs[index].agentStatus = .inactive
         }
+        // Make terminal first responder so keyboard events (paste, Shift+Enter) go to the right tab
+        terminals[id]?.focus()
     }
 
     func selectTabByIndex(_ index: Int) {
@@ -324,6 +327,7 @@ final class TaskState: ObservableObject, Identifiable {
                 tab.agentMode = AgentMode(rawValue: modeRaw)
             }
 
+            panel.tmuxSession = tabSnapshot.tmuxSession
             tabs.append(tab)
             terminals[tabId] = panel
 

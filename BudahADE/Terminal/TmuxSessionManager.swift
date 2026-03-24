@@ -103,11 +103,17 @@ enum TmuxSessionManager {
     // MARK: - Send Keys
 
     /// Send keys to a tmux session (bypasses terminal encoding issues).
-    static func sendKeys(session: String, keys: String) {
+    /// Send keys to a tmux session.
+    /// - literal: if true, passes `-l` flag so keys are sent as literal characters (raw bytes), bypassing key name parsing.
+    static func sendKeys(session: String, keys: String, literal: Bool = false) {
         DispatchQueue.global(qos: .userInteractive).async {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: tmuxPath)
-            process.arguments = ["send-keys", "-t", session, keys]
+            if literal {
+                process.arguments = ["send-keys", "-t", session, "-l", keys]
+            } else {
+                process.arguments = ["send-keys", "-t", session, keys]
+            }
             let errPipe = Pipe()
             process.standardOutput = FileHandle.nullDevice
             process.standardError = errPipe
@@ -116,7 +122,7 @@ enum TmuxSessionManager {
                 process.waitUntilExit()
                 let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
                 let errStr = String(data: errData, encoding: .utf8) ?? ""
-                print("[TmuxSendKeys] send-keys '\(keys)' to '\(session)' → exit=\(process.terminationStatus)\(errStr.isEmpty ? "" : " err=\(errStr.trimmingCharacters(in: .whitespacesAndNewlines))")")
+                print("[TmuxSendKeys] send-keys\(literal ? " -l" : "") '\(keys.debugDescription)' to '\(session)' → exit=\(process.terminationStatus)\(errStr.isEmpty ? "" : " err=\(errStr.trimmingCharacters(in: .whitespacesAndNewlines))")")
             } catch {
                 print("[TmuxSendKeys] Failed to run tmux: \(error)")
             }

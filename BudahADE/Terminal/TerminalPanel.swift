@@ -51,7 +51,15 @@ final class TerminalPanel: ObservableObject, Identifiable {
     func sendCommand(_ text: String) { surface.sendCommand(text) }
     func sendEnter() { surface.sendEnter() }
     func sendKeyEvent(_ event: NSEvent) { surface.sendKeyEvent(event) }
-    func focus() { surface.setFocus(true) }
+    func focus() {
+        surface.setFocus(true)
+        // Make the surface view first responder so keyboard events (paste, Shift+Enter) go to this tab.
+        // Deferred async so it runs after any button-click focus changes in the same event cycle.
+        let view = surfaceView
+        DispatchQueue.main.async {
+            view.window?.makeFirstResponder(view)
+        }
+    }
     func unfocus() { surface.setFocus(false) }
     func close() { surface.requestClose() }
 

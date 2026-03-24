@@ -842,6 +842,7 @@ final class PlanCanvasState: ObservableObject {
                 // Found a live session — reattach
                 panel.sendCommandWhenReady(TmuxSessionManager.attachCommand(name: savedSession))
                 terminalTmuxSessions[panel.id] = savedSession
+                panel.tmuxSession = savedSession
             } else {
                 // No live session — launch fresh in tmux
                 launchAgent(panel: panel, agent: agent)
@@ -876,6 +877,7 @@ final class PlanCanvasState: ObservableObject {
                 panel.sendCommandWhenReady(command)
             }
             terminalTmuxSessions[panel.id] = sessionName
+            panel.tmuxSession = sessionName
         } else {
             panel.sendCommandWhenReady(command)
         }
