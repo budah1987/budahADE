@@ -149,6 +149,9 @@ enum SpecAssembler {
 
         case .stickyNote:
             return ""
+
+        case .chatAgent:
+            return ""
         }
     }
 

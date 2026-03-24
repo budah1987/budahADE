@@ -178,6 +178,11 @@ private struct TileContentView: View {
             BrowserTileView(url: url, onClose: {
                 canvas.removeElement(elementId)
             }, isVisible: true)
+
+        case .chatAgent:
+            Text("Chat Agent")
+                .foregroundColor(Theme.textMuted)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

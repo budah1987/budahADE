@@ -71,7 +71,7 @@ enum AgentPrompts {
 
     // MARK: - Prompts
 
-    private static func systemPrompt(
+    static func systemPrompt(
         agent: AgentMode,
         taskName: String,
         branchName: String,
@@ -122,6 +122,22 @@ enum AgentPrompts {
             \(specBlock)
             """
         }
+    }
+
+    static func chatSystemPrompt(
+        agent: AgentMode,
+        taskName: String,
+        branchName: String,
+        specFilePath: String? = nil,
+        specProgress: (completed: Int, total: Int)? = nil
+    ) -> String {
+        systemPrompt(
+            agent: agent,
+            taskName: taskName,
+            branchName: branchName,
+            specFilePath: specFilePath,
+            specProgress: specProgress
+        )
     }
 
     /// Execution-focused prompt for builder agents

@@ -45,6 +45,15 @@ enum AgentMode: String, CaseIterable, Identifiable {
         case .developer:  return Theme.accent
         }
     }
+
+    var defaultChatModel: AgentModel {
+        switch self {
+        case .claude:     return .sonnet
+        case .researcher: return .sonnet
+        case .ideator:    return .opus
+        case .developer:  return .sonnet
+        }
+    }
 }
 
 // MARK: - Tile Type
@@ -55,6 +64,7 @@ enum TileType: Equatable {
     case markdown(path: String)
     case image(path: String)
     case browser(url: URL?)
+    case chatAgent(sessionId: UUID, role: AgentRole)
 
     var displayName: String {
         switch self {
@@ -63,6 +73,7 @@ enum TileType: Equatable {
         case .markdown:               return "Markdown"
         case .image:                  return "Image"
         case .browser:                return "Browser"
+        case .chatAgent(_, let role): return role.name
         }
     }
 
@@ -73,6 +84,7 @@ enum TileType: Equatable {
         case .markdown:               return "doc.text"
         case .image:                  return "photo"
         case .browser:                return "globe"
+        case .chatAgent:              return "bubble.left.and.text.bubble.right"
         }
     }
 }
