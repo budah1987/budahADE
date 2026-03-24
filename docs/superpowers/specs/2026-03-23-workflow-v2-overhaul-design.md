@@ -344,7 +344,21 @@ Canvas state is in-memory only. Quitting BudahADE loses all tiles, positions, an
 
 ## Phase 2.75: Session Persistence (Build Mode + Terminal Tiles) ✅ SHIPPED
 
-**Shipped:** tmux-backed terminal sessions (conversations survive app quit — Claude keeps running in tmux daemon). App state persistence (`~/.budahade/app-state.json`) restores projects/tasks on relaunch. Tab metadata + tmux session names saved to `.budahade/sessions/tabs.json`. Canvas chat tile `claudeSessionId` persisted for `--resume`. Tab names protected from shell title overwrites. Surface creation retries on Ghostty init timing. Keyboard: Opt+P model selector fixed (translation_mods + unshifted_codepoint), cursor states fixed (push/pop → set). **In progress:** Shift+Enter linebreaks through tmux (send-keys approach), Cmd+V paste surface timing.
+**Shipped:** tmux-backed terminal sessions (conversations survive app quit — Claude keeps running in tmux daemon). App state persistence (`~/.budahade/app-state.json`) restores projects/tasks on relaunch. Tab metadata + tmux session names saved to `.budahade/sessions/tabs.json`. Canvas chat tile `claudeSessionId` persisted for `--resume`. Tab names protected from shell title overwrites. Surface creation retries on Ghostty init timing.
+
+**Keyboard fixes (all shipped):**
+- Opt+P model selector fixed (translation_mods + unshifted_codepoint)
+- Cursor states fixed (push/pop → set)
+- Shift+Enter: sends `\e[13;2u` as literal bytes via `tmux send-keys -l` (bypasses tmux key-name encoding; Claude CLI parses raw sequence regardless of kitty protocol negotiation)
+- Shift+Tab: intercepts keyCode 48+Shift at top of `keyDown`, sends `\e[Z` literal bytes (prevents AppKit insertBacktab focus traversal)
+- Cmd+V paste routing: `performKeyEquivalent` guarded with `window?.firstResponder === self` so only the focused tab handles paste
+- Image paste: detects image on clipboard, saves temp PNG, pastes file path (Claude CLI accepts `@/path` images)
+- Tab 1 focus bug: `viewDidMoveToWindow` no longer unconditionally steals first responder; `createTab()` and `restoreSessionState()` explicitly call `focus()` so the correct tab always gets keyboard input
+
+**ChatTileView keyboard:**
+- Shift+Enter: TextField → TextEditor migration (TextEditor's default Return inserts newline; plain Return intercepted via `onKeyPress(.return, phases: .down)` to submit)
+- ESC: cancels streaming agent session
+- `tmuxSession` propagated directly on `TerminalSurface`/`TerminalPanel` for reliable `findTmuxSession()` lookup (eliminates UUID-prefix matching that broke after restore)
 
 ### Problem
 
@@ -420,7 +434,7 @@ On app quit (`NSApplication.willTerminateNotification`) and task switch:
 
 ---
 
-## Phase 3: Contextual Connections
+## Phase 3: Contextual Connections ← CURRENT
 
 ### Required Reading (read before implementing)
 - `Plan/PlanCanvasState.swift` — add `connections: [TileConnection]` array here. Understand `elements` array pattern for persistence/mutation.
