@@ -47,6 +47,18 @@ struct ChatTileView: View {
                 Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
                 inputArea
             }
+            // Opt+P — cycle model
+            .onKeyPress(characters: CharacterSet(charactersIn: "p"), phases: .down) { press in
+                guard press.modifiers.contains(.option) else { return .ignored }
+                cycleModel()
+                return .handled
+            }
+            // Ctrl+V — paste image from clipboard
+            .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
+                guard press.modifiers.contains(.control) else { return .ignored }
+                if pasteImageFromClipboard() { return .handled }
+                return .ignored
+            }
         }
     }
 
@@ -398,6 +410,12 @@ struct ChatTileView: View {
         !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || pendingImagePath != nil
             || session.stagedContent != nil
+    }
+
+    private func cycleModel() {
+        let all = AgentModel.allCases
+        guard let idx = all.firstIndex(of: selectedModel) else { return }
+        selectedModel = all[(idx + 1) % all.count]
     }
 
     private func sendMessage() {
