@@ -13,6 +13,8 @@ final class TerminalSurface: Identifiable, ObservableObject {
     private var lastPixelWidth: UInt32 = 0
     private var lastPixelHeight: UInt32 = 0
     @Published var title: String = "Terminal"
+    /// tmux session name for this surface (set by TaskState when session is created or restored).
+    var tmuxSession: String?
 
     init(workingDirectory: String? = nil) {
         self.id = UUID()

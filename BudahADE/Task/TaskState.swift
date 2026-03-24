@@ -154,6 +154,7 @@ final class TaskState: ObservableObject, Identifiable {
             if let idx = tabs.firstIndex(where: { $0.id == id }) {
                 tabs[idx].tmuxSession = sessionName
             }
+            panel.tmuxSession = sessionName
         }
 
         return id

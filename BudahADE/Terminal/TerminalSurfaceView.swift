@@ -79,7 +79,10 @@ final class TerminalSurfaceView: NSView {
         // tmux strips Shift from Enter in legacy mode and CSI u sequences aren't
         // interpreted by tmux's input parser. tmux send-keys handles it correctly.
         if event.keyCode == 36 && event.modifierFlags.contains(.shift) {
-            if let tmuxSession = findTmuxSession() {
+            let foundSession = findTmuxSession()
+            print("[SHIFT-ENTER] findTmuxSession=\(foundSession ?? "nil") surfaceId=\(terminalSurface?.id.uuidString.prefix(8) ?? "nil")")
+            if let tmuxSession = foundSession {
+                print("[SHIFT-ENTER] Sending S-Enter to tmux session: \(tmuxSession)")
                 TmuxSessionManager.sendKeys(session: tmuxSession, keys: "S-Enter")
             } else {
                 // No tmux — send normally (works without tmux)

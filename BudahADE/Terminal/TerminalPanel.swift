@@ -41,6 +41,12 @@ final class TerminalPanel: ObservableObject, Identifiable {
     /// Whether the Ghostty surface is ready to receive input.
     var isSurfaceReady: Bool { surface.surface != nil }
 
+    /// tmux session name — proxies to surface so TerminalSurfaceView can look it up directly.
+    var tmuxSession: String? {
+        get { surface.tmuxSession }
+        set { surface.tmuxSession = newValue }
+    }
+
     func sendText(_ text: String) { surface.sendText(text) }
     func sendCommand(_ text: String) { surface.sendCommand(text) }
     func sendEnter() { surface.sendEnter() }
