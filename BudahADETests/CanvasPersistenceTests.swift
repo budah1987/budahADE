@@ -266,4 +266,67 @@ final class CanvasPersistenceTests: XCTestCase {
         let decoded = try roundTrip(element)
         XCTAssertNil(decoded.specSection)
     }
+
+    // MARK: - CanvasPersistence
+
+    func testSaveAndLoadSnapshot() throws {
+        let dir = NSTemporaryDirectory() + "budahade-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+
+        let elements = [
+            CanvasElement(kind: .tile(.stickyNote), position: CGPoint(x: 10, y: 20), title: "Note"),
+            CanvasElement(kind: .tile(.markdown(path: "/tmp/spec.md")), position: CGPoint(x: 300, y: 0), title: "Spec"),
+        ]
+        let snapshot = CanvasSnapshot(
+            elements: elements, zoom: 0.75,
+            panOffsetWidth: 100, panOffsetHeight: -50,
+            chatMessages: [:]
+        )
+        try CanvasPersistence.save(snapshot, to: dir)
+
+        let path = (dir as NSString).appendingPathComponent(".budahade/canvas.json")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: path))
+
+        let loaded = try XCTUnwrap(CanvasPersistence.load(from: dir))
+        XCTAssertEqual(loaded.elements.count, 2)
+        XCTAssertEqual(loaded.zoom, 0.75)
+        XCTAssertEqual(loaded.panOffsetWidth, 100)
+        XCTAssertEqual(loaded.panOffsetHeight, -50)
+    }
+
+    func testLoadMissingFileReturnsNil() {
+        let dir = NSTemporaryDirectory() + "budahade-nonexistent-\(UUID().uuidString)"
+        XCTAssertNil(CanvasPersistence.load(from: dir))
+    }
+
+    func testLoadCorruptedFileReturnsNil() throws {
+        let dir = NSTemporaryDirectory() + "budahade-test-\(UUID().uuidString)"
+        let budahDir = (dir as NSString).appendingPathComponent(".budahade")
+        try FileManager.default.createDirectory(atPath: budahDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let path = (budahDir as NSString).appendingPathComponent("canvas.json")
+        try "{ broken json".write(toFile: path, atomically: true, encoding: .utf8)
+        XCTAssertNil(CanvasPersistence.load(from: dir))
+    }
+
+    func testChatMessagesPersistedWithSnapshot() throws {
+        let dir = NSTemporaryDirectory() + "budahade-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+
+        let sessionId = UUID()
+        let messages = [
+            ChatMessage(role: .user, content: "Hello"),
+            ChatMessage(role: .assistant, content: "Hi there", inputTokens: 10, outputTokens: 5),
+        ]
+        let snapshot = CanvasSnapshot(
+            elements: [], zoom: 1.0, panOffsetWidth: 0, panOffsetHeight: 0,
+            chatMessages: [sessionId: messages]
+        )
+        try CanvasPersistence.save(snapshot, to: dir)
+        let loaded = try XCTUnwrap(CanvasPersistence.load(from: dir))
+        XCTAssertEqual(loaded.chatMessages[sessionId]?.count, 2)
+        XCTAssertEqual(loaded.chatMessages[sessionId]?[1].content, "Hi there")
+    }
 }
