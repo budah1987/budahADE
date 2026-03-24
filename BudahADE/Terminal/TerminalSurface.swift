@@ -159,28 +159,13 @@ final class TerminalSurface: Identifiable, ObservableObject {
     func sendKeyEvent(_ event: NSEvent) {
         guard let surface else { return }
 
-        let rawMods = modsFromEvent(event)
-        let translatedMods = ghostty_surface_key_translation_mods(surface, rawMods)
-        let translatedFlags = eventModifierFlags(from: translatedMods)
-
-        let unshiftedCodepoint: UInt32 = {
-            if let chars = event.charactersIgnoringModifiers,
-               let scalar = chars.unicodeScalars.first,
-               scalar.value < 0xF700 || scalar.value > 0xF8FF {
-                return scalar.value
-            }
-            return 0
-        }()
-
-        let consumedMods = GHOSTTY_MODS_NONE
-
         var keyEvent = ghostty_input_key_s()
         keyEvent.action = GHOSTTY_ACTION_PRESS
         keyEvent.keycode = UInt32(event.keyCode)
-        keyEvent.mods = rawMods
-        keyEvent.consumed_mods = consumedMods
+        keyEvent.mods = modsFromEvent(event)
+        keyEvent.consumed_mods = GHOSTTY_MODS_NONE
         keyEvent.text = nil
-        keyEvent.unshifted_codepoint = unshiftedCodepoint
+        keyEvent.unshifted_codepoint = 0
         keyEvent.composing = false
         _ = ghostty_surface_key(surface, keyEvent)
     }

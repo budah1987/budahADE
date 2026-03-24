@@ -103,8 +103,11 @@ final class TerminalSurfaceView: NSView {
             return chars
         }()
 
-        // Unshifted codepoint: the character the key produces with NO modifiers.
+        // Unshifted codepoint: only needed when Option is held (for Opt+P / macos-option-as-alt).
+        // For all other keys, leave as 0 to preserve default Ghostty behavior
+        // (setting it for Shift+letter breaks capitalization, Shift+Enter breaks linebreaks).
         let unshiftedCodepoint: UInt32 = {
+            guard optionConsumed else { return 0 }
             if let chars = event.charactersIgnoringModifiers,
                let scalar = chars.unicodeScalars.first,
                scalar.value < 0xF700 || scalar.value > 0xF8FF {
@@ -147,22 +150,13 @@ final class TerminalSurfaceView: NSView {
             return
         }
 
-        let unshiftedCodepoint: UInt32 = {
-            if let chars = event.charactersIgnoringModifiers,
-               let scalar = chars.unicodeScalars.first,
-               scalar.value < 0xF700 || scalar.value > 0xF8FF {
-                return scalar.value
-            }
-            return 0
-        }()
-
         var keyEvent = ghostty_input_key_s()
         keyEvent.action = GHOSTTY_ACTION_RELEASE
         keyEvent.keycode = UInt32(event.keyCode)
         keyEvent.mods = modsFromEvent(event)
         keyEvent.consumed_mods = GHOSTTY_MODS_NONE
         keyEvent.text = nil
-        keyEvent.unshifted_codepoint = unshiftedCodepoint
+        keyEvent.unshifted_codepoint = 0
         keyEvent.composing = false
         _ = ghostty_surface_key(surface, keyEvent)
     }
@@ -284,13 +278,13 @@ final class TerminalSurfaceView: NSView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        // Cmd+V → paste
-        if flags == .command && event.keyCode == 9 {
+        // Cmd+V → paste (use .contains instead of == for robustness)
+        if flags.contains(.command) && event.keyCode == 9 {
             paste(nil)
             return true
         }
         // Cmd+C → copy selection
-        if flags == .command && event.keyCode == 8 {
+        if flags.contains(.command) && event.keyCode == 8 {
             if let surface = terminalSurface?.surface, ghostty_surface_has_selection(surface) {
                 var textInfo = ghostty_text_s()
                 if ghostty_surface_read_selection(surface, &textInfo), let ptr = textInfo.text {
