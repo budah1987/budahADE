@@ -77,11 +77,16 @@ final class TerminalSurfaceView: NSView {
 
         let mods = modsFromEvent(event)
 
-        // Filter out characters in the Unicode private-use area (U+F700–U+F8FF).
-        // Arrow keys, function keys, Home/End etc. produce these special characters
-        // which must NOT be sent as text — only the keycode matters for those keys.
+        // When Option is held, macOS produces composed characters (e.g., Opt+P → π).
+        // Send the unmodified character instead so Ghostty receives 'p' + ALT modifier,
+        // matching macos-option-as-alt behavior. This makes Opt+P work as Alt+P in Claude CLI.
         let text: String? = {
-            guard let chars = event.characters, !chars.isEmpty else { return nil }
+            let isOptionHeld = event.modifierFlags.contains(.option)
+            let chars = isOptionHeld
+                ? event.charactersIgnoringModifiers
+                : event.characters
+            guard let chars, !chars.isEmpty else { return nil }
+            // Filter out Unicode private-use area (U+F700–U+F8FF) — arrow/function keys
             if let scalar = chars.unicodeScalars.first,
                scalar.value >= 0xF700, scalar.value <= 0xF8FF {
                 return nil
