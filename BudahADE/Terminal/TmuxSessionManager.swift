@@ -6,8 +6,8 @@ enum TmuxSessionManager {
 
     // MARK: - Availability
 
-    /// Whether tmux is installed and available.
-    static let isAvailable: Bool = {
+    /// Resolved tmux binary path (nil if not installed).
+    private static let resolvedPath: String? = {
         let candidates = [
             "/opt/homebrew/bin/tmux",
             "/usr/local/bin/tmux",
@@ -15,14 +15,18 @@ enum TmuxSessionManager {
         ]
         for path in candidates {
             if FileManager.default.isExecutableFile(atPath: path) {
-                tmuxPath = path
-                return true
+                print("[TmuxSessionManager] Found tmux at: \(path)")
+                return path
             }
         }
-        return false
+        print("[TmuxSessionManager] tmux not found")
+        return nil
     }()
 
-    private static var tmuxPath = "/opt/homebrew/bin/tmux"
+    /// Whether tmux is installed and available.
+    static var isAvailable: Bool { resolvedPath != nil }
+
+    private static var tmuxPath: String { resolvedPath ?? "/opt/homebrew/bin/tmux" }
 
     // MARK: - Session Names
 
