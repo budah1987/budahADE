@@ -61,11 +61,36 @@ enum TmuxSessionManager {
     }
 
     /// Command to create a new tmux session (stays attached).
-    /// Sets extended-keys so tmux passes through Shift+Enter, kitty keyboard protocol, etc.
+    /// Uses a BudahADE-specific tmux config for extended-keys passthrough.
     static func newSessionCommand(name: String, workingDirectory: String) -> String {
-        "\(tmuxPath) new-session -s \(name) -c '\(workingDirectory)'" +
-        " \\; set -s extended-keys on" +
-        " \\; set -s extended-keys-format csi-u"
+        ensureTmuxConfig()
+        return "\(tmuxPath) -f '\(tmuxConfigPath)' new-session -s \(name) -c '\(workingDirectory)'"
+    }
+
+    /// Path to BudahADE's tmux config file.
+    private static var tmuxConfigPath: String {
+        (NSHomeDirectory() as NSString).appendingPathComponent(".config/budahade/tmux.conf")
+    }
+
+    /// Write BudahADE's tmux config if it doesn't exist.
+    private static func ensureTmuxConfig() {
+        let path = tmuxConfigPath
+        let dir = (path as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let config = """
+        # BudahADE tmux config — enables kitty keyboard protocol passthrough
+        set -s extended-keys on
+        set -s extended-keys-format csi-u
+        set -g allow-passthrough on
+        set -g default-terminal "xterm-256color"
+        set -as terminal-features ",xterm-256color:clipboard"
+        set -g mouse on
+        set -g set-clipboard on
+
+        # Don't show tmux status bar (BudahADE has its own tab bar)
+        set -g status off
+        """
+        try? config.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
     /// Command to attach if exists, otherwise create new.

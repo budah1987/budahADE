@@ -282,8 +282,13 @@ final class TerminalSurfaceView: NSView {
             print("[PASTE] No surface available")
             return
         }
-        guard let str = NSPasteboard.general.string(forType: .string) else {
-            print("[PASTE] No string on clipboard")
+        let pb = NSPasteboard.general
+        // Try multiple pasteboard types
+        let str = pb.string(forType: .string)
+            ?? pb.string(forType: .init("public.utf8-plain-text"))
+            ?? pb.string(forType: .init("public.plain-text"))
+        guard let str, !str.isEmpty else {
+            print("[PASTE] No text on clipboard. Types: \(pb.types?.map(\.rawValue) ?? [])")
             return
         }
         print("[PASTE] Pasting \(str.count) chars")
