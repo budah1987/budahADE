@@ -287,6 +287,16 @@ struct PlanCanvasView: View {
             }
         }
 
+        Menu("Add Chat Agent") {
+            ForEach(AgentMode.allCases) { agent in
+                Button {
+                    canvas.addChatTile(agent: agent, at: position)
+                } label: {
+                    Label("\(agent.displayName) Chat", systemImage: "bubble.left.and.text.bubble.right")
+                }
+            }
+        }
+
         Button {
             canvas.addTile(type: .stickyNote, at: position)
         } label: {

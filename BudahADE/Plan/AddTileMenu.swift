@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AddTileMenu: View {
     let onAddAgent: (AgentMode) -> Void
+    let onAddChatAgent: (AgentMode) -> Void
     let onAddStickyNote: () -> Void
     let onAddTextBox: () -> Void   // Creates ElementKind.text (label with style tools)
     let onAddMarkdown: () -> Void
@@ -9,6 +10,7 @@ struct AddTileMenu: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var hoveredAgent: AgentMode?
+    @State private var hoveredChatAgent: AgentMode?
     @State private var hoveredUtility: String?
 
     var body: some View {
@@ -43,6 +45,51 @@ struct AddTileMenu: View {
                 .buttonStyle(.plain)
                 .onHover { hovering in
                     hoveredAgent = hovering ? agent : nil
+                }
+            }
+
+            Rectangle()
+                .fill(Theme.borderSubtle)
+                .frame(height: 1)
+                .padding(.vertical, 4)
+
+            Text("Chat Agents")
+                .font(Theme.caption(10))
+                .foregroundColor(Theme.textMuted)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 2)
+
+            ForEach(AgentMode.allCases) { agent in
+                Button {
+                    onAddChatAgent(agent)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "bubble.left.and.text.bubble.right")
+                            .font(.system(size: 10))
+                            .foregroundColor(agent.dotColor)
+                            .frame(width: 8)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("\(agent.displayName) Chat")
+                                .font(Theme.label(13))
+                                .foregroundColor(Theme.textPrimary)
+                            Text("Lightweight, no skills")
+                                .font(Theme.caption(11))
+                                .foregroundColor(Theme.textMuted)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(hoveredChatAgent == agent ? Theme.hoverFill : Color.clear)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    hoveredChatAgent = hovering ? agent : nil
                 }
             }
 

@@ -7,6 +7,10 @@ final class PlanCanvasState: ObservableObject {
     @Published var elements: [CanvasElement] = []
     @Published var terminals: [UUID: TerminalPanel] = [:]
 
+    // Chat agent sessions
+    @Published var chatSessions: [UUID: AgentSession] = [:]
+    let chatManager = CLISubprocessManager()
+
     // Viewport
     @Published var zoom: CGFloat = 1.0
     @Published var panOffset: CGSize = .zero
@@ -123,6 +127,76 @@ final class PlanCanvasState: ObservableObject {
         launchAgent(panel: panel, agent: agent)
         didMutate()
         return element.id
+    }
+
+    /// Add a chat agent tile to the canvas
+    @discardableResult
+    func addChatTile(agent: AgentMode, at position: CGPoint, parentFrameId: UUID? = nil) -> UUID {
+        let role = AgentRole.from(agent: agent, taskName: taskName, branchName: branchName)
+        let session = chatManager.createSession(
+            model: role.defaultModel,
+            agentMode: agent,
+            systemPrompt: role.systemPrompt,
+            workingDirectory: worktreePath
+        )
+        chatSessions[session.id] = session
+
+        let element = CanvasElement(
+            kind: .tile(.chatAgent(sessionId: session.id, role: role)),
+            position: position,
+            size: CGSize(width: 400, height: 500),
+            title: role.name
+        )
+
+        if let frameId = parentFrameId {
+            insertIntoFrame(element, frameId: frameId)
+        } else {
+            elements.append(element)
+        }
+
+        didMutate()
+        return element.id
+    }
+
+    // MARK: - Chat Agent Actions
+
+    func sendChatMessage(sessionId: UUID, prompt: String, model: AgentModel) {
+        chatManager.send(sessionId: sessionId, prompt: prompt, model: model)
+    }
+
+    func sendToSpec(content: String, fromAgent: AgentRole) {
+        // Find the first markdown tile on the canvas
+        guard let specElement = allTiles.first(where: {
+            if case .tile(.markdown) = $0.kind { return true }
+            return false
+        }),
+        case .tile(.markdown(let path)) = specElement.kind else { return }
+
+        let section = "\n\n## From \(fromAgent.name)\n\n<!-- source: \(fromAgent.id) -->\n\n\(content)"
+
+        if let existing = try? String(contentsOfFile: path, encoding: .utf8) {
+            try? (existing + section).write(toFile: path, atomically: true, encoding: .utf8)
+        }
+    }
+
+    func sendToAgent(content: String, fromAgent: AgentRole, targetAgent: AgentMode) {
+        let targetSession: AgentSession
+        if let existing = chatSessions.values.first(where: { $0.agentMode == targetAgent }) {
+            targetSession = existing
+        } else {
+            let pos = nextFreePosition(size: CGSize(width: 400, height: 500))
+            let elementId = addChatTile(agent: targetAgent, at: pos)
+            guard let element = findElement(elementId),
+                  case .tile(.chatAgent(let sessionId, _)) = element.kind,
+                  let session = chatSessions[sessionId] else { return }
+            targetSession = session
+        }
+
+        let contextMessage = ChatMessage(
+            role: .system,
+            content: "Context from \(fromAgent.name):\n\n\(content)"
+        )
+        targetSession.messages.append(contextMessage)
     }
 
     // MARK: - Add Frame
@@ -542,6 +616,10 @@ final class PlanCanvasState: ObservableObject {
             panel.close()
         }
         terminals.removeAll()
+        for sessionId in chatSessions.keys {
+            chatManager.cancel(sessionId: sessionId)
+        }
+        chatSessions.removeAll()
         elements.removeAll()
     }
 
@@ -552,7 +630,7 @@ final class PlanCanvasState: ObservableObject {
         ContextManifest.write(canvas: self)
     }
 
-    private func findElement(_ id: UUID) -> CanvasElement? {
+    func findElement(_ id: UUID) -> CanvasElement? {
         if let el = elements.first(where: { $0.id == id }) { return el }
         for element in elements {
             if case .frame(let data) = element.kind {
@@ -616,6 +694,9 @@ final class PlanCanvasState: ObservableObject {
             if case .terminal(let panelId, _) = tileType {
                 terminals[panelId]?.close()
                 terminals.removeValue(forKey: panelId)
+            } else if case .chatAgent(let sessionId, _) = tileType {
+                chatManager.cancel(sessionId: sessionId)
+                chatSessions.removeValue(forKey: sessionId)
             }
         case .frame(let data):
             for child in data.children {

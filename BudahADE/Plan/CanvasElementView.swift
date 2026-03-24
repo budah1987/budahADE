@@ -179,10 +179,12 @@ private struct TileContentView: View {
                 canvas.removeElement(elementId)
             }, isVisible: true)
 
-        case .chatAgent:
-            Text("Chat Agent")
-                .foregroundColor(Theme.textMuted)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .chatAgent(let sessionId, let role):
+            if let session = canvas.chatSessions[sessionId] {
+                ChatTileView(session: session, role: role, canvas: canvas, elementId: elementId) {
+                    canvas.removeElement(elementId)
+                }
+            }
         }
     }
 }
