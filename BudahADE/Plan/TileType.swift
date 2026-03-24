@@ -54,6 +54,16 @@ enum AgentMode: String, CaseIterable, Identifiable, Codable {
         case .developer:  return .sonnet
         }
     }
+
+    /// Allowed tools for chat agent tiles. Nil = no restriction, empty = no tools.
+    var chatAllowedTools: [String]? {
+        switch self {
+        case .claude:     return nil  // unrestricted
+        case .researcher: return ["WebSearch", "WebFetch", "Read"]
+        case .ideator:    return []   // pure conversation, no tools
+        case .developer:  return ["Read", "Grep", "Glob"]
+        }
+    }
 }
 
 // MARK: - Tile Type

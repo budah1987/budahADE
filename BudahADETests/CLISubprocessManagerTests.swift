@@ -63,7 +63,7 @@ final class CLISubprocessManagerTests: XCTestCase {
         XCTAssertTrue(cmd.contains("sonnet"), "Should contain 'sonnet'")
         XCTAssertTrue(cmd.contains("--system-prompt-file"), "Should contain '--system-prompt-file'")
         XCTAssertTrue(cmd.contains("/tmp/prompt.md"), "Should contain the system prompt path")
-        XCTAssertTrue(cmd.contains("--dangerously-skip-permissions"), "Should contain '--dangerously-skip-permissions'")
+        XCTAssertTrue(cmd.contains("--verbose"), "Should contain '--verbose'")
         XCTAssertFalse(cmd.contains("--resume"), "Should not contain '--resume' when sessionId is nil")
     }
 

@@ -136,6 +136,20 @@ struct ChatTileView: View {
                         if !session.currentStreamingText.isEmpty {
                             streamingBubble
                                 .id("streaming")
+                        } else if !session.pendingToolCalls.isEmpty {
+                            // Tool activity — compact spinner with latest tool name
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .scaleEffect(0.7)
+                                Text("Working... (\(session.pendingToolCalls.count) tool calls)")
+                                    .font(Theme.caption(11))
+                                    .foregroundColor(Theme.textMuted)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 4)
+                            .id("tool-activity")
                         } else {
                             thinkingDots
                                 .id("streaming")
@@ -208,12 +222,15 @@ struct ChatTileView: View {
     }
 
     private var thinkingDots: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<3, id: \.self) { i in
-                Circle()
-                    .fill(Theme.textMuted)
-                    .frame(width: 5, height: 5)
-                    .opacity(0.6)
+        TimelineView(.animation(minimumInterval: 0.4)) { timeline in
+            let phase = Int(timeline.date.timeIntervalSinceReferenceDate / 0.4) % 3
+            HStack(spacing: 3) {
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(Theme.textMuted)
+                        .frame(width: 5, height: 5)
+                        .opacity(i == phase ? 1.0 : 0.3)
+                }
             }
         }
         .padding(.horizontal, 10)
@@ -274,17 +291,30 @@ struct ChatTileView: View {
                         return .handled
                     }
 
-                Button(action: sendMessage) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(
-                            inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                ? Theme.textMuted
-                                : Theme.accent
-                        )
+                if session.status == .streaming {
+                    // Stop button while streaming
+                    Button {
+                        canvas.chatManager.cancel(sessionId: session.id)
+                    } label: {
+                        Image(systemName: "stop.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.red.opacity(0.8))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    // Send button
+                    Button(action: sendMessage) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(
+                                inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    ? Theme.textMuted
+                                    : Theme.accent
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .buttonStyle(.plain)
-                .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -388,6 +418,7 @@ private struct MessageBubble: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: frameAlignment)
+        .contentShape(Rectangle())
         .onHover { isHovered = $0 }
     }
 
@@ -456,8 +487,8 @@ private struct MessageBubble: View {
                 Spacer(minLength: 40)
             }
 
-            // Send-to button (shows on hover)
-            if isHovered || showSendToMenu == message.id {
+            // Send-to button (shows on hover, only for messages with text)
+            if !message.content.isEmpty && (isHovered || showSendToMenu == message.id) {
                 Button {
                     withAnimation(.easeOut(duration: 0.12)) {
                         showSendToMenu = showSendToMenu == message.id ? nil : message.id

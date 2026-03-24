@@ -74,17 +74,45 @@ final class AgentSession: ObservableObject, Identifiable {
         messages.append(message)
     }
 
+    /// Tool calls accumulating during the current turn (before the text response)
+    @Published var pendingToolCalls: [ToolCall] = []
+
     func handleAssistantMessage(_ event: StreamEvent.AssistantMessage) {
+        // Use streamed text if the event content is empty (deltas accumulated it)
+        let text = event.content.isEmpty ? currentStreamingText : event.content
+
+        // Always track tokens
+        totalInputTokens += event.inputTokens
+        totalOutputTokens += event.outputTokens
+
+        // Tool-only messages: accumulate into pendingToolCalls, don't create a bubble
+        if text.isEmpty && event.toolCalls != nil {
+            pendingToolCalls.append(contentsOf: event.toolCalls ?? [])
+            return
+        }
+
+        // Skip completely empty messages (no text, no tools)
+        guard !text.isEmpty else { return }
+
+        // Real text response — flush pending tool calls as a single collapsible message,
+        // then add the text message
+        if !pendingToolCalls.isEmpty {
+            let toolMessage = ChatMessage(
+                role: .assistant,
+                content: "",
+                toolCalls: pendingToolCalls
+            )
+            messages.append(toolMessage)
+            pendingToolCalls = []
+        }
+
         let message = ChatMessage(
             role: event.role,
-            content: event.content,
-            toolCalls: event.toolCalls,
+            content: text,
             inputTokens: event.inputTokens,
             outputTokens: event.outputTokens
         )
         messages.append(message)
-        totalInputTokens += event.inputTokens
-        totalOutputTokens += event.outputTokens
         currentStreamingText = ""
     }
 
