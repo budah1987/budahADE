@@ -53,6 +53,12 @@ struct ChatTileView: View {
                 cycleModel()
                 return .handled
             }
+            // Esc — cancel streaming agent
+            .onKeyPress(.escape) {
+                guard session.status == .streaming else { return .ignored }
+                canvas.chatManager.cancel(sessionId: session.id)
+                return .handled
+            }
             // Ctrl+V — paste image from clipboard
             .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
                 guard press.modifiers.contains(.control) else { return .ignored }
@@ -335,28 +341,36 @@ struct ChatTileView: View {
                 .buttonStyle(.plain)
                 .help("Attach image")
 
-                TextField(
-                    session.stagedContent != nil
-                        ? "What should \(role.name) do with this?"
-                        : "Message \(role.name)...",
-                    text: $inputText,
-                    axis: .vertical
-                )
-                    .font(Theme.body(14))
-                    .foregroundColor(Theme.textPrimary)
-                    .lineLimit(1...6)
-                    .textFieldStyle(.plain)
-                    .onSubmit { sendMessage() }
-                    .onKeyPress(.return) {
-                        sendMessage()
-                        return .handled
+                ZStack(alignment: .topLeading) {
+                    // Placeholder text
+                    if inputText.isEmpty {
+                        Text(session.stagedContent != nil
+                            ? "What should \(role.name) do with this?"
+                            : "Message \(role.name)...")
+                            .font(Theme.body(14))
+                            .foregroundColor(Theme.textMuted)
+                            .padding(.top, 2)
+                            .allowsHitTesting(false)
                     }
-                    .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down, action: { press in
-                        // Cmd+V — paste image from clipboard if available
-                        guard press.modifiers.contains(.command) else { return .ignored }
-                        if pasteImageFromClipboard() { return .handled }
-                        return .ignored  // fall through to normal text paste
-                    })
+                    TextEditor(text: $inputText)
+                        .font(Theme.body(14))
+                        .foregroundColor(Theme.textPrimary)
+                        .frame(minHeight: 20, maxHeight: 120)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.clear)
+                        // Plain Return → submit; Shift+Return → let TextEditor insert newline naturally
+                        .onKeyPress(.return, phases: .down) { press in
+                            guard !press.modifiers.contains(.shift) else { return .ignored }
+                            sendMessage()
+                            return .handled
+                        }
+                        .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down, action: { press in
+                            // Cmd+V — paste image from clipboard if available
+                            guard press.modifiers.contains(.command) else { return .ignored }
+                            if pasteImageFromClipboard() { return .handled }
+                            return .ignored  // fall through to normal text paste
+                        })
+                }
 
                 if session.status == .streaming {
                     Button {
