@@ -6,6 +6,7 @@ final class PlanCanvasState: ObservableObject {
     // Content
     @Published var elements: [CanvasElement] = []
     @Published var terminals: [UUID: TerminalPanel] = [:]
+    var terminalTmuxSessions: [UUID: String] = [:]  // panelId → tmux session name
 
     // Chat agent sessions
     @Published var chatSessions: [UUID: AgentSession] = [:]
@@ -629,7 +630,8 @@ final class PlanCanvasState: ObservableObject {
             panOffsetWidth: panOffset.width,
             panOffsetHeight: panOffset.height,
             chatMessages: chatMessages,
-            claudeSessionIds: sessionIds.isEmpty ? nil : sessionIds
+            claudeSessionIds: sessionIds.isEmpty ? nil : sessionIds,
+            terminalTmuxSessions: terminalTmuxSessions.isEmpty ? nil : terminalTmuxSessions
         )
     }
 
@@ -661,7 +663,12 @@ final class PlanCanvasState: ObservableObject {
             }
         }
 
-        // Restore terminal tile panels (empty shells — user relaunches Claude manually)
+        // Restore saved tmux session mappings for terminal tiles
+        if let savedTmux = snapshot.terminalTmuxSessions {
+            terminalTmuxSessions = savedTmux
+        }
+
+        // Restore terminal tile panels — reattach to tmux if sessions are alive
         restoreTerminalPanels()
     }
 
@@ -796,6 +803,7 @@ final class PlanCanvasState: ObservableObject {
                     let panel = TerminalPanel(workingDirectory: worktreePath)
                     terminals[panel.id] = panel
                     elements[i].kind = .tile(.terminal(panelId: panel.id, agent: agent))
+                    restoreOrLaunchInTmux(panel: panel, agent: agent)
                 }
             }
             if case .frame(var frameData) = elements[i].kind {
@@ -807,6 +815,7 @@ final class PlanCanvasState: ObservableObject {
                             terminals[panel.id] = panel
                             frameData.children[j].kind = .tile(.terminal(panelId: panel.id, agent: agent))
                             changed = true
+                            restoreOrLaunchInTmux(panel: panel, agent: agent)
                         }
                     }
                 }
@@ -817,6 +826,31 @@ final class PlanCanvasState: ObservableObject {
         }
     }
 
+    /// Try to reattach to an existing tmux session for a canvas terminal tile.
+    /// Falls back to launching a fresh Claude session in tmux.
+    private func restoreOrLaunchInTmux(panel: TerminalPanel, agent: AgentMode) {
+        // Check if there's a tmux session matching the old panel ID pattern
+        if TmuxSessionManager.isAvailable {
+            // Try to find a matching session from the saved tmux sessions
+            let sessionName = TmuxSessionManager.sessionName(for: panel.id)
+            // For canvas tiles, we check all budahade sessions and try to match
+            let liveSessions = TmuxSessionManager.listSessions()
+
+            // If we saved a tmux session for this tile's old panel ID, try that
+            // Otherwise launch fresh
+            if let savedSession = terminalTmuxSessions.values.first(where: { liveSessions.contains($0) }) {
+                // Found a live session — reattach
+                panel.sendCommandWhenReady(TmuxSessionManager.attachCommand(name: savedSession))
+                terminalTmuxSessions[panel.id] = savedSession
+            } else {
+                // No live session — launch fresh in tmux
+                launchAgent(panel: panel, agent: agent)
+            }
+        } else {
+            launchAgent(panel: panel, agent: agent)
+        }
+    }
+
     private func allElementRects() -> [CGRect] {
         elements.map { CGRect(origin: $0.position, size: $0.size) }
     }
@@ -824,16 +858,26 @@ final class PlanCanvasState: ObservableObject {
     // MARK: - Agent Launch
 
     private func launchAgent(panel: TerminalPanel, agent: AgentMode) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self else { return }
-            let command = AgentPrompts.launchCommand(
-                agent: agent,
-                taskName: self.taskName,
-                branchName: self.branchName,
-                worktreePath: self.worktreePath,
-                panelId: panel.id
+        let command = AgentPrompts.launchCommand(
+            agent: agent,
+            taskName: self.taskName,
+            branchName: self.branchName,
+            worktreePath: self.worktreePath,
+            panelId: panel.id
+        )
+
+        if TmuxSessionManager.isAvailable {
+            let sessionName = TmuxSessionManager.sessionName(for: panel.id)
+            let tmuxCmd = TmuxSessionManager.newSessionCommand(
+                name: sessionName, workingDirectory: worktreePath
             )
-            panel.sendCommand(command)
+            panel.sendCommandWhenReady(tmuxCmd)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                panel.sendCommandWhenReady(command)
+            }
+            terminalTmuxSessions[panel.id] = sessionName
+        } else {
+            panel.sendCommandWhenReady(command)
         }
     }
 }

@@ -143,6 +143,16 @@ final class TaskState: ObservableObject, Identifiable {
 
         if launchAgent {
             launchClaudeInTab(id, agent: agent)
+        } else if TmuxSessionManager.isAvailable {
+            // Wrap even bare shell tabs in tmux for persistence
+            let sessionName = TmuxSessionManager.sessionName(for: id)
+            let tmuxCmd = TmuxSessionManager.newSessionCommand(
+                name: sessionName, workingDirectory: worktreePath
+            )
+            panel.sendCommandWhenReady(tmuxCmd)
+            if let idx = tabs.firstIndex(where: { $0.id == id }) {
+                tabs[idx].tmuxSession = sessionName
+            }
         }
 
         return id
