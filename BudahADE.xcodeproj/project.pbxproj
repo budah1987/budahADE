@@ -1757,6 +1757,7 @@
 			<array>
 				<string>AA30003000300030AA300030</string>
 				<string>BB20002000200020BB200020</string>
+				<string>CLI001000100010001CLI00100</string>
 			</array>
 			<key>isa</key>
 			<string>PBXGroup</string>
@@ -2040,6 +2041,7 @@
 				<string>AA1F001F001F001FAA1F001F</string>
 				<string>MA10001000100010MA100010</string>
 				<string>MA20002000200020MA200020</string>
+				<string>CLI002000200020002CLI00200</string>
 			</array>
 			<key>isa</key>
 			<string>PBXSourcesBuildPhase</string>
@@ -2108,6 +2110,42 @@
 		<dict>
 			<key>fileRef</key>
 			<string>AA30003000300030AA300030</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
+		<key>CLI001000100010001CLI00100</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>CLISubprocessManager.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>CLI002000200020002CLI00200</key>
+		<dict>
+			<key>fileRef</key>
+			<string>CLI001000100010001CLI00100</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
+		<key>TCL001000100010001TCL00100</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>CLISubprocessManagerTests.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>TCL002000200020002TCL00200</key>
+		<dict>
+			<key>fileRef</key>
+			<string>TCL001000100010001TCL00100</string>
 			<key>isa</key>
 			<string>PBXBuildFile</string>
 		</dict>
@@ -2288,6 +2326,7 @@
 				<string>TF03000300030003TF030003</string>
 				<string>TF04000400040004TF040004</string>
 				<string>TE05000500050005TE050005</string>
+				<string>TCL001000100010001TCL00100</string>
 			</array>
 			<key>isa</key>
 			<string>PBXGroup</string>
@@ -2334,6 +2373,7 @@
 				<string>TE03000300030003TE030003</string>
 				<string>TE04000400040004TE040004</string>
 				<string>TF05000500050005TF050005</string>
+				<string>TCL002000200020002TCL00200</string>
 			</array>
 			<key>isa</key>
 			<string>PBXSourcesBuildPhase</string>
