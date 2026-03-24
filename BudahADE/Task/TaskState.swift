@@ -405,9 +405,13 @@ final class TaskState: ObservableObject, Identifiable {
     /// Find the most recent Claude session ID by scanning the .claude/projects/ directory.
     /// Claude stores sessions as JSONL files; the session_XXXXX ID is inside.
     private static func findLatestClaudeSessionId(worktreePath: String) -> String? {
-        // Claude project dir is the worktree path with / replaced by -
+        // Claude project dir slug: path with / → -, space → -, dot removed
+        // e.g. "/Users/amir/Documents/Cursor Projects/.budahade-worktrees/Ghost/feat-test"
+        //    → "-Users-amir-Documents-Cursor-Projects--budahade-worktrees-Ghost-feat-test"
         let projectSlug = worktreePath
             .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: ".", with: "")
         let claudeProjectDir = (NSHomeDirectory() as NSString)
             .appendingPathComponent(".claude/projects/\(projectSlug)")
 
