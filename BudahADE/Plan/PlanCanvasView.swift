@@ -38,7 +38,7 @@ struct PlanCanvasView: View {
                     .allowsHitTesting(!isSpacePanning)
 
                 // Connection ports layer (above tiles so drag gesture wins)
-                ConnectionPortsLayer(canvas: canvas, hoveredElementId: canvas.hoveredTileId)
+                ConnectionPortsLayer(canvas: canvas)
                     .scaleEffect(localZoom, anchor: .topLeading)
                     .offset(localPanOffset)
                     .allowsHitTesting(!isSpacePanning)

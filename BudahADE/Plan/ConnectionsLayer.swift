@@ -182,77 +182,117 @@ private struct ConnectionHitTarget: View {
 
 // MARK: - Connection Port Overlay
 
-/// Port circles rendered directly in canvas space (not inside CanvasElementView).
-/// This avoids gesture conflicts with tile drag gestures.
+/// Always-visible port circles in canvas space. Subtle at rest, bright on hover.
+/// Rendered in a separate layer above tiles so drag gestures don't conflict.
 struct ConnectionPortsLayer: View {
     @ObservedObject var canvas: PlanCanvasState
-    let hoveredElementId: UUID?
-
-    private let portSize: CGFloat = 12
 
     var body: some View {
-        ForEach(canvas.elements.filter { isTile($0) }) { element in
-            let showPorts = hoveredElementId == element.id || canvas.connectionDragSource != nil
-
-            if showPorts {
-                // Output port — right edge center
-                Circle()
-                    .fill(canvas.connectionDragSource == element.id ? Theme.accent : Theme.surface2)
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1.5)
-                    )
-                    .frame(width: portSize, height: portSize)
-                    .position(
-                        x: element.position.x + element.size.width,
-                        y: element.position.y + element.size.height / 2
-                    )
-                    .gesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                canvas.connectionDragSource = element.id
-                                // Convert drag translation to canvas-space endpoint
-                                let startX = element.position.x + element.size.width
-                                let startY = element.position.y + element.size.height / 2
-                                canvas.connectionDragEndpoint = CGPoint(
-                                    x: startX + value.translation.width,
-                                    y: startY + value.translation.height
-                                )
-                            }
-                            .onEnded { value in
-                                if let endpoint = canvas.connectionDragEndpoint,
-                                   let targetId = canvas.elementAt(point: endpoint),
-                                   targetId != element.id {
-                                    canvas.addConnection(sourceId: element.id, destinationId: targetId)
-                                }
-                                canvas.connectionDragSource = nil
-                                canvas.connectionDragEndpoint = nil
-                            }
-                    )
-                    .onHover { hovering in
-                        if hovering { NSCursor.crosshair.push() } else { NSCursor.pop() }
-                    }
-
-                // Input port — left edge center (visual only)
-                Circle()
-                    .fill(Theme.surface2)
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1.5)
-                    )
-                    .frame(width: portSize, height: portSize)
-                    .position(
-                        x: element.position.x,
-                        y: element.position.y + element.size.height / 2
-                    )
-                    .allowsHitTesting(false)
-            }
+        ForEach(canvas.elements.filter(isTile)) { element in
+            OutputPort(element: element, canvas: canvas)
+            InputPort(element: element, canvas: canvas)
         }
     }
 
     private func isTile(_ element: CanvasElement) -> Bool {
         if case .tile = element.kind { return true }
         return false
+    }
+}
+
+// MARK: - Output Port (draggable)
+
+private struct OutputPort: View {
+    let element: CanvasElement
+    @ObservedObject var canvas: PlanCanvasState
+    @State private var isHovered = false
+
+    private let size: CGFloat = 12
+
+    private var isDragging: Bool { canvas.connectionDragSource == element.id }
+    private var anyDragActive: Bool { canvas.connectionDragSource != nil }
+
+    // Subtle at rest, bright on hover or during drag
+    private var opacity: Double {
+        if isDragging || isHovered { return 1.0 }
+        if anyDragActive { return 0.6 }
+        return 0.0
+    }
+
+    var body: some View {
+        Circle()
+            .fill(isDragging ? Theme.accent : Theme.surface2)
+            .overlay(
+                Circle().strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1.5)
+            )
+            .frame(width: size, height: size)
+            .opacity(opacity)
+            .animation(.easeInOut(duration: 0.15), value: opacity)
+            .position(
+                x: element.position.x + element.size.width,
+                y: element.position.y + element.size.height / 2
+            )
+            .onHover { hovering in
+                isHovered = hovering
+                if hovering { NSCursor.crosshair.push() } else { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        canvas.connectionDragSource = element.id
+                        let startX = element.position.x + element.size.width
+                        let startY = element.position.y + element.size.height / 2
+                        canvas.connectionDragEndpoint = CGPoint(
+                            x: startX + value.translation.width,
+                            y: startY + value.translation.height
+                        )
+                    }
+                    .onEnded { _ in
+                        if let endpoint = canvas.connectionDragEndpoint,
+                           let targetId = canvas.elementAt(point: endpoint),
+                           targetId != element.id {
+                            canvas.addConnection(sourceId: element.id, destinationId: targetId)
+                        }
+                        canvas.connectionDragSource = nil
+                        canvas.connectionDragEndpoint = nil
+                    }
+            )
+    }
+}
+
+// MARK: - Input Port (visual indicator only)
+
+private struct InputPort: View {
+    let element: CanvasElement
+    @ObservedObject var canvas: PlanCanvasState
+    @State private var isHovered = false
+
+    private let size: CGFloat = 12
+    private var anyDragActive: Bool { canvas.connectionDragSource != nil }
+
+    private var opacity: Double {
+        if isHovered { return 1.0 }
+        if anyDragActive { return 0.6 }
+        return 0.0
+    }
+
+    var body: some View {
+        Circle()
+            .fill(Theme.surface2)
+            .overlay(
+                Circle().strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1.5)
+            )
+            .frame(width: size, height: size)
+            .opacity(opacity)
+            .animation(.easeInOut(duration: 0.15), value: opacity)
+            .position(
+                x: element.position.x,
+                y: element.position.y + element.size.height / 2
+            )
+            .onHover { hovering in
+                isHovered = hovering
+            }
+            .allowsHitTesting(anyDragActive) // only hit-testable as drop target during drag
     }
 }
 
