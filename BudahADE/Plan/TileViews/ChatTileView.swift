@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - ChatTileView
 
@@ -15,6 +16,7 @@ struct ChatTileView: View {
     @State private var showSendToMenu: UUID?
     @State private var pendingImage: NSImage?
     @State private var pendingImagePath: String?
+    @State private var showFilePicker = false
 
     init(
         session: AgentSession,
@@ -312,14 +314,14 @@ struct ChatTileView: View {
             }
 
             HStack(spacing: 6) {
-                // Paste image from clipboard button
-                Button(action: pasteImageFromClipboard) {
+                // Attach image from file
+                Button { showFilePicker = true } label: {
                     Image(systemName: "paperclip")
                         .font(.system(size: 14))
                         .foregroundColor(Theme.textMuted)
                 }
                 .buttonStyle(.plain)
-                .help("Paste image from clipboard")
+                .help("Attach image")
 
                 TextField(
                     session.stagedContent != nil
@@ -337,6 +339,12 @@ struct ChatTileView: View {
                         sendMessage()
                         return .handled
                     }
+                    .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down, action: { press in
+                        // Cmd+V — paste image from clipboard if available
+                        guard press.modifiers.contains(.command) else { return .ignored }
+                        if pasteImageFromClipboard() { return .handled }
+                        return .ignored  // fall through to normal text paste
+                    })
 
                 if session.status == .streaming {
                     Button {
@@ -365,6 +373,22 @@ struct ChatTileView: View {
         .background(Theme.surface2.opacity(0.4))
         .onDrop(of: ["public.image", "public.file-url"], isTargeted: nil) { providers in
             handleDrop(providers: providers)
+        }
+        .fileImporter(
+            isPresented: $showFilePicker,
+            allowedContentTypes: [.png, .jpeg, .tiff, .image],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result,
+                  let url = urls.first,
+                  url.startAccessingSecurityScopedResource() else { return }
+            defer { url.stopAccessingSecurityScopedResource() }
+            guard let data = try? Data(contentsOf: url),
+                  let image = NSImage(data: data) else { return }
+            if let path = saveImage(data: data) {
+                pendingImage = image
+                pendingImagePath = path
+            }
         }
     }
 
@@ -422,13 +446,12 @@ struct ChatTileView: View {
         session.currentStreamingText = ""
     }
 
-    private func pasteImageFromClipboard() {
+    @discardableResult
+    private func pasteImageFromClipboard() -> Bool {
         let pb = NSPasteboard.general
-        // Check for image data on the clipboard
         guard let imageData = pb.data(forType: .png)
-                ?? pb.data(forType: .tiff) else { return }
-        guard let image = NSImage(data: imageData) else { return }
-        // Convert TIFF to PNG for consistent storage
+                ?? pb.data(forType: .tiff) else { return false }
+        guard let image = NSImage(data: imageData) else { return false }
         let pngData: Data
         if let png = pb.data(forType: .png) {
             pngData = png
@@ -436,12 +459,14 @@ struct ChatTileView: View {
                   let converted = tiffRep.representation(using: .png, properties: [:]) {
             pngData = converted
         } else {
-            return
+            return false
         }
         if let path = saveImage(data: pngData) {
             pendingImage = image
             pendingImagePath = path
+            return true
         }
+        return false
     }
 
     private func sendToSpec(_ content: String) {
