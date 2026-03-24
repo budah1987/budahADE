@@ -141,6 +141,69 @@ final class TileConnectionTests: XCTestCase {
         XCTAssertTrue(output.textRepresentation.contains("Assistant: Hi there"))
     }
 
+    // MARK: - Connection CRUD
+
+    func testAddConnection() async throws {
+        let state = await PlanCanvasState(worktreePath: "/tmp", taskName: "test", branchName: "test")
+        let idA = await state.addTile(type: .stickyNote, at: .zero)
+        let idB = await state.addTile(type: .stickyNote, at: CGPoint(x: 300, y: 0))
+        let connId = await state.addConnection(sourceId: idA, destinationId: idB)
+        let conns = await state.connections
+        XCTAssertEqual(conns.count, 1)
+        XCTAssertEqual(conns.first?.id, connId)
+        XCTAssertEqual(conns.first?.sourceId, idA)
+        XCTAssertEqual(conns.first?.destinationId, idB)
+    }
+
+    func testRemoveConnection() async throws {
+        let state = await PlanCanvasState(worktreePath: "/tmp", taskName: "test", branchName: "test")
+        let idA = await state.addTile(type: .stickyNote, at: .zero)
+        let idB = await state.addTile(type: .stickyNote, at: CGPoint(x: 300, y: 0))
+        let connId = await state.addConnection(sourceId: idA, destinationId: idB)
+        await state.removeConnection(connId)
+        let conns = await state.connections
+        XCTAssertEqual(conns.count, 0)
+    }
+
+    func testNoDuplicateConnections() async throws {
+        let state = await PlanCanvasState(worktreePath: "/tmp", taskName: "test", branchName: "test")
+        let idA = await state.addTile(type: .stickyNote, at: .zero)
+        let idB = await state.addTile(type: .stickyNote, at: CGPoint(x: 300, y: 0))
+        let firstId = await state.addConnection(sourceId: idA, destinationId: idB)
+        let secondId = await state.addConnection(sourceId: idA, destinationId: idB)
+        let conns = await state.connections
+        XCTAssertEqual(conns.count, 1, "Duplicate connection should not be added")
+        XCTAssertEqual(firstId, secondId, "Should return existing connection ID")
+    }
+
+    func testConnectionsCleanedUpOnElementRemoval() async throws {
+        let state = await PlanCanvasState(worktreePath: "/tmp", taskName: "test", branchName: "test")
+        let idA = await state.addTile(type: .stickyNote, at: .zero)
+        let idB = await state.addTile(type: .stickyNote, at: CGPoint(x: 300, y: 0))
+        await state.addConnection(sourceId: idA, destinationId: idB)
+        await state.removeElement(idA)
+        let conns = await state.connections
+        XCTAssertEqual(conns.count, 0, "Connection should be removed when source element is deleted")
+    }
+
+    func testIncomingConnections() async throws {
+        let state = await PlanCanvasState(worktreePath: "/tmp", taskName: "test", branchName: "test")
+        let idA = await state.addTile(type: .stickyNote, at: .zero)
+        let idB = await state.addTile(type: .stickyNote, at: CGPoint(x: 300, y: 0))
+        let idC = await state.addTile(type: .stickyNote, at: CGPoint(x: 600, y: 0))
+        await state.addConnection(sourceId: idA, destinationId: idC)
+        await state.addConnection(sourceId: idB, destinationId: idC)
+        await state.addConnection(sourceId: idA, destinationId: idB)
+
+        let incoming = await state.incomingConnections(for: idC)
+        XCTAssertEqual(incoming.count, 2)
+        XCTAssertTrue(incoming.allSatisfy { $0.destinationId == idC })
+
+        let outgoing = await state.outgoingConnections(for: idA)
+        XCTAssertEqual(outgoing.count, 2)
+        XCTAssertTrue(outgoing.allSatisfy { $0.sourceId == idA })
+    }
+
     // MARK: - tileOutput(for:)
 
     func testTileOutputForStickyNoteEmptyTitle() async throws {

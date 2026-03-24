@@ -7,6 +7,7 @@ final class PlanCanvasState: ObservableObject {
     @Published var elements: [CanvasElement] = []
     @Published var terminals: [UUID: TerminalPanel] = [:]
     var terminalTmuxSessions: [UUID: String] = [:]  // panelId → tmux session name
+    @Published var connections: [TileConnection] = []
 
     // Chat agent sessions
     @Published var chatSessions: [UUID: AgentSession] = [:]
@@ -237,6 +238,9 @@ final class PlanCanvasState: ObservableObject {
     // MARK: - Remove Element
 
     func removeElement(_ id: UUID) {
+        // Remove any connections involving this element
+        connections.removeAll { $0.sourceId == id || $0.destinationId == id }
+
         // Clean up terminal if it's a tile
         if let element = findElement(id) {
             cleanupElement(element)
@@ -480,6 +484,53 @@ final class PlanCanvasState: ObservableObject {
             }
         }
         return result
+    }
+
+    // MARK: - Connections
+
+    /// Add a connection between two tiles. Prevents self-connections and duplicates.
+    /// Returns the existing connection ID if a duplicate is found, or a no-op UUID for self-connections.
+    @discardableResult
+    func addConnection(sourceId: UUID, destinationId: UUID) -> UUID {
+        // Prevent self-connections
+        guard sourceId != destinationId else { return UUID() }
+
+        // Prevent duplicates
+        if let existing = connections.first(where: {
+            $0.sourceId == sourceId && $0.destinationId == destinationId
+        }) {
+            return existing.id
+        }
+
+        let connection = TileConnection(
+            sourceId: sourceId,
+            destinationId: destinationId,
+            sourceVersion: 0
+        )
+        connections.append(connection)
+        didMutate()
+        return connection.id
+    }
+
+    func removeConnection(_ id: UUID) {
+        connections.removeAll { $0.id == id }
+        didMutate()
+    }
+
+    func incomingConnections(for elementId: UUID) -> [TileConnection] {
+        connections.filter { $0.destinationId == elementId }
+    }
+
+    func outgoingConnections(for elementId: UUID) -> [TileConnection] {
+        connections.filter { $0.sourceId == elementId }
+    }
+
+    /// Invalidate cached summaries for connections sourced from a tile, and increment their sourceVersion
+    func invalidateConnectionSummaries(sourceId: UUID) {
+        for i in connections.indices where connections[i].sourceId == sourceId {
+            connections[i].cachedSummary = nil
+            connections[i].sourceVersion += 1
+        }
     }
 
     /// Resolve the current output of any tile by its element ID
