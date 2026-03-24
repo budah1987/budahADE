@@ -70,27 +70,24 @@ final class TerminalSurfaceView: NSView {
     // MARK: - Keyboard Input
 
     override func keyDown(with event: NSEvent) {
-        print("[keyDown] keyCode=\(event.keyCode) chars='\(event.characters ?? "nil")' charsIgnoring='\(event.charactersIgnoringModifiers ?? "nil")' mods=0x\(String(event.modifierFlags.rawValue, radix: 16)) isFirstResponder=\(window?.firstResponder === self)")
-
         guard let surface = terminalSurface?.surface else {
-            print("[keyDown] NO SURFACE — falling through to super")
             super.keyDown(with: event)
             return
         }
 
-        let mods = modsFromEvent(event)
-        print("[keyDown] ghostty mods=\(mods.rawValue) (ALT=\(GHOSTTY_MODS_ALT.rawValue))")
+        let rawMods = modsFromEvent(event)
+        // Ask Ghostty to translate mods (applies macos-option-as-alt config)
+        let translatedMods = ghostty_surface_key_translation_mods(surface, rawMods)
 
-        // When Option is held, macOS produces composed characters (e.g., Opt+P → π).
-        // Send the unmodified character instead so Ghostty receives 'p' + ALT modifier,
-        // matching macos-option-as-alt behavior. This makes Opt+P work as Alt+P in Claude CLI.
+        // If Ghostty translated the mods (e.g., Option → Alt), use the
+        // unmodified characters so the app receives 'p' not 'π'
+        let optionConsumed = rawMods.rawValue != translatedMods.rawValue
+            && event.modifierFlags.contains(.option)
         let text: String? = {
-            let isOptionHeld = event.modifierFlags.contains(.option)
-            let chars = isOptionHeld
+            let chars = optionConsumed
                 ? event.charactersIgnoringModifiers
                 : event.characters
             guard let chars, !chars.isEmpty else { return nil }
-            // Filter out Unicode private-use area (U+F700–U+F8FF) — arrow/function keys
             if let scalar = chars.unicodeScalars.first,
                scalar.value >= 0xF700, scalar.value <= 0xF8FF {
                 return nil
@@ -101,12 +98,13 @@ final class TerminalSurfaceView: NSView {
         var keyEvent = ghostty_input_key_s()
         keyEvent.action = GHOSTTY_ACTION_PRESS
         keyEvent.keycode = UInt32(event.keyCode)
-        keyEvent.mods = mods
-        keyEvent.consumed_mods = GHOSTTY_MODS_NONE
+        keyEvent.mods = translatedMods
+        // Tell Ghostty that Alt was consumed for Option→Meta translation
+        keyEvent.consumed_mods = optionConsumed
+            ? ghostty_input_mods_e(rawValue: GHOSTTY_MODS_ALT.rawValue)
+            : GHOSTTY_MODS_NONE
         keyEvent.unshifted_codepoint = 0
         keyEvent.composing = false
-
-        print("[keyDown] sending to ghostty: text='\(text ?? "nil")' keycode=\(keyEvent.keycode) mods=\(keyEvent.mods.rawValue)")
 
         let handled: Bool
         if let text, !text.isEmpty {
@@ -119,18 +117,7 @@ final class TerminalSurfaceView: NSView {
             handled = ghostty_surface_key(surface, keyEvent)
         }
 
-        print("[keyDown] ghostty handled=\(handled)")
         if !handled {
-            // If Option was held and Ghostty didn't handle it, send ESC + char
-            // directly as the Alt escape sequence (e.g., Alt+P → \x1bp).
-            // This bypasses Ghostty's key binding system for Option-as-Meta.
-            let isOptionHeld = event.modifierFlags.contains(.option)
-            if isOptionHeld, let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
-                let escSeq = "\u{1b}" + chars  // ESC + character
-                print("[keyDown] sending Alt escape sequence: ESC+\(chars)")
-                terminalSurface?.sendText(escSeq)
-                return
-            }
             interpretKeyEvents([event])
         }
     }
@@ -269,7 +256,6 @@ final class TerminalSurfaceView: NSView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        print("[performKeyEquiv] keyCode=\(event.keyCode) chars='\(event.characters ?? "nil")' flags=\(flags) isFirstResponder=\(window?.firstResponder === self)")
         // Cmd+V → paste
         if flags == .command && event.keyCode == 9 {
             paste(nil)
