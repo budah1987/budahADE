@@ -208,7 +208,7 @@ struct AgentRole {
 - `LazyVStack` ensures only visible messages render
 - Idle sessions: process terminated, messages retained in memory for resume
 
-### Phase 2 Verification (check before starting Phase 3)
+### Phase 2 Verification (check before starting Phase 2.5)
 
 1. **Subprocess lifecycle** — spawn a chat agent, send 3 messages, verify multi-turn works via `--session-id` + `--resume`. Cancel mid-stream, verify process kills cleanly.
 2. **Stream-json parsing** — verify all message types parse correctly: text content, tool calls, errors. No dropped events, no malformed messages.
@@ -218,6 +218,53 @@ struct AgentRole {
 6. **Image paste** — paste image into input area, verify thumbnail preview, verify image path referenced in prompt, verify agent responds to the image.
 7. **Token tracking** — verify token count in header updates after each turn. Values should be plausible (not zero, not absurdly high).
 8. **Agent roles** — create Ideator (Opus), Developer (Sonnet). Verify system prompts apply and model defaults are correct.
+
+---
+
+## Phase 2.5: Canvas State Persistence
+
+### Problem
+
+Canvas state is in-memory only. Quitting BudahADE loses all tiles, positions, and content. This makes the app unusable as a daily driver and blocks Phase 3 (connections must persist).
+
+### Required Reading (read before implementing)
+- `Plan/PlanCanvasState.swift` — the state to serialize. Contains `elements: [CanvasElement]`, `zoom`, `panOffset`, and will contain `connections` in Phase 3.
+- `Plan/CanvasNode.swift` — `CanvasElement` data model. Must be `Codable`.
+- `Task/TaskState.swift` — task lifecycle. Canvas state saves/loads here on task switch and app quit.
+- `Task/BuildStatusWatcher.swift` — reference for file-based state persistence pattern (polls `.budahade/build-status.json`).
+
+### Design
+
+**Storage:** Serialize `PlanCanvasState` to `.budahade/canvas.json` in the task's worktree directory.
+
+**Save triggers:**
+- On every meaningful mutation (tile add/remove/move/resize/edit) — debounced 1s
+- On task switch (immediate)
+- On app quit (immediate via `NSApplication.willTerminateNotification`)
+
+**Load:** When a task is opened and `enterPlanMode()` is called, check for `.budahade/canvas.json` in the worktree. If exists, deserialize and restore. If not, start with empty canvas.
+
+**What to serialize:**
+- All `CanvasElement` structs (position, size, type, content, title)
+- Viewport state (zoom level, pan offset)
+- Frame data (children, axis, gap, padding)
+- Text content for sticky notes, text boxes, markdown tiles
+- Agent chat tile state: session ID, messages, role, model (so conversations can resume)
+- NOT: terminal tile state (Ghostty sessions can't be serialized — terminal tiles restore as empty shells)
+
+**Codable conformance:** Add `Codable` to `CanvasElement`, `FrameData`, `TextData`, and all `TileType` cases. Use `JSONEncoder`/`JSONDecoder` with `.prettyPrinted` for debuggability.
+
+**File size:** canvas.json will be small (typically <100KB even with chat messages) — no compression needed.
+
+### Phase 2.5 Verification (check before starting Phase 3)
+
+1. **Save on mutation** — add tiles, move them, edit text. Verify `.budahade/canvas.json` exists in worktree and contains current state.
+2. **Restore on relaunch** — quit app, reopen, open same task. Canvas should restore: tile positions, sizes, text content, zoom level, pan offset.
+3. **Task switching** — switch between tasks. Each task's canvas restores independently.
+4. **Chat tile persistence** — create a chat agent, have a conversation. Quit app, reopen. Chat messages should be there. Session should resume on next send.
+5. **Terminal tiles** — terminal tiles restore as empty shells (no crash). User relaunches Claude manually. This is expected and acceptable.
+6. **Empty canvas** — new task with no canvas.json starts with blank canvas. No errors.
+7. **Corrupted file** — delete or corrupt canvas.json. App should start with empty canvas, not crash.
 
 ---
 

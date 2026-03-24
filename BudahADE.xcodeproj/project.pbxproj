@@ -71,6 +71,8 @@
 		AA18001800180018AA180018 /* BuildStatusWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB18001800180018BB180018 /* BuildStatusWatcher.swift */; };
 		TE01000100010001TE010001 /* SpecParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF01000100010001TF010001 /* SpecParserTests.swift */; };
 		TE02000200020002TE020002 /* CanvasNodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF02000200020002TF020003 /* CanvasNodeTests.swift */; };
+		TE04000400040004TE040004 /* ChatMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TF04000400040004TF040004 /* ChatMessageTests.swift */; };
+		AA20002000200020AA200020 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB20002000200020BB200020 /* ChatMessage.swift */; };
 		AA1A001A001A001AAA1A001A /* TileResizeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1A001A001A001ABB1A001A /* TileResizeHandler.swift */; };
 		AA1B001B001B001BAA1B001B /* FrameContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1B001B001B001BBB1B001B /* FrameContainerView.swift */; };
 		AA1C001C001C001CAA1C001C /* TileDragHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1C001C001C001CBB1C001C /* TileDragHandler.swift */; };
@@ -140,6 +142,8 @@
 		BB12001200120012BB120012 /* SmartGuides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartGuides.swift; sourceTree = "<group>"; };
 		BB13001300130013BB130013 /* CanvasElementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasElementView.swift; sourceTree = "<group>"; };
 		TF03000300030003TF030003 /* MarkdownSectionParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownSectionParserTests.swift; sourceTree = "<group>"; };
+		TF04000400040004TF040004 /* ChatMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageTests.swift; sourceTree = "<group>"; };
+		BB20002000200020BB200020 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		BB15001500150015BB150015 /* SpecPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecPanelView.swift; sourceTree = "<group>"; };
 		BB16001600160016BB160016 /* SpecAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecAssembler.swift; sourceTree = "<group>"; };
 		BB17001700170017BB170017 /* BuildStatusState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusState.swift; sourceTree = "<group>"; };
@@ -273,6 +277,7 @@
 				TF01000100010001TF010001 /* SpecParserTests.swift */,
 				TF02000200020002TF020003 /* CanvasNodeTests.swift */,
 				TF03000300030003TF030003 /* MarkdownSectionParserTests.swift */,
+				TF04000400040004TF040004 /* ChatMessageTests.swift */,
 			);
 			path = BudahADETests;
 			sourceTree = "<group>";
@@ -317,6 +322,7 @@
 		B41BC2537EB0E2BA710AD4D6 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				BB20002000200020BB200020 /* ChatMessage.swift */,
 				767DE60DA0CF895A8BD7606E /* AgentStatusView.swift */,
 				A03D062065CF15E980ECF4E6 /* KeyboardShortcuts.swift */,
 				AC6BAB7A597B9483594284F5 /* Theme.swift */,
@@ -514,9 +520,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA20002000200020AA200020 /* ChatMessage.swift in Sources */,
 				TE01000100010001TE010001 /* SpecParserTests.swift in Sources */,
 				TE02000200020002TE020002 /* CanvasNodeTests.swift in Sources */,
 				TE03000300030003TE030003 /* MarkdownSectionParserTests.swift in Sources */,
+				TE04000400040004TE040004 /* ChatMessageTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
