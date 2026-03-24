@@ -70,12 +70,16 @@ final class TerminalSurfaceView: NSView {
     // MARK: - Keyboard Input
 
     override func keyDown(with event: NSEvent) {
+        print("[keyDown] keyCode=\(event.keyCode) chars='\(event.characters ?? "nil")' charsIgnoring='\(event.charactersIgnoringModifiers ?? "nil")' mods=0x\(String(event.modifierFlags.rawValue, radix: 16)) isFirstResponder=\(window?.firstResponder === self)")
+
         guard let surface = terminalSurface?.surface else {
+            print("[keyDown] NO SURFACE — falling through to super")
             super.keyDown(with: event)
             return
         }
 
         let mods = modsFromEvent(event)
+        print("[keyDown] ghostty mods=\(mods.rawValue) (ALT=\(GHOSTTY_MODS_ALT.rawValue))")
 
         // When Option is held, macOS produces composed characters (e.g., Opt+P → π).
         // Send the unmodified character instead so Ghostty receives 'p' + ALT modifier,
@@ -102,6 +106,8 @@ final class TerminalSurfaceView: NSView {
         keyEvent.unshifted_codepoint = 0
         keyEvent.composing = false
 
+        print("[keyDown] sending to ghostty: text='\(text ?? "nil")' keycode=\(keyEvent.keycode) mods=\(keyEvent.mods.rawValue)")
+
         let handled: Bool
         if let text, !text.isEmpty {
             handled = text.withCString { ptr in
@@ -113,7 +119,18 @@ final class TerminalSurfaceView: NSView {
             handled = ghostty_surface_key(surface, keyEvent)
         }
 
+        print("[keyDown] ghostty handled=\(handled)")
         if !handled {
+            // If Option was held and Ghostty didn't handle it, send ESC + char
+            // directly as the Alt escape sequence (e.g., Alt+P → \x1bp).
+            // This bypasses Ghostty's key binding system for Option-as-Meta.
+            let isOptionHeld = event.modifierFlags.contains(.option)
+            if isOptionHeld, let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
+                let escSeq = "\u{1b}" + chars  // ESC + character
+                print("[keyDown] sending Alt escape sequence: ESC+\(chars)")
+                terminalSurface?.sendText(escSeq)
+                return
+            }
             interpretKeyEvents([event])
         }
     }
@@ -252,6 +269,7 @@ final class TerminalSurfaceView: NSView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        print("[performKeyEquiv] keyCode=\(event.keyCode) chars='\(event.characters ?? "nil")' flags=\(flags) isFirstResponder=\(window?.firstResponder === self)")
         // Cmd+V → paste
         if flags == .command && event.keyCode == 9 {
             paste(nil)
