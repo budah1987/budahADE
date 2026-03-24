@@ -652,6 +652,9 @@ final class PlanCanvasState: ObservableObject {
                 chatSessions[sessionId] = restoredSession
             }
         }
+
+        // Restore terminal tile panels (empty shells — user relaunches Claude manually)
+        restoreTerminalPanels()
     }
 
     func saveNow() {
@@ -769,6 +772,36 @@ final class PlanCanvasState: ObservableObject {
             }
         case .text:
             break
+        }
+    }
+
+    private func restoreTerminalPanels() {
+        // Check root elements
+        for i in elements.indices {
+            if case .tile(.terminal(let panelId, let agent)) = elements[i].kind {
+                if terminals[panelId] == nil {
+                    let panel = TerminalPanel(workingDirectory: worktreePath)
+                    terminals[panel.id] = panel
+                    elements[i].kind = .tile(.terminal(panelId: panel.id, agent: agent))
+                }
+            }
+            // Check frame children
+            if case .frame(var frameData) = elements[i].kind {
+                var changed = false
+                for j in frameData.children.indices {
+                    if case .tile(.terminal(let panelId, let agent)) = frameData.children[j].kind {
+                        if terminals[panelId] == nil {
+                            let panel = TerminalPanel(workingDirectory: worktreePath)
+                            terminals[panel.id] = panel
+                            frameData.children[j].kind = .tile(.terminal(panelId: panel.id, agent: agent))
+                            changed = true
+                        }
+                    }
+                }
+                if changed {
+                    elements[i].kind = .frame(frameData)
+                }
+            }
         }
     }
 
