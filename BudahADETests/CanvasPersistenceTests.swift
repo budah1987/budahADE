@@ -281,7 +281,8 @@ final class CanvasPersistenceTests: XCTestCase {
         let snapshot = CanvasSnapshot(
             elements: elements, zoom: 0.75,
             panOffsetWidth: 100, panOffsetHeight: -50,
-            chatMessages: [:]
+            chatMessages: [:],
+            claudeSessionIds: nil
         )
         try CanvasPersistence.save(snapshot, to: dir)
 
@@ -322,7 +323,8 @@ final class CanvasPersistenceTests: XCTestCase {
         ]
         let snapshot = CanvasSnapshot(
             elements: [], zoom: 1.0, panOffsetWidth: 0, panOffsetHeight: 0,
-            chatMessages: [sessionId: messages]
+            chatMessages: [sessionId: messages],
+            claudeSessionIds: nil
         )
         try CanvasPersistence.save(snapshot, to: dir)
         let loaded = try XCTUnwrap(CanvasPersistence.load(from: dir))

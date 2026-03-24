@@ -614,9 +614,13 @@ final class PlanCanvasState: ObservableObject {
 
     func snapshot() -> CanvasSnapshot {
         var chatMessages: [UUID: [ChatMessage]] = [:]
+        var sessionIds: [UUID: String] = [:]
         for (sessionId, session) in chatSessions {
             if !session.messages.isEmpty {
                 chatMessages[sessionId] = session.messages
+            }
+            if let claudeId = session.claudeSessionId {
+                sessionIds[sessionId] = claudeId
             }
         }
         return CanvasSnapshot(
@@ -624,7 +628,8 @@ final class PlanCanvasState: ObservableObject {
             zoom: zoom,
             panOffsetWidth: panOffset.width,
             panOffsetHeight: panOffset.height,
-            chatMessages: chatMessages
+            chatMessages: chatMessages,
+            claudeSessionIds: sessionIds.isEmpty ? nil : sessionIds
         )
     }
 
@@ -647,6 +652,9 @@ final class PlanCanvasState: ObservableObject {
                     restoredSession.messages = messages
                     restoredSession.totalInputTokens = messages.reduce(0) { $0 + $1.inputTokens }
                     restoredSession.totalOutputTokens = messages.reduce(0) { $0 + $1.outputTokens }
+                }
+                if let claudeId = snapshot.claudeSessionIds?[sessionId] {
+                    restoredSession.claudeSessionId = claudeId
                 }
                 chatManager.sessions[sessionId] = restoredSession
                 chatSessions[sessionId] = restoredSession

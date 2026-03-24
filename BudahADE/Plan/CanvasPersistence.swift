@@ -6,6 +6,7 @@ struct CanvasSnapshot: Codable {
     let panOffsetWidth: CGFloat
     let panOffsetHeight: CGFloat
     let chatMessages: [UUID: [ChatMessage]]  // sessionId → messages
+    let claudeSessionIds: [UUID: String]?  // sessionId → claude session ID for --resume
 }
 
 enum CanvasPersistence {
