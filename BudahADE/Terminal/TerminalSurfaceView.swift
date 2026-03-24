@@ -75,13 +75,15 @@ final class TerminalSurfaceView: NSView {
             return
         }
 
-        // Diagnostic: log Shift+Enter and Cmd+V
-        let diagMods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if event.keyCode == 36 && diagMods.contains(.shift) {
-            print("[KEY-DIAG] Shift+Enter: keyCode=\(event.keyCode) chars='\(event.characters ?? "")' mods=\(diagMods.rawValue)")
-        }
-        if event.keyCode == 9 {
-            print("[KEY-DIAG] V key: keyCode=\(event.keyCode) chars='\(event.characters ?? "")' mods=\(diagMods.rawValue)")
+        // Shift+Enter → send kitty keyboard protocol sequence directly.
+        // tmux strips Shift from Enter in legacy mode; bypass by writing CSI u sequence.
+        if event.keyCode == 36 && event.modifierFlags.contains(.shift) {
+            // \e[13;2u = CR (13) with Shift (modifier 2) in CSI u format
+            let seq = "\u{1b}[13;2u"
+            seq.withCString { ptr in
+                ghostty_surface_text(surface, ptr, UInt(seq.utf8.count))
+            }
+            return
         }
 
         let rawMods = modsFromEvent(event)
