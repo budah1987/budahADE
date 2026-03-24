@@ -61,8 +61,11 @@ enum TmuxSessionManager {
     }
 
     /// Command to create a new tmux session (stays attached).
+    /// Sets extended-keys so tmux passes through Shift+Enter, kitty keyboard protocol, etc.
     static func newSessionCommand(name: String, workingDirectory: String) -> String {
-        "\(tmuxPath) new-session -s \(name) -c '\(workingDirectory)'"
+        "\(tmuxPath) new-session -s \(name) -c '\(workingDirectory)'" +
+        " \\; set -s extended-keys on" +
+        " \\; set -s extended-keys-format csi-u"
     }
 
     /// Command to attach if exists, otherwise create new.

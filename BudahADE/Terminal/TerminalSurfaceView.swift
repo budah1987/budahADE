@@ -75,6 +75,15 @@ final class TerminalSurfaceView: NSView {
             return
         }
 
+        // Diagnostic: log Shift+Enter and Cmd+V
+        let diagMods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if event.keyCode == 36 && diagMods.contains(.shift) {
+            print("[KEY-DIAG] Shift+Enter: keyCode=\(event.keyCode) chars='\(event.characters ?? "")' mods=\(diagMods.rawValue)")
+        }
+        if event.keyCode == 9 {
+            print("[KEY-DIAG] V key: keyCode=\(event.keyCode) chars='\(event.characters ?? "")' mods=\(diagMods.rawValue)")
+        }
+
         let rawMods = modsFromEvent(event)
 
         // Ask Ghostty to translate mods per config (e.g. macos-option-as-alt).
@@ -269,17 +278,30 @@ final class TerminalSurfaceView: NSView {
     // MARK: - Paste
 
     @objc func paste(_ sender: Any?) {
-        guard let surface = terminalSurface?.surface else { return }
-        guard let str = NSPasteboard.general.string(forType: .string) else { return }
-        str.withCString { ptr in
-            ghostty_surface_text(surface, ptr, UInt(str.utf8.count))
+        guard let surface = terminalSurface?.surface else {
+            print("[PASTE] No surface available")
+            return
+        }
+        guard let str = NSPasteboard.general.string(forType: .string) else {
+            print("[PASTE] No string on clipboard")
+            return
+        }
+        print("[PASTE] Pasting \(str.count) chars")
+        // Use bracketed paste mode (terminals/tmux expect this)
+        let bracketedPaste = "\u{1b}[200~\(str)\u{1b}[201~"
+        bracketedPaste.withCString { ptr in
+            ghostty_surface_text(surface, ptr, UInt(bracketedPaste.utf8.count))
         }
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if event.keyCode == 36 || event.keyCode == 9 {
+            print("[PERF-KEY] keyCode=\(event.keyCode) flags=\(flags.rawValue) isFirstResponder=\(window?.firstResponder === self)")
+        }
         // Cmd+V → paste (use .contains instead of == for robustness)
         if flags.contains(.command) && event.keyCode == 9 {
+            print("[PERF-KEY] Cmd+V → pasting")
             paste(nil)
             return true
         }
