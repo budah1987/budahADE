@@ -18,6 +18,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 window.backgroundColor = .clear
             }
         }
+
+        // Restore previous session AFTER Ghostty is initialized.
+        // Delay slightly to ensure SwiftUI has wired appState via onAppear.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            if let appState = self?.appState, appState.hasNoWorkspaces {
+                print("[AppDelegate] Restoring previous session...")
+                _ = appState.restoreFromSavedState()
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

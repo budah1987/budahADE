@@ -13,12 +13,8 @@ struct BudahADEApp: App {
                 .background(Theme.appBackground)
                 .preferredColorScheme(.dark)
                 .onAppear {
-                    // Wire AppState to AppDelegate so it can save before Ghostty shutdown
+                    // Wire AppState to AppDelegate for save-on-quit and restore-after-Ghostty-init
                     appDelegate.appState = appState
-                    // Restore previous session on launch
-                    if appState.hasNoWorkspaces {
-                        _ = appState.restoreFromSavedState()
-                    }
                 }
         }
         .windowStyle(.hiddenTitleBar)
