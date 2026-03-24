@@ -193,11 +193,11 @@ final class PlanCanvasState: ObservableObject {
             targetSession = session
         }
 
-        let contextMessage = ChatMessage(
-            role: .system,
-            content: "Context from \(fromAgent.name):\n\n\(content)"
+        // Stage the content — the destination tile's input field will prompt for an instruction
+        targetSession.stagedContent = AgentSession.StagedContent(
+            content: content,
+            fromAgent: fromAgent.name
         )
-        targetSession.messages.append(contextMessage)
     }
 
     // MARK: - Add Frame

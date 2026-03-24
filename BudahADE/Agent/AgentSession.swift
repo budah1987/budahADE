@@ -48,7 +48,14 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var totalOutputTokens: Int = 0
     @Published var claudeSessionId: String?
     @Published var currentStreamingText: String = ""
+    /// Content staged via "Send to" from another agent, awaiting user instruction
+    @Published var stagedContent: StagedContent?
     var process: Process?
+
+    struct StagedContent {
+        let content: String
+        let fromAgent: String
+    }
 
     init(
         id: UUID = UUID(),

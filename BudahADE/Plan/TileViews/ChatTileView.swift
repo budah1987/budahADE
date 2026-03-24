@@ -278,21 +278,58 @@ struct ChatTileView: View {
                 .padding(.top, 6)
             }
 
+            // Staged content preview (from "Send to" action)
+            if let staged = session.stagedContent {
+                HStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("From \(staged.fromAgent)")
+                            .font(Theme.caption(10))
+                            .foregroundColor(Theme.textMuted)
+                        Text(staged.content.prefix(120) + (staged.content.count > 120 ? "..." : ""))
+                            .font(Theme.body(11))
+                            .foregroundColor(Theme.textSecondary)
+                            .lineLimit(3)
+                    }
+                    Spacer()
+                    Button {
+                        session.stagedContent = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(Theme.textMuted)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(8)
+                .background(Theme.accent.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Theme.accent.opacity(0.2), lineWidth: 0.5)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+            }
+
             HStack(spacing: 6) {
-                TextField("Message \(role.name)...", text: $inputText, axis: .vertical)
+                TextField(
+                    session.stagedContent != nil
+                        ? "What should \(role.name) do with this?"
+                        : "Message \(role.name)...",
+                    text: $inputText,
+                    axis: .vertical
+                )
                     .font(Theme.body(12))
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1...6)
                     .textFieldStyle(.plain)
                     .onSubmit { sendMessage() }
                     .onKeyPress(.return) {
-                        // Cmd+Return or plain Return sends
                         sendMessage()
                         return .handled
                     }
 
                 if session.status == .streaming {
-                    // Stop button while streaming
                     Button {
                         canvas.chatManager.cancel(sessionId: session.id)
                     } label: {
@@ -302,18 +339,15 @@ struct ChatTileView: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    // Send button
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 20))
                             .foregroundColor(
-                                inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                    ? Theme.textMuted
-                                    : Theme.accent
+                                canSend ? Theme.accent : Theme.textMuted
                             )
                     }
                     .buttonStyle(.plain)
-                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(!canSend)
                 }
             }
             .padding(.horizontal, 10)
@@ -327,11 +361,34 @@ struct ChatTileView: View {
 
     // MARK: - Actions
 
+    private var canSend: Bool {
+        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || pendingImagePath != nil
+            || session.stagedContent != nil
+    }
+
     private func sendMessage() {
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty || pendingImagePath != nil else { return }
+        guard canSend else { return }
 
         var prompt = trimmed
+
+        // Handle staged content from "Send to" — frame as primary subject
+        if let staged = session.stagedContent {
+            let instruction = prompt.isEmpty
+                ? "The following was shared with you from \(staged.fromAgent). Read it and respond."
+                : prompt
+            prompt = """
+            \(instruction)
+
+            --- Content from \(staged.fromAgent) ---
+            \(staged.content)
+            ---
+            """
+            session.stagedContent = nil
+        }
+
+        // Handle image attachment
         if let imagePath = pendingImagePath {
             if prompt.isEmpty {
                 prompt = "[Image: \(imagePath)]"
