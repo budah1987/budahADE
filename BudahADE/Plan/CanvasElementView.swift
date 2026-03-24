@@ -88,6 +88,14 @@ struct CanvasElementView: View {
                                 .animation(.easeOut(duration: 0.2), value: isSelected)
                         }
                     }
+                    // Connection ports (visible on hover or during drag)
+                    .overlay {
+                        ConnectionPortOverlay(element: element, canvas: canvas, isHovered: isHovered)
+                    }
+                    // Destination highlight during connection drag
+                    .overlay {
+                        ConnectionDestinationHighlight(element: element, canvas: canvas)
+                    }
                     .shadow(
                         color: .black.opacity(isSelected ? 0.25 : 0.15),
                         radius: isSelected ? 10 : 4,

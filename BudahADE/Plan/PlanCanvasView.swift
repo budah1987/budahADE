@@ -28,6 +28,11 @@ struct PlanCanvasView: View {
                 // Background layer (dot grid)
                 canvasBackground
 
+                // Connections layer (arrows between tiles, in canvas coords)
+                ConnectionsLayer(canvas: canvas)
+                    .scaleEffect(localZoom, anchor: .topLeading)
+                    .offset(localPanOffset)
+
                 // Content layer (zoom + pan transform)
                 canvasContent
                     .allowsHitTesting(!isSpacePanning)
@@ -231,6 +236,7 @@ struct PlanCanvasView: View {
                 CanvasElementView(element: element, canvas: canvas)
             }
         }
+        .coordinateSpace(name: "canvasContent")
         .scaleEffect(localZoom, anchor: .topLeading)
         .offset(localPanOffset)
     }

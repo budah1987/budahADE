@@ -26,6 +26,10 @@ final class PlanCanvasState: ObservableObject {
     @Published var guides: [AlignmentGuide] = []
     @Published var mutationCount: Int = 0
 
+    // Connection drag state
+    @Published var connectionDragSource: UUID?
+    @Published var connectionDragEndpoint: CGPoint?
+
     let worktreePath: String
     let taskName: String
     let branchName: String
@@ -484,6 +488,15 @@ final class PlanCanvasState: ObservableObject {
             }
         }
         return result
+    }
+
+    /// Hit-test: return the topmost element whose rect contains the given canvas-space point
+    func elementAt(point: CGPoint) -> UUID? {
+        for element in elements.reversed() {
+            let rect = CGRect(origin: element.position, size: element.size)
+            if rect.contains(point) { return element.id }
+        }
+        return nil
     }
 
     // MARK: - Connections
