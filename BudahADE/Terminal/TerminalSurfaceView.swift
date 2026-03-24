@@ -279,6 +279,13 @@ final class TerminalSurfaceView: NSView {
             return true
         }
 
+        // Claim Option+key and Ctrl+key events so SwiftUI/AppKit don't intercept them.
+        // These need to reach the terminal for Claude CLI shortcuts (Opt+P model switch, etc.)
+        if flags == .option || flags == .control || flags == [.option, .shift] {
+            keyDown(with: event)
+            return true
+        }
+
         return super.performKeyEquivalent(with: event)
     }
 
