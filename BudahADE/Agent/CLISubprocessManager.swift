@@ -59,8 +59,9 @@ final class CLISubprocessManager: ObservableObject {
             maxTurns: session.agentMode?.chatMaxTurns
         )
 
+        let workDir = session.workingDirectory
         Task {
-            await runSubprocess(command: command, session: session)
+            await self.runSubprocess(command: command, workingDirectory: workDir, session: session)
         }
     }
 
@@ -175,7 +176,8 @@ final class CLISubprocessManager: ObservableObject {
 
     /// Resolve the `claude` executable path. GUI apps don't inherit shell PATH,
     /// so we search common install locations explicitly.
-    private nonisolated(unsafe) static let claudePath: String = {
+    /// (nonisolated to avoid MainActor isolation inherited from the class)
+    private nonisolated static let claudePath: String = {
         let candidates = [
             "\(NSHomeDirectory())/.local/bin/claude",
             "\(NSHomeDirectory())/.superset/bin/claude",
@@ -195,7 +197,7 @@ final class CLISubprocessManager: ObservableObject {
 
     // MARK: - Private: Run Subprocess
 
-    private nonisolated func runSubprocess(command: [String], session: AgentSession) async {
+    private nonisolated func runSubprocess(command: [String], workingDirectory: String, session: AgentSession) async {
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
@@ -207,14 +209,12 @@ final class CLISubprocessManager: ObservableObject {
             process.arguments = command
         } else {
             process.executableURL = URL(fileURLWithPath: claudeBin)
-            // Strip "claude" from command args (it's the executable now, not an arg)
             process.arguments = Array(command.dropFirst())
         }
 
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        // Ensure PATH is set for child process (claude may need node, git, etc.)
         var env = ProcessInfo.processInfo.environment
         let extraPaths = [
             "\(NSHomeDirectory())/.local/bin",
@@ -226,14 +226,13 @@ final class CLISubprocessManager: ObservableObject {
         env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
         process.environment = env
 
-        let workDir = await session.workingDirectory
-        process.currentDirectoryURL = URL(fileURLWithPath: workDir)
+        process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
 
         await MainActor.run { session.process = process }
 
         let fullCommand = ([claudeBin] + (process.arguments ?? [])).joined(separator: " ")
         print("[CLISubprocessManager] Launching: \(fullCommand)")
-        print("[CLISubprocessManager] Working dir: \(workDir)")
+        print("[CLISubprocessManager] Working dir: \(workingDirectory)")
 
         do {
             try process.run()
@@ -256,10 +255,11 @@ final class CLISubprocessManager: ObservableObject {
             }
         }
 
-        // Read stdout line by line
+        // Read stdout line by line — lineCount tracked as nonisolated mutable
+        // to avoid "captured var in concurrent code" warning
         let handle = stdoutPipe.fileHandleForReading
         var buffer = Data()
-        var lineCount = 0
+        nonisolated(unsafe) var lineCount = 0
 
         while process.isRunning || !buffer.isEmpty {
             let chunk = handle.availableData
