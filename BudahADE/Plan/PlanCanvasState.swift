@@ -482,6 +482,38 @@ final class PlanCanvasState: ObservableObject {
         return result
     }
 
+    /// Resolve the current output of any tile by its element ID
+    func tileOutput(for elementId: UUID) -> TileOutput? {
+        guard let element = findElement(elementId),
+              case .tile(let tileType) = element.kind else { return nil }
+
+        switch tileType {
+        case .stickyNote:
+            let title = element.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            return title.isEmpty ? nil : .text(title)
+
+        case .markdown(let path):
+            guard let content = try? String(contentsOfFile: path, encoding: .utf8),
+                  !content.isEmpty else { return nil }
+            return .text(content)
+
+        case .chatAgent(let sessionId, _):
+            guard let session = chatSessions[sessionId],
+                  !session.messages.isEmpty else { return nil }
+            return .conversation(session.messages)
+
+        case .image(let path):
+            return .image(URL(fileURLWithPath: path))
+
+        case .browser(let url):
+            guard let url = url else { return nil }
+            return .url(url)
+
+        case .terminal:
+            return nil
+        }
+    }
+
     // MARK: - Spec Tagging
 
     func tagElement(_ id: UUID, section: String) {

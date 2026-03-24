@@ -140,4 +140,54 @@ final class TileConnectionTests: XCTestCase {
         XCTAssertTrue(output.textRepresentation.contains("User: Hello"))
         XCTAssertTrue(output.textRepresentation.contains("Assistant: Hi there"))
     }
+
+    // MARK: - tileOutput(for:)
+
+    func testTileOutputForStickyNoteEmptyTitle() async throws {
+        let state = await PlanCanvasState(worktreePath: "/tmp", taskName: "test", branchName: "test")
+        let id = await state.addTile(type: .stickyNote, at: .zero)
+        // Rename to empty to trigger the nil path
+        await state.renameElement(id, to: "")
+        let output = await state.tileOutput(for: id)
+        XCTAssertNil(output, "Empty title should return nil")
+    }
+
+    func testTileOutputForMarkdown() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("testTileOutput_\(UUID()).md").path
+        try "# Hello\n\nWorld".write(toFile: tmp, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: tmp) }
+
+        let state = await PlanCanvasState(worktreePath: "/tmp", taskName: "test", branchName: "test")
+        let id = await state.addTile(type: .markdown(path: tmp), at: .zero)
+        let output = await state.tileOutput(for: id)
+        guard case .text(let content) = output else {
+            XCTFail("Expected .text output"); return
+        }
+        XCTAssertTrue(content.contains("Hello"))
+    }
+
+    func testTileOutputForChatAgent() async throws {
+        let state = await PlanCanvasState(worktreePath: "/tmp", taskName: "test", branchName: "test")
+        let id = await state.addChatTile(agent: .claude, at: .zero)
+
+        // Retrieve the session and inject messages
+        guard let element = await state.findElement(id),
+              case .tile(.chatAgent(let sessionId, _)) = element.kind,
+              let session = await state.chatSessions[sessionId] else {
+            XCTFail("Could not find chat session"); return
+        }
+        await MainActor.run {
+            session.messages = [
+                ChatMessage(role: .user, content: "Hello"),
+                ChatMessage(role: .assistant, content: "Hi")
+            ]
+        }
+
+        let output = await state.tileOutput(for: id)
+        guard case .conversation(let messages) = output else {
+            XCTFail("Expected .conversation output"); return
+        }
+        XCTAssertEqual(messages.count, 2)
+    }
 }
