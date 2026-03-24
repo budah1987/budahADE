@@ -25,6 +25,7 @@
 		90C7EAE97BF0325E90DF8482 /* TaskRailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5759D771BB98273BB6BD7A50 /* TaskRailView.swift */; };
 		936B5BEAB42C54F0B6C8D0AF /* TerminalTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3EEC5156CC17A25522CEA8 /* TerminalTabBar.swift */; };
 		FF11111111111111FF111111 /* BudahADE/Terminal/SessionPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF22222222222222FF222222 /* BudahADE/Terminal/SessionPersistence.swift */; };
+		SC11111111111111SC111111 /* BudahADE/Terminal/ScrollbackCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC22222222222222SC222222 /* BudahADE/Terminal/ScrollbackCapture.swift */; };
 		FF33333333333333FF333333 /* SessionPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF44444444444444FF444444 /* SessionPersistenceTests.swift */; };
 
 		943AE62532082E736CADB572 /* BranchPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BFD18F77F12A05253442BE7 /* BranchPicker.swift */; };
@@ -138,6 +139,7 @@
 		AC6BAB7A597B9483594284F5 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		AE3EEC5156CC17A25522CEA8 /* TerminalTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTabBar.swift; sourceTree = "<group>"; };
 		FF22222222222222FF222222 /* BudahADE/Terminal/SessionPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPersistence.swift; sourceTree = "<group>"; };
+		SC22222222222222SC222222 /* BudahADE/Terminal/ScrollbackCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollbackCapture.swift; sourceTree = "<group>"; };
 		FF44444444444444FF444444 /* SessionPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPersistenceTests.swift; sourceTree = "<group>"; };
 
 		B69971DA73882AEBFEEFC20D /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
@@ -216,6 +218,7 @@
 				097E88C7634C6AEA371FCED8 /* TerminalSurfaceView.swift */,
 				AE3EEC5156CC17A25522CEA8 /* TerminalTabBar.swift */,
 				FF22222222222222FF222222 /* SessionPersistence.swift */,
+				SC22222222222222SC222222 /* ScrollbackCapture.swift */,
 			);
 			path = Terminal;
 			sourceTree = "<group>";
@@ -569,6 +572,7 @@
 				CB01010101010101CB010101 /* ChatTileView.swift in Sources */,
 				SB01010101010101SB010101 /* SendToMenu.swift in Sources */,
 				FF11111111111111FF111111 /* BudahADE/Terminal/SessionPersistence.swift in Sources */,
+				SC11111111111111SC111111 /* BudahADE/Terminal/ScrollbackCapture.swift in Sources */,
 				AA99999999999999AA999999 /* BudahADE/Plan/CanvasPersistence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

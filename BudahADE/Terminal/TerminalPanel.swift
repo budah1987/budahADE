@@ -43,4 +43,10 @@ final class TerminalPanel: ObservableObject, Identifiable {
     func focus() { surface.setFocus(true) }
     func unfocus() { surface.setFocus(false) }
     func close() { surface.requestClose() }
+
+    /// Capture current terminal scrollback text. Returns nil if unavailable.
+    func readScrollback() -> String? {
+        guard let ghosttySurface = surface.surface else { return nil }
+        return ScrollbackCapture.readAll(from: ghosttySurface)
+    }
 }
