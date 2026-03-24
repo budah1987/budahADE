@@ -78,14 +78,16 @@ enum TmuxSessionManager {
         let dir = (path as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let config = """
-        # BudahADE tmux config — enables kitty keyboard protocol passthrough
+        # BudahADE tmux config
         set -s extended-keys on
         set -s extended-keys-format csi-u
         set -g allow-passthrough on
         set -g default-terminal "xterm-256color"
         set -as terminal-features ",xterm-256color:clipboard"
-        set -g mouse on
         set -g set-clipboard on
+
+        # Mouse OFF — let Ghostty handle selection natively (Cmd+C to copy)
+        set -g mouse off
 
         # Don't show tmux status bar (BudahADE has its own tab bar)
         set -g status off
@@ -106,10 +108,18 @@ enum TmuxSessionManager {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: tmuxPath)
             process.arguments = ["send-keys", "-t", session, keys]
+            let errPipe = Pipe()
             process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            try? process.run()
-            process.waitUntilExit()
+            process.standardError = errPipe
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                let errStr = String(data: errData, encoding: .utf8) ?? ""
+                print("[TmuxSendKeys] send-keys '\(keys)' to '\(session)' → exit=\(process.terminationStatus)\(errStr.isEmpty ? "" : " err=\(errStr.trimmingCharacters(in: .whitespacesAndNewlines))")")
+            } catch {
+                print("[TmuxSendKeys] Failed to run tmux: \(error)")
+            }
         }
     }
 
