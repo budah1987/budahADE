@@ -438,6 +438,11 @@ struct ChatTileView: View {
 
         var prompt = trimmed
 
+        // Prepend connected tile context
+        if let connectedContext = canvas.assembleConnectedContext(for: elementId) {
+            prompt = "\(connectedContext)\n\n\(prompt)"
+        }
+
         // Handle staged content from "Send to" — frame as primary subject
         if let staged = session.stagedContent {
             let instruction = prompt.isEmpty

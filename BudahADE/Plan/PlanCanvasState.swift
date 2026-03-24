@@ -548,6 +548,32 @@ final class PlanCanvasState: ObservableObject {
         }
     }
 
+    /// Assemble context from all tiles with incoming connections to `destinationId`.
+    /// Uses cached summaries when available; falls back to truncated raw output and triggers generation.
+    func assembleConnectedContext(for destinationId: UUID) -> String? {
+        let incomingIds = connections.indices.filter { connections[$0].destinationId == destinationId }
+        guard !incomingIds.isEmpty else { return nil }
+
+        var contextBlocks: [String] = []
+        for idx in incomingIds {
+            guard let sourceEl = findElement(connections[idx].sourceId) else { continue }
+            let label = sourceEl.title.isEmpty ? "Tile" : sourceEl.title
+
+            if let summary = connections[idx].cachedSummary {
+                contextBlocks.append("[\(label)] \(summary)")
+            } else if let output = tileOutput(for: connections[idx].sourceId) {
+                let _ = summaryManager.resolvedSummary(for: &connections[idx], output: output)
+                let raw = String(output.textRepresentation.prefix(500))
+                contextBlocks.append("[\(label)] \(raw)")
+            }
+        }
+
+        guard !contextBlocks.isEmpty else { return nil }
+        return "Context from connected tiles:\n---\n" +
+            contextBlocks.joined(separator: "\n---\n") +
+            "\n---"
+    }
+
     /// Resolve the current output of any tile by its element ID
     func tileOutput(for elementId: UUID) -> TileOutput? {
         guard let element = findElement(elementId),

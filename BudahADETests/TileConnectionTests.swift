@@ -253,4 +253,35 @@ final class TileConnectionTests: XCTestCase {
         }
         XCTAssertEqual(messages.count, 2)
     }
+
+    // MARK: - assembleConnectedContext
+
+    @MainActor
+    func testAssembleConnectedContext() throws {
+        let canvas = PlanCanvasState(worktreePath: "/tmp/test", taskName: "test", branchName: "test")
+        let tmpFile = NSTemporaryDirectory() + "ctx-test-\(UUID()).md"
+        try "# Design Notes\nUse OAuth2 for auth.".write(toFile: tmpFile, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: tmpFile) }
+
+        let noteId = canvas.addTile(type: .markdown(path: tmpFile), at: .zero)
+        let chatId = canvas.addChatTile(agent: .ideator, at: CGPoint(x: 500, y: 0))
+
+        let connId = canvas.addConnection(sourceId: noteId, destinationId: chatId)
+        // Manually set cached summary
+        if let idx = canvas.connections.firstIndex(where: { $0.id == connId }) {
+            canvas.connections[idx].cachedSummary = "Design notes about OAuth2 auth approach"
+        }
+
+        let context = canvas.assembleConnectedContext(for: chatId)
+        XCTAssertNotNil(context)
+        XCTAssertTrue(context!.contains("OAuth2"))
+        XCTAssertTrue(context!.contains("Context from connected tiles"))
+    }
+
+    @MainActor
+    func testAssembleConnectedContextNoConnections() {
+        let canvas = PlanCanvasState(worktreePath: "/tmp/test", taskName: "test", branchName: "test")
+        let tileId = canvas.addTile(type: .stickyNote, at: .zero)
+        XCTAssertNil(canvas.assembleConnectedContext(for: tileId))
+    }
 }
