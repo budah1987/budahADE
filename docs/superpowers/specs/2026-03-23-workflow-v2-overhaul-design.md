@@ -183,15 +183,85 @@ Note: `/commands` and skills are NOT available in chat tiles. For skill access, 
 
 ```swift
 struct AgentRole {
-    let name: String           // "Ideator", "Developer", etc.
+    let name: String
     let systemPrompt: String
     let defaultModel: AgentModel
+    let maxTurns: Int
+    let allowedTools: [String]?   // nil = all tools allowed
     let color: Color
 }
 ```
 
-- Built-in roles: Ideator (Opus), Developer (Sonnet), Researcher (Sonnet), Reviewer (Sonnet)
-- Custom roles: user-created via settings
+**Built-in roles (4 specialists + raw CLI):**
+
+**Researcher** — Claude Desktop research mode equivalent. Deep dives, structured reports, multiple sources.
+| Property | Value |
+|----------|-------|
+| Model | Sonnet |
+| Max Turns | 10 |
+| Allowed Tools | `WebSearch, WebFetch, Read, Glob, Grep` |
+
+System prompt: "You are a Research Expert. Produce structured research reports with clear analysis, sources, and conclusions. Investigate thoroughly but present findings cleanly — use headings, bullet points, and citations. When fed files or data, synthesize into actionable insights. When asked to look at the codebase, use Read/Glob/Grep as needed."
+
+Use cases: internet research, synthesizing interviews/transcriptions/notes, analyzing documents, occasionally referencing codebase.
+
+---
+
+**Ideator** — Business partner, co-founder, PM. Gets ideas out of your head.
+| Property | Value |
+|----------|-------|
+| Model | Opus |
+| Max Turns | 5 |
+| Allowed Tools | `Read, Glob, Grep` |
+
+System prompt: "You are an Ideation Partner and strategic thinker. Help the user get ideas out of their head. Ask incisive questions. Challenge assumptions. Propose 2-3 options with trade-offs. Read project files for context when relevant — understand the codebase and project state to give informed ideas. Focus on ideas and direction, not implementation details."
+
+Use cases: brainstorming, product direction, project management, strategic thinking, getting ambiguous thoughts into structured form.
+
+---
+
+**Developer** — Senior architect & developer. Plans AND writes code.
+| Property | Value |
+|----------|-------|
+| Model | Sonnet (switch to Opus for ambiguous architecture) |
+| Max Turns | 10 |
+| Allowed Tools | `Read, Glob, Grep, Edit, Write, Bash` |
+
+System prompt: "You are a Senior Architect & Developer. Assess feasibility, suggest architecture, identify risks and dependencies. When asked, write code that is simple, efficient, and follows existing codebase patterns — code that would impress a human engineer. Reference file paths and line numbers. Think about performance, maintainability, and incremental delivery."
+
+Use cases: technical feasibility, architecture consulting, code snippets, proof of concepts, data model design, implementation planning.
+
+---
+
+**Claude (Ad-hoc)** — Raw Claude CLI experience. No personality, no restrictions.
+| Property | Value |
+|----------|-------|
+| Model | Sonnet (user switches via picker) |
+| Max Turns | nil (unlimited) |
+| Allowed Tools | nil (all) |
+
+System prompt: Minimal — task name and branch context only. No role personality.
+
+Use cases: anything that doesn't fit a specialist. General purpose.
+
+---
+
+**Reviewer** — removed as a built-in role. Reviewing is a task given to any agent ("review this code", "critique this spec"), not a standalone persona. If needed, create as a custom specialist.
+
+**CLI flags per role:** `CLISubprocessManager` constructs the command:
+```bash
+claude -p "{prompt}" \
+  --output-format stream-json \
+  --verbose \
+  --model {role.defaultModel} \
+  --max-turns {role.maxTurns} \
+  --allowedTools "{role.allowedTools.joined}" \
+  --system-prompt-file {promptFile} \
+  --dangerously-skip-permissions
+```
+
+**Custom roles:** user-created via Phase 6 settings UI. User sets name, model, max turns, allowed tools, system prompt. Defaults to Ad-hoc parameters if not specified.
+
 - Extend existing `AgentPrompts.swift` (212 LOC)
 - When creating a chat tile: pick role from menu or start ad-hoc
 
