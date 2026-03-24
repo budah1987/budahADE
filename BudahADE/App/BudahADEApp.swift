@@ -13,12 +13,10 @@ struct BudahADEApp: App {
                 .background(Theme.appBackground)
                 .preferredColorScheme(.dark)
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    for workspace in appState.workspaces {
-                        for task in workspace.tasks {
-                            task.saveSessionState()
-                            task.planCanvas?.saveNow()
-                        }
-                    }
+                    appState.saveAllState()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { _ in
+                    appState.saveAllState()
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -166,11 +164,74 @@ class AppState: ObservableObject {
         activeWorkspaceIndex = workspaces.count - 1
     }
 
+    func saveAllState() {
+        for workspace in workspaces {
+            for task in workspace.tasks {
+                task.saveSessionState()
+                task.planCanvas?.saveNow()
+            }
+        }
+        // Save app-level state (which projects/tasks are open)
+        let snapshot = AppSnapshot(
+            workspaces: workspaces.map { ws in
+                WorkspaceSnapshot(
+                    projectPath: ws.projectPath,
+                    tasks: ws.tasks.map { task in
+                        TaskSnapshot(
+                            name: task.name,
+                            branchName: task.branchName,
+                            baseBranch: task.baseBranch,
+                            mode: task.mode.rawValue
+                        )
+                    },
+                    activeTaskIndex: ws.tasks.firstIndex(where: { $0.id == ws.activeTaskId })
+                )
+            },
+            activeWorkspaceIndex: activeWorkspaceIndex
+        )
+        AppStatePersistence.save(snapshot)
+    }
+
+    func restoreFromSavedState() -> Bool {
+        guard let snapshot = AppStatePersistence.load() else { return false }
+        guard !snapshot.workspaces.isEmpty else { return false }
+
+        for wsSnapshot in snapshot.workspaces {
+            // Verify project path still exists
+            guard FileManager.default.fileExists(atPath: wsSnapshot.projectPath) else { continue }
+
+            let workspace = WorkspaceState(projectPath: wsSnapshot.projectPath, restoring: true)
+            workspaces.append(workspace)
+
+            for (i, taskSnapshot) in wsSnapshot.tasks.enumerated() {
+                workspace.restoreTask(taskSnapshot)
+                // Set mode after creation
+                if let task = workspace.tasks.last, taskSnapshot.mode == "plan" {
+                    task.enterPlanMode()
+                }
+                // Select the previously active task
+                if let activeIdx = wsSnapshot.activeTaskIndex, i == activeIdx {
+                    workspace.activeTaskId = workspace.tasks.last?.id
+                }
+            }
+
+            // If no task was restored as active, select the first
+            if workspace.activeTaskId == nil, let first = workspace.tasks.first {
+                workspace.activeTaskId = first.id
+            }
+        }
+
+        activeWorkspaceIndex = min(snapshot.activeWorkspaceIndex, max(workspaces.count - 1, 0))
+        return !workspaces.isEmpty
+    }
+
     func closeWorkspace(at index: Int) {
         guard index < workspaces.count else { return }
         let workspace = workspaces[index]
-        // Close all task terminals
+        // Save state before closing terminals
         for task in workspace.tasks {
+            task.saveSessionState()
+            task.planCanvas?.saveNow()
             task.closeAllTerminals()
         }
         workspaces.remove(at: index)
@@ -215,6 +276,12 @@ struct ContentView: View {
         }
         .toolbar {
             // Empty — workspace dropdown is now in the task rail
+        }
+        .onAppear {
+            // Restore previous session on launch
+            if appState.hasNoWorkspaces {
+                _ = appState.restoreFromSavedState()
+            }
         }
     }
 }

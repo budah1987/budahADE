@@ -318,6 +318,7 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     func saveSessionState() {
+        print("[SessionPersistence] Saving \(tabs.count) tabs to \(worktreePath)")
         var tabSnapshots: [TabSnapshot] = []
 
         for tab in tabs {
@@ -341,7 +342,12 @@ final class TaskState: ObservableObject, Identifiable {
         }
 
         let session = SessionSnapshot(tabs: tabSnapshots, selectedTabId: selectedTabId)
-        try? SessionPersistence.save(session, to: worktreePath)
+        do {
+            try SessionPersistence.save(session, to: worktreePath)
+            print("[SessionPersistence] Saved \(tabSnapshots.count) tabs successfully")
+        } catch {
+            print("[SessionPersistence] Save failed: \(error)")
+        }
     }
 
     // MARK: - Private

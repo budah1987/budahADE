@@ -35,11 +35,13 @@ final class WorkspaceState: ObservableObject, Identifiable {
     // so WorkspaceView re-renders when tabs/terminals change inside a task.
     private var taskCancellables: [UUID: [AnyCancellable]] = [:]
 
-    init(projectPath: String) {
+    init(projectPath: String, restoring: Bool = false) {
         self.projectPath = projectPath
         ensureClaudeMd()
-        // No auto-task creation — show "What are you working on?" prompt
-        showNewTaskSheet = true
+        if !restoring {
+            // No auto-task creation — show "What are you working on?" prompt
+            showNewTaskSheet = true
+        }
     }
 
     // MARK: - Task Management
@@ -89,6 +91,45 @@ final class WorkspaceState: ObservableObject, Identifiable {
         }
     }
 
+    /// Restore a task from saved state (no worktree creation — already exists)
+    func restoreTask(_ snapshot: TaskSnapshot) {
+        let worktreePath = GitWorktreeManager.worktreeDirectory(
+            repoPath: projectPath,
+            branchName: snapshot.branchName
+        )
+
+        // Verify worktree directory exists
+        guard FileManager.default.fileExists(atPath: worktreePath) else {
+            print("[WorkspaceState] Skipping restore — worktree missing: \(worktreePath)")
+            return
+        }
+
+        let task = TaskState(
+            name: snapshot.name,
+            branchName: snapshot.branchName,
+            baseBranch: snapshot.baseBranch,
+            worktreePath: worktreePath,
+            repoPath: projectPath
+        )
+
+        var cancellables: [AnyCancellable] = []
+        cancellables.append(
+            task.objectWillChange
+                .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+        )
+        cancellables.append(
+            task.specState.objectWillChange
+                .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+        )
+        taskCancellables[task.id] = cancellables
+
+        tasks.append(task)
+        activeTaskId = task.id
+
+        // Start terminal — will try restoring saved session state first
+        task.startTerminal()
+    }
+
     func selectTask(_ id: UUID) {
         guard tasks.contains(where: { $0.id == id }) else { return }
         activeTask?.unfocusAllTerminals()
@@ -117,6 +158,8 @@ final class WorkspaceState: ObservableObject, Identifiable {
         let repoPath = task.repoPath
         let worktreePath = task.worktreePath
 
+        task.saveSessionState()
+        task.planCanvas?.saveNow()
         task.closeAllTerminals()
 
         if let index = tasks.firstIndex(where: { $0.id == id }) {
