@@ -75,15 +75,30 @@ final class TerminalSurfaceView: NSView {
             return
         }
 
+        // Shift+Tab → send \e[Z (backtab) as literal bytes.
+        // Without this, interpretKeyEvents fires insertBacktab which moves AppKit focus
+        // instead of sending the sequence to Claude CLI (e.g. permission bypass cycling).
+        if event.keyCode == 48 && event.modifierFlags.contains(.shift) {
+            let seq = "\u{1b}[Z"
+            if let tmuxSession = findTmuxSession() {
+                TmuxSessionManager.sendKeys(session: tmuxSession, keys: seq, literal: true)
+            } else {
+                seq.withCString { ptr in
+                    ghostty_surface_text(surface, ptr, UInt(seq.utf8.count))
+                }
+            }
+            return
+        }
+
         // Shift+Enter → use tmux send-keys to pass Shift+Enter through tmux.
         // tmux strips Shift from Enter in legacy mode and CSI u sequences aren't
         // interpreted by tmux's input parser. tmux send-keys handles it correctly.
         if event.keyCode == 36 && event.modifierFlags.contains(.shift) {
-            let foundSession = findTmuxSession()
-            print("[SHIFT-ENTER] findTmuxSession=\(foundSession ?? "nil") surfaceId=\(terminalSurface?.id.uuidString.prefix(8) ?? "nil")")
-            if let tmuxSession = foundSession {
-                print("[SHIFT-ENTER] Sending S-Enter to tmux session: \(tmuxSession)")
-                TmuxSessionManager.sendKeys(session: tmuxSession, keys: "S-Enter")
+            if let tmuxSession = findTmuxSession() {
+                // Send \e[13;2u (kitty keyboard protocol: Shift+Enter) as literal bytes.
+                // Using -l flag bypasses tmux's key-name encoding — Claude CLI parses the
+                // raw escape sequence regardless of whether kitty protocol was negotiated.
+                TmuxSessionManager.sendKeys(session: tmuxSession, keys: "\u{1b}[13;2u", literal: true)
             } else {
                 // No tmux — send normally (works without tmux)
                 var keyEvent = ghostty_input_key_s()
@@ -298,30 +313,75 @@ final class TerminalSurfaceView: NSView {
             return
         }
         let pb = NSPasteboard.general
-        // Try multiple pasteboard types
-        let str = pb.string(forType: .string)
+
+        // Text paste
+        if let str = pb.string(forType: .string)
             ?? pb.string(forType: .init("public.utf8-plain-text"))
-            ?? pb.string(forType: .init("public.plain-text"))
-        guard let str, !str.isEmpty else {
-            print("[PASTE] No text on clipboard. Types: \(pb.types?.map(\.rawValue) ?? [])")
+            ?? pb.string(forType: .init("public.plain-text")),
+           !str.isEmpty {
+            print("[PASTE] Pasting \(str.count) chars")
+            // Send raw text — Claude CLI's tmux pane doesn't enable bracketed paste mode.
+            str.withCString { ptr in
+                ghostty_surface_text(surface, ptr, UInt(str.utf8.count))
+            }
             return
         }
-        print("[PASTE] Pasting \(str.count) chars")
-        // Use bracketed paste mode (terminals/tmux expect this)
-        let bracketedPaste = "\u{1b}[200~\(str)\u{1b}[201~"
-        bracketedPaste.withCString { ptr in
-            ghostty_surface_text(surface, ptr, UInt(bracketedPaste.utf8.count))
+
+        // Image paste: Claude CLI accepts images via file path.
+        // 1. If clipboard has a file URL (image copied from Finder), use that path.
+        // 2. Otherwise save raw image data to a temp file and paste the path.
+        if let path = imagePathFromPasteboard(pb) {
+            print("[PASTE] Pasting image path: \(path)")
+            path.withCString { ptr in
+                ghostty_surface_text(surface, ptr, UInt(path.utf8.count))
+            }
+            return
         }
+
+        print("[PASTE] No pasteable content. Types: \(pb.types?.map(\.rawValue) ?? [])")
+    }
+
+    private func imagePathFromPasteboard(_ pb: NSPasteboard) -> String? {
+        // Prefer a file URL (image copied from Finder — no temp file needed)
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           let fileURL = urls.first(where: { $0.isFileURL }) {
+            return fileURL.path
+        }
+
+        // No file URL — save raw image data to a temp PNG
+        let imageTypes: [NSPasteboard.PasteboardType] = [
+            .init("public.png"), .init("public.tiff"),
+            .init("public.jpeg"), .init("public.heic"),
+        ]
+        for type in imageTypes {
+            guard let data = pb.data(forType: type) else { continue }
+            guard let image = NSImage(data: data),
+                  let tiffData = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmap.representation(using: .png, properties: [:]) else { continue }
+
+            let tempDir = FileManager.default.temporaryDirectory
+            let filename = "budahade-paste-\(Int(Date().timeIntervalSince1970)).png"
+            let url = tempDir.appendingPathComponent(filename)
+            do {
+                try pngData.write(to: url)
+                return url.path
+            } catch {
+                print("[PASTE] Failed to write temp image: \(error)")
+            }
+        }
+        return nil
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if event.keyCode == 36 || event.keyCode == 9 {
-            print("[PERF-KEY] keyCode=\(event.keyCode) flags=\(flags.rawValue) isFirstResponder=\(window?.firstResponder === self)")
-        }
-        // Cmd+V → paste (use .contains instead of == for robustness)
+        // Cmd+V → paste, but only if THIS view is first responder.
+        // performKeyEquivalent fires on every view in the hierarchy; without this guard
+        // the first terminal view (tab 1) always handles paste regardless of active tab.
         if flags.contains(.command) && event.keyCode == 9 {
-            print("[PERF-KEY] Cmd+V → pasting")
+            guard window?.firstResponder === self else {
+                return super.performKeyEquivalent(with: event)
+            }
             paste(nil)
             return true
         }
@@ -375,12 +435,7 @@ final class TerminalSurfaceView: NSView {
 
     /// Find the tmux session name for this terminal view's surface.
     private func findTmuxSession() -> String? {
-        guard let surfaceId = terminalSurface?.id else { return nil }
-        // Walk up the responder chain to find TaskState or check NotificationCenter
-        // Simpler: check all running tmux sessions and match by surface ID prefix
-        let sessions = TmuxSessionManager.listSessions()
-        let prefix = "budahade-\(surfaceId.uuidString.prefix(8).lowercased())"
-        return sessions.first(where: { $0 == prefix }) ?? sessions.first
+        return terminalSurface?.tmuxSession
     }
 
     // MARK: - Helpers

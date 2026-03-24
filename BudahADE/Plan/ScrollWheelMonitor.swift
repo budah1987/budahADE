@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct CanvasInputMonitor: NSViewRepresentable {
     let onScroll: (_ deltaX: CGFloat, _ deltaY: CGFloat, _ isZoom: Bool, _ isShiftPan: Bool) -> Void
@@ -76,6 +77,7 @@ struct CanvasInputMonitor: NSViewRepresentable {
                 var current: NSView? = view
                 while let v = current {
                     if v is TerminalSurfaceView { return true }
+                    if v is WKWebView { return true }
                     current = v.superview
                 }
             }
