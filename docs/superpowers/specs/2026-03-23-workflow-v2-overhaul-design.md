@@ -342,7 +342,9 @@ Canvas state is in-memory only. Quitting BudahADE loses all tiles, positions, an
 
 ---
 
-## Phase 2.75: Session Persistence (Build Mode + Terminal Tiles)
+## Phase 2.75: Session Persistence (Build Mode + Terminal Tiles) ✅ SHIPPED
+
+**Shipped:** tmux-backed terminal sessions (conversations survive app quit — Claude keeps running in tmux daemon). App state persistence (`~/.budahade/app-state.json`) restores projects/tasks on relaunch. Tab metadata + tmux session names saved to `.budahade/sessions/tabs.json`. Canvas chat tile `claudeSessionId` persisted for `--resume`. Tab names protected from shell title overwrites. Surface creation retries on Ghostty init timing. Keyboard: Opt+P model selector fixed (translation_mods + unshifted_codepoint), cursor states fixed (push/pop → set). **In progress:** Shift+Enter linebreaks through tmux (send-keys approach), Cmd+V paste surface timing.
 
 ### Problem
 
