@@ -30,8 +30,9 @@ struct TabInfo: Identifiable, Equatable {
     var title: String
     var isRunning: Bool
     var agentStatus: AgentStatus = .inactive
-    var claudeSessionId: String?   // For --resume on restart
+    var claudeSessionId: String?   // For --resume fallback (when tmux unavailable)
     var agentMode: AgentMode?      // Which agent role launched this tab
+    var tmuxSession: String?       // tmux session name for persistence
 
     static func == (lhs: TabInfo, rhs: TabInfo) -> Bool {
         lhs.id == rhs.id &&

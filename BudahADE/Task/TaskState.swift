@@ -148,19 +148,31 @@ final class TaskState: ObservableObject, Identifiable {
         return id
     }
 
-    /// Launch Claude in a specific tab with spec awareness
-    func launchClaudeInTab(_ tabId: UUID, agent: AgentMode? = nil, resumeSessionId: String? = nil) {
+    /// Launch Claude in a specific tab with spec awareness.
+    /// If tmuxSession is provided and alive, reattaches instead of launching fresh.
+    func launchClaudeInTab(_ tabId: UUID, agent: AgentMode? = nil, tmuxSession: String? = nil) {
         guard let panel = terminals[tabId] else { return }
 
+        // If we have a tmux session that's still alive, just reattach — Claude is still running
+        if TmuxSessionManager.isAvailable,
+           let sessionName = tmuxSession,
+           TmuxSessionManager.sessionExists(sessionName) {
+            print("[TaskState] Reattaching tmux session: \(sessionName)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                panel.sendCommand(TmuxSessionManager.attachCommand(name: sessionName))
+            }
+            return
+        }
+
+        // Build the Claude launch command
         let specPath = specState.activeSpec?.filePath
         let progress: (completed: Int, total: Int)? = specState.activeSpec.map {
             (completed: $0.completedCount, total: $0.totalCount)
         }
 
-        var command: String
+        let claudeCommand: String
         if let specPath, let progress, agent == nil {
-            // Builder mode: spec-focused execution
-            command = AgentPrompts.builderLaunchCommand(
+            claudeCommand = AgentPrompts.builderLaunchCommand(
                 taskName: name,
                 branchName: branchName,
                 worktreePath: worktreePath,
@@ -168,8 +180,7 @@ final class TaskState: ObservableObject, Identifiable {
                 specProgress: progress
             )
         } else {
-            // Agent mode or no spec: use role prompt with optional spec context
-            command = AgentPrompts.launchCommand(
+            claudeCommand = AgentPrompts.launchCommand(
                 agent: agent ?? .claude,
                 taskName: name,
                 branchName: branchName,
@@ -180,17 +191,40 @@ final class TaskState: ObservableObject, Identifiable {
             )
         }
 
-        if let resumeId = resumeSessionId {
-            command += " --resume \(resumeId)"
-        }
+        if TmuxSessionManager.isAvailable {
+            // Launch inside a new tmux session
+            let sessionName = tmuxSession ?? TmuxSessionManager.sessionName(for: tabId)
+            print("[TaskState] Creating tmux session: \(sessionName)")
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            panel.sendCommand(command)
+            // Create tmux session and run Claude inside it
+            let tmuxCmd = TmuxSessionManager.newSessionCommand(
+                name: sessionName, workingDirectory: worktreePath
+            )
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                panel.sendCommand(tmuxCmd)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                panel.sendCommand(claudeCommand)
+            }
+
+            // Track tmux session on the tab
+            if let idx = self.tabs.firstIndex(where: { $0.id == tabId }) {
+                self.tabs[idx].tmuxSession = sessionName
+            }
+        } else {
+            // No tmux — launch Claude directly (old behavior)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                panel.sendCommand(claudeCommand)
+            }
         }
     }
 
     func closeTab(_ id: UUID) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
+        // Kill tmux session when user explicitly closes a tab
+        if let tmuxName = tabs[index].tmuxSession {
+            TmuxSessionManager.killSession(tmuxName)
+        }
         terminals[id]?.close()
         terminals.removeValue(forKey: id)
         tabs.remove(at: index)
@@ -273,14 +307,12 @@ final class TaskState: ObservableObject, Identifiable {
 
         for tabSnapshot in snapshot.tabs {
             let panel = TerminalPanel(workingDirectory: worktreePath)
-            // Use the saved tab ID so references remain stable
-            // Note: TerminalPanel.id is derived from TerminalSurface.id, so we use the new panel.id
-            // but track the tab with the panel's actual id
             let tabId = panel.id
             panel.title = tabSnapshot.title
 
             var tab = TabInfo(id: tabId, title: tabSnapshot.title, isRunning: false)
             tab.claudeSessionId = tabSnapshot.claudeSessionId
+            tab.tmuxSession = tabSnapshot.tmuxSession
             if let modeRaw = tabSnapshot.agentMode {
                 tab.agentMode = AgentMode(rawValue: modeRaw)
             }
@@ -288,12 +320,11 @@ final class TaskState: ObservableObject, Identifiable {
             tabs.append(tab)
             terminals[tabId] = panel
 
-            // Always relaunch Claude — with --resume if we have a session ID
-            launchClaudeInTab(tabId, agent: tab.agentMode, resumeSessionId: tabSnapshot.claudeSessionId)
+            // tmux reattach (conversation intact) or fresh launch
+            launchClaudeInTab(tabId, agent: tab.agentMode, tmuxSession: tabSnapshot.tmuxSession)
         }
 
-        // Restore selected tab — map by position since UUIDs are new
-        // Use the first tab that was active, falling back to the first tab
+        // Restore selected tab by position
         if let activeSnapshot = snapshot.tabs.first(where: { $0.isActive }),
            let index = snapshot.tabs.firstIndex(where: { $0.id == activeSnapshot.id }),
            index < tabs.count {
@@ -333,7 +364,8 @@ final class TaskState: ObservableObject, Identifiable {
                 claudeSessionId: sessionId,
                 agentMode: tab.agentMode?.rawValue,
                 isActive: tab.id == selectedTabId,
-                scrollbackPath: scrollbackPath
+                scrollbackPath: scrollbackPath,
+                tmuxSession: tab.tmuxSession
             ))
         }
 

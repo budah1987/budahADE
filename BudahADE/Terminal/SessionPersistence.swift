@@ -7,6 +7,7 @@ struct TabSnapshot: Codable {
     let agentMode: String?       // AgentMode rawValue or nil
     let isActive: Bool
     let scrollbackPath: String?  // relative path to scrollback text file
+    let tmuxSession: String?     // tmux session name for reattach
 }
 
 struct SessionSnapshot: Codable {
