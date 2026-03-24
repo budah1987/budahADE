@@ -327,10 +327,7 @@ final class TaskState: ObservableObject, Identifiable {
                     scrollbackPath = try? SessionPersistence.saveScrollback(
                         text, tabId: tab.id, to: worktreePath
                     )
-                    // Extract Claude session ID from scrollback if not already tracked
-                    if sessionId == nil {
-                        sessionId = Self.extractSessionId(from: text)
-                    }
+                    // Note: scrollback-based session extraction removed — using filesystem approach below
                 }
             }
 
@@ -394,8 +391,9 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     /// Extract Claude session ID from terminal scrollback text.
-    /// Claude prints: https://claude.ai/code/session_XXXXX
-    private static func extractSessionId(from text: String) -> String? {
+    /// Not used for --resume (that needs the local UUID from .claude/projects/).
+    /// Kept as a reference but the filesystem approach is preferred.
+    private static func extractSessionIdFromScrollback(from text: String) -> String? {
         guard let range = text.range(of: "session_[A-Za-z0-9]+", options: [.regularExpression, .backwards]) else {
             return nil
         }
@@ -431,13 +429,11 @@ final class TaskState: ObservableObject, Identifiable {
 
         guard let mostRecent = jsonlFiles.first else { return nil }
 
-        // Read first line and extract session_XXXXX
-        guard let data = fm.contents(atPath: mostRecent.0),
-              let content = String(data: data, encoding: .utf8) else { return nil }
-        guard let range = content.range(of: "session_[A-Za-z0-9]+", options: .regularExpression) else { return nil }
-        let sessionId = String(content[range])
-        print("[SessionPersistence] Found Claude session: \(sessionId) from \(mostRecent.0)")
-        return sessionId
+        // The local session ID is the JSONL filename (UUID) without extension.
+        // Claude CLI's --resume expects this UUID, not the API session_XXXXX.
+        let filename = ((mostRecent.0 as NSString).lastPathComponent as NSString).deletingPathExtension
+        print("[SessionPersistence] Found Claude session: \(filename) from \(mostRecent.0)")
+        return filename
     }
 
     /// Map terminal title patterns to agent status.
