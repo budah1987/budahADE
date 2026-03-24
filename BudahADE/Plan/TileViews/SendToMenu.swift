@@ -10,9 +10,9 @@ struct SendToMenu: View {
             Button(action: onSendToSpec) {
                 HStack(spacing: 3) {
                     Image(systemName: "doc.text")
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                     Text("Spec")
-                        .font(Theme.caption(10))
+                        .font(Theme.caption(12))
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
@@ -30,9 +30,9 @@ struct SendToMenu: View {
                     HStack(spacing: 3) {
                         Circle()
                             .fill(mode.dotColor)
-                            .frame(width: 5, height: 5)
+                            .frame(width: 6, height: 6)
                         Text(mode.displayName)
-                            .font(Theme.caption(10))
+                            .font(Theme.caption(12))
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)

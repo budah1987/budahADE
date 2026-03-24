@@ -60,7 +60,7 @@ struct MarkdownTileView: View {
     private func progressBar(_ spec: SpecParseResult) -> some View {
         HStack(spacing: 8) {
             Text("\(spec.completedCount)/\(spec.totalCount)")
-                .font(Theme.mono(10))
+                .font(Theme.mono(12))
                 .foregroundColor(spec.progress >= 1.0 ? Theme.success : Theme.textSecondary)
 
             GeometryReader { geo in
@@ -85,15 +85,15 @@ struct MarkdownTileView: View {
             // Section header
             HStack(spacing: 6) {
                 Text(section.heading)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Theme.textPrimary)
 
                 // Source attribution
                 if let sourceId = section.sourceId {
                     HStack(spacing: 3) {
-                        Circle().fill(Theme.accent).frame(width: 5, height: 5)
+                        Circle().fill(Theme.accent).frame(width: 6, height: 6)
                         Text("from \(sourceId)")
-                            .font(Theme.caption(9))
+                            .font(Theme.caption(11))
                             .foregroundColor(Theme.textMuted)
                     }
                 }
@@ -101,7 +101,7 @@ struct MarkdownTileView: View {
                 if !section.checkboxItems.isEmpty {
                     let done = section.checkboxItems.filter(\.isCompleted).count
                     Text("\(done)/\(section.checkboxItems.count)")
-                        .font(Theme.mono(9))
+                        .font(Theme.mono(11))
                         .foregroundColor(done == section.checkboxItems.count ? Theme.success : Theme.textMuted)
                 }
 
@@ -112,9 +112,9 @@ struct MarkdownTileView: View {
                     canvas.detachSpecSection(specTileId: elementId, sectionId: section.id, specPath: path)
                 } label: {
                     Image(systemName: "arrow.up.right.square")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Theme.textMuted)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 24, height: 24)
                 }
                 .buttonStyle(.plain)
                 .help("Detach section to canvas tile")
@@ -133,7 +133,7 @@ struct MarkdownTileView: View {
             if editingSectionId == section.id {
                 // Edit mode
                 TextEditor(text: $editContent)
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundColor(Theme.textPrimary)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 60)
@@ -151,7 +151,7 @@ struct MarkdownTileView: View {
                         .joined(separator: "\n")
                     if !preview.isEmpty {
                         Text(preview)
-                            .font(.system(size: 11))
+                            .font(.system(size: 13))
                             .foregroundColor(Theme.textMuted)
                             .lineLimit(5)
                             .padding(.horizontal, 12)
@@ -177,10 +177,10 @@ struct MarkdownTileView: View {
         Button { toggleTask(task) } label: {
             HStack(spacing: 8) {
                 Image(systemName: task.isCompleted ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 13))
+                    .font(.system(size: 15))
                     .foregroundColor(task.isCompleted ? Theme.success : Theme.textMuted)
                 Text(task.title)
-                    .font(.system(size: 11, weight: task.isCompleted ? .regular : .medium))
+                    .font(.system(size: 13, weight: task.isCompleted ? .regular : .medium))
                     .foregroundColor(task.isCompleted ? Theme.textMuted : Theme.textPrimary)
                     .strikethrough(task.isCompleted, color: Theme.textMuted)
                     .lineLimit(2)
@@ -260,11 +260,11 @@ struct MarkdownTileView: View {
                 .font(.system(size: 9))
                 .foregroundColor(Theme.textMuted)
             Text(filename)
-                .font(Theme.mono(9))
+                .font(Theme.mono(11))
                 .foregroundColor(Theme.textMuted)
             Spacer()
             Text("\(sections.count) sections")
-                .font(Theme.caption(9))
+                .font(Theme.caption(11))
                 .foregroundColor(Theme.textMuted)
         }
         .padding(.horizontal, 12)
@@ -279,7 +279,7 @@ struct MarkdownTileView: View {
                 .font(.system(size: 24))
                 .foregroundColor(Theme.textMuted)
             Text("Empty document")
-                .font(Theme.body(13))
+                .font(Theme.body(14))
                 .foregroundColor(Theme.textMuted)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

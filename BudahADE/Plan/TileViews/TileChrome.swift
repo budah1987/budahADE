@@ -30,15 +30,15 @@ struct TileChrome<Content: View>: View {
                 if let dotColor {
                     Circle()
                         .fill(dotColor)
-                        .frame(width: 6, height: 6)
+                        .frame(width: 7, height: 7)
                 } else {
                     Image(systemName: icon)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Theme.textMuted)
                 }
 
                 Text(title)
-                    .font(Theme.label(11))
+                    .font(Theme.label(13))
                     .foregroundColor(Theme.textSecondary)
                     .lineLimit(1)
 
@@ -46,9 +46,9 @@ struct TileChrome<Content: View>: View {
 
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(isCloseHovered ? Theme.textSecondary : Theme.textMuted)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 22, height: 22)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(isCloseHovered ? Theme.hoverFill : Color.clear)
@@ -57,8 +57,8 @@ struct TileChrome<Content: View>: View {
                 .buttonStyle(.plain)
                 .onHover { isCloseHovered = $0 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
             .background(Theme.surface2)
 
             Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)

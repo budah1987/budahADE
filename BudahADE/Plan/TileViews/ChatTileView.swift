@@ -64,7 +64,7 @@ struct ChatTileView: View {
                 }
             }
             .pickerStyle(.menu)
-            .font(Theme.caption(10))
+            .font(Theme.caption(12))
             .labelsHidden()
             .frame(maxWidth: 80)
 
@@ -73,7 +73,7 @@ struct ChatTileView: View {
             // Token count
             if session.totalTokens > 0 {
                 Text(session.formattedTokenCount)
-                    .font(Theme.mono(10))
+                    .font(Theme.mono(11))
                     .foregroundColor(Theme.textMuted)
             }
 
@@ -84,9 +84,9 @@ struct ChatTileView: View {
                     .disabled(true)
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(Theme.textMuted)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 24, height: 24)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
@@ -143,7 +143,7 @@ struct ChatTileView: View {
                                     .controlSize(.small)
                                     .scaleEffect(0.7)
                                 Text("Working... (\(session.pendingToolCalls.count) tool calls)")
-                                    .font(Theme.caption(11))
+                                    .font(Theme.caption(12))
                                     .foregroundColor(Theme.textMuted)
                                 Spacer()
                             }
@@ -174,7 +174,7 @@ struct ChatTileView: View {
                 .font(.system(size: 24))
                 .foregroundColor(Theme.textMuted)
             Text("Send a message to start the conversation")
-                .font(Theme.body(12))
+                .font(Theme.body(14))
                 .foregroundColor(Theme.textMuted)
                 .multilineTextAlignment(.center)
         }
@@ -186,14 +186,14 @@ struct ChatTileView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.red)
             Text(message)
-                .font(Theme.body(11))
+                .font(Theme.body(13))
                 .foregroundColor(.red)
                 .lineLimit(3)
             Spacer()
             Button("Retry") {
                 session.status = .idle
             }
-            .font(Theme.caption(10))
+            .font(Theme.caption(12))
             .foregroundColor(.red)
             .buttonStyle(.plain)
         }
@@ -210,7 +210,7 @@ struct ChatTileView: View {
     private var streamingBubble: some View {
         HStack {
             Text(session.currentStreamingText)
-                .font(Theme.body(12))
+                .font(Theme.body(14))
                 .foregroundColor(Theme.textPrimary)
                 .textSelection(.enabled)
                 .padding(.horizontal, 10)
@@ -283,10 +283,10 @@ struct ChatTileView: View {
                 HStack(spacing: 6) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("From \(staged.fromAgent)")
-                            .font(Theme.caption(10))
+                            .font(Theme.caption(12))
                             .foregroundColor(Theme.textMuted)
                         Text(staged.content.prefix(120) + (staged.content.count > 120 ? "..." : ""))
-                            .font(Theme.body(11))
+                            .font(Theme.body(13))
                             .foregroundColor(Theme.textSecondary)
                             .lineLimit(3)
                     }
@@ -319,7 +319,7 @@ struct ChatTileView: View {
                     text: $inputText,
                     axis: .vertical
                 )
-                    .font(Theme.body(12))
+                    .font(Theme.body(14))
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1...6)
                     .textFieldStyle(.plain)
@@ -495,7 +495,7 @@ private struct MessageBubble: View {
         HStack {
             Spacer(minLength: 40)
             Text(message.content)
-                .font(Theme.body(12))
+                .font(Theme.body(14))
                 .foregroundColor(Theme.textPrimary)
                 .textSelection(.enabled)
                 .padding(.horizontal, 10)
@@ -518,20 +518,20 @@ private struct MessageBubble: View {
                                         .font(.system(size: 9))
                                         .foregroundColor(Theme.textMuted)
                                     Text("\(tool.name)")
-                                        .font(Theme.mono(10))
+                                        .font(Theme.mono(11))
                                         .foregroundColor(Theme.textMuted)
                                 }
                                 .padding(.leading, 8)
                                 .padding(.top, 2)
                             }
                         }
-                        .font(Theme.caption(10))
+                        .font(Theme.caption(12))
                         .foregroundColor(Theme.textMuted)
                     }
 
                     if !message.content.isEmpty {
                         Text(message.content)
-                            .font(Theme.body(12))
+                            .font(Theme.body(14))
                             .foregroundColor(Theme.textPrimary)
                             .textSelection(.enabled)
                     }
@@ -544,34 +544,31 @@ private struct MessageBubble: View {
                 Spacer(minLength: 40)
             }
 
-            // Send-to button (shows on hover, only for messages with text)
-            if !message.content.isEmpty && (isHovered || showSendToMenu == message.id) {
+            // Send-to button (always visible for messages with text)
+            if !message.content.isEmpty {
                 Button {
                     withAnimation(.easeOut(duration: 0.12)) {
                         showSendToMenu = showSendToMenu == message.id ? nil : message.id
                     }
                 } label: {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         Image(systemName: "arrow.up.forward.square")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                         Text("Send to")
-                            .font(Theme.caption(10))
+                            .font(Theme.caption(12))
                     }
                     .foregroundColor(Theme.textMuted)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Theme.hoverFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
                 }
                 .buttonStyle(.plain)
-                .transition(.opacity)
             }
         }
     }
 
     private var systemBubble: some View {
         Text(message.content)
-            .font(Theme.caption(10))
+            .font(Theme.caption(12))
             .foregroundColor(Theme.textMuted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
