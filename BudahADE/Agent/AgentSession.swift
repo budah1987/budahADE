@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - AgentModel Enum
 
-enum AgentModel: String, CaseIterable, Identifiable {
+enum AgentModel: String, CaseIterable, Identifiable, Codable {
     case haiku
     case sonnet
     case opus

@@ -150,7 +150,7 @@ struct FrameData: Equatable {
 
 // MARK: - Text Data
 
-struct TextData: Equatable {
+struct TextData: Equatable, Codable {
     var content: String = "Text"
     var fontSize: CGFloat = 16
     var weight: TextWeight = .regular
@@ -232,7 +232,7 @@ struct TextData: Equatable {
     }
 }
 
-enum TextWeight: String, CaseIterable, Equatable {
+enum TextWeight: String, CaseIterable, Equatable, Codable {
     case light, regular, medium, semibold, bold, heavy, black
 
     var fontWeight: Font.Weight {
@@ -260,8 +260,72 @@ enum TextWeight: String, CaseIterable, Equatable {
     }
 }
 
-enum TextFontFamily: String, CaseIterable, Equatable {
+enum TextFontFamily: String, CaseIterable, Equatable, Codable {
     case system
     case monospace
     case serif
 }
+
+// MARK: - Codable Conformances
+
+extension FrameData: Codable {
+    enum CodingKeys: String, CodingKey {
+        case axis, children, gap, padding, headerHeight
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let axisStr = try c.decode(String.self, forKey: .axis)
+        self.axis = axisStr == "vertical" ? .vertical : .horizontal
+        self.children = try c.decode([CanvasElement].self, forKey: .children)
+        self.gap = try c.decode(CGFloat.self, forKey: .gap)
+        self.padding = try c.decode(CGFloat.self, forKey: .padding)
+        self.headerHeight = try c.decode(CGFloat.self, forKey: .headerHeight)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(axis == .vertical ? "vertical" : "horizontal", forKey: .axis)
+        try c.encode(children, forKey: .children)
+        try c.encode(gap, forKey: .gap)
+        try c.encode(padding, forKey: .padding)
+        try c.encode(headerHeight, forKey: .headerHeight)
+    }
+}
+
+extension ElementKind: Codable {
+    enum CodingKeys: String, CodingKey {
+        case type, tileType, frameData, textData
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try c.decode(String.self, forKey: .type)
+        switch type {
+        case "tile":  self = .tile(try c.decode(TileType.self, forKey: .tileType))
+        case "frame": self = .frame(try c.decode(FrameData.self, forKey: .frameData))
+        case "text":  self = .text(try c.decode(TextData.self, forKey: .textData))
+        default:
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: [CodingKeys.type], debugDescription: "Unknown element kind: \(type)")
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .tile(let t):
+            try c.encode("tile", forKey: .type)
+            try c.encode(t, forKey: .tileType)
+        case .frame(let f):
+            try c.encode("frame", forKey: .type)
+            try c.encode(f, forKey: .frameData)
+        case .text(let t):
+            try c.encode("text", forKey: .type)
+            try c.encode(t, forKey: .textData)
+        }
+    }
+}
+
+extension CanvasElement: Codable {}
