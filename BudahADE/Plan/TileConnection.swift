@@ -16,7 +16,7 @@ struct TileConnection: Identifiable, Codable, Equatable {
         destinationId: UUID,
         cachedSummary: String? = nil,
         summaryTimestamp: Date? = nil,
-        sourceVersion: Int
+        sourceVersion: Int = 0
     ) {
         self.id = id
         self.sourceId = sourceId

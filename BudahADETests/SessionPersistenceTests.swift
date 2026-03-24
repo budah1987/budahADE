@@ -9,7 +9,8 @@ final class SessionPersistenceTests: XCTestCase {
             claudeSessionId: "sess_abc123",
             agentMode: "claude",
             isActive: true,
-            scrollbackPath: "sessions/abc-scrollback.txt"
+            scrollbackPath: "sessions/abc-scrollback.txt",
+            tmuxSession: nil
         )
         let session = SessionSnapshot(tabs: [snapshot], selectedTabId: snapshot.id)
 
@@ -26,7 +27,7 @@ final class SessionPersistenceTests: XCTestCase {
         let dir = NSTemporaryDirectory() + "budahade-test-\(UUID().uuidString)"
         defer { try? FileManager.default.removeItem(atPath: dir) }
 
-        let tab = TabSnapshot(id: UUID(), title: "Test", claudeSessionId: nil, agentMode: nil, isActive: false, scrollbackPath: nil)
+        let tab = TabSnapshot(id: UUID(), title: "Test", claudeSessionId: nil, agentMode: nil, isActive: false, scrollbackPath: nil, tmuxSession: nil)
         let session = SessionSnapshot(tabs: [tab], selectedTabId: tab.id)
 
         try SessionPersistence.save(session, to: dir)
