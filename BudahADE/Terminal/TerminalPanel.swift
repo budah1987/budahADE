@@ -15,6 +15,8 @@ final class TerminalPanel: ObservableObject, Identifiable {
     }()
     @Published var title: String = "Terminal"
     @Published var isActive: Bool = false
+    /// Scrollback text from previous session (displayed as read-only snapshot above terminal)
+    var restoredScrollback: String?
     private var cancellables = Set<AnyCancellable>()
 
     init(workingDirectory: String? = nil) {

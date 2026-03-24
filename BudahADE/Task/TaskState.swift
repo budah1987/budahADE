@@ -91,6 +91,11 @@ final class TaskState: ObservableObject, Identifiable {
     /// Call after the worktree directory is ready on disk.
     func startTerminal() {
         guard tabs.isEmpty else { return } // Already started
+        if restoreSessionState() {
+            specWatcher = SpecWatcher(worktreePath: worktreePath, specState: specState)
+            specWatcher?.startWatching()
+            return
+        }
         createTab()
         autoLaunchClaude()
         specWatcher = SpecWatcher(worktreePath: worktreePath, specState: specState)
@@ -144,7 +149,7 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     /// Launch Claude in a specific tab with spec awareness
-    func launchClaudeInTab(_ tabId: UUID, agent: AgentMode? = nil) {
+    func launchClaudeInTab(_ tabId: UUID, agent: AgentMode? = nil, resumeSessionId: String? = nil) {
         guard let panel = terminals[tabId] else { return }
 
         let specPath = specState.activeSpec?.filePath
@@ -152,7 +157,7 @@ final class TaskState: ObservableObject, Identifiable {
             (completed: $0.completedCount, total: $0.totalCount)
         }
 
-        let command: String
+        var command: String
         if let specPath, let progress, agent == nil {
             // Builder mode: spec-focused execution
             command = AgentPrompts.builderLaunchCommand(
@@ -173,6 +178,10 @@ final class TaskState: ObservableObject, Identifiable {
                 specFilePath: specPath,
                 specProgress: progress
             )
+        }
+
+        if let resumeId = resumeSessionId {
+            command += " --resume \(resumeId)"
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -253,6 +262,60 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     // MARK: - Session Persistence
+
+    /// Restore tabs from saved session state. Returns true if state was restored.
+    @discardableResult
+    func restoreSessionState() -> Bool {
+        guard let snapshot = SessionPersistence.load(from: worktreePath),
+              !snapshot.tabs.isEmpty else {
+            return false
+        }
+
+        for tabSnapshot in snapshot.tabs {
+            let panel = TerminalPanel(workingDirectory: worktreePath)
+            // Use the saved tab ID so references remain stable
+            // Note: TerminalPanel.id is derived from TerminalSurface.id, so we use the new panel.id
+            // but track the tab with the panel's actual id
+            let tabId = panel.id
+
+            // Load and store scrollback from previous session
+            if let scrollbackPath = tabSnapshot.scrollbackPath {
+                panel.restoredScrollback = SessionPersistence.loadScrollback(
+                    relativePath: scrollbackPath,
+                    from: worktreePath
+                )
+            }
+
+            panel.title = tabSnapshot.title
+
+            var tab = TabInfo(id: tabId, title: tabSnapshot.title, isRunning: false)
+            tab.claudeSessionId = tabSnapshot.claudeSessionId
+            if let modeRaw = tabSnapshot.agentMode {
+                tab.agentMode = AgentMode(rawValue: modeRaw)
+            }
+
+            tabs.append(tab)
+            terminals[tabId] = panel
+
+            // Relaunch Claude with --resume if this tab had an active session
+            if let sessionId = tabSnapshot.claudeSessionId {
+                let agentMode = tab.agentMode
+                launchClaudeInTab(tabId, agent: agentMode, resumeSessionId: sessionId)
+            }
+        }
+
+        // Restore selected tab — map by position since UUIDs are new
+        // Use the first tab that was active, falling back to the first tab
+        if let activeSnapshot = snapshot.tabs.first(where: { $0.isActive }),
+           let index = snapshot.tabs.firstIndex(where: { $0.id == activeSnapshot.id }),
+           index < tabs.count {
+            selectedTabId = tabs[index].id
+        } else {
+            selectedTabId = tabs.first?.id
+        }
+
+        return true
+    }
 
     func saveSessionState() {
         var tabSnapshots: [TabSnapshot] = []
