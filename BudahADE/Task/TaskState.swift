@@ -323,18 +323,25 @@ final class TaskState: ObservableObject, Identifiable {
 
         for tab in tabs {
             var scrollbackPath: String?
+            var sessionId = tab.claudeSessionId
+
             if let panel = terminals[tab.id] {
                 if let text = panel.readScrollback(), !text.isEmpty {
                     scrollbackPath = try? SessionPersistence.saveScrollback(
                         text, tabId: tab.id, to: worktreePath
                     )
+                    // Extract Claude session ID from scrollback if not already tracked.
+                    // Claude prints: https://claude.ai/code/session_XXXXX
+                    if sessionId == nil {
+                        sessionId = Self.extractSessionId(from: text)
+                    }
                 }
             }
 
             tabSnapshots.append(TabSnapshot(
                 id: tab.id,
                 title: tab.title,
-                claudeSessionId: tab.claudeSessionId,
+                claudeSessionId: sessionId,
                 agentMode: tab.agentMode?.rawValue,
                 isActive: tab.id == selectedTabId,
                 scrollbackPath: scrollbackPath
@@ -383,6 +390,16 @@ final class TaskState: ObservableObject, Identifiable {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// Extract Claude session ID from terminal scrollback text.
+    /// Claude prints: https://claude.ai/code/session_XXXXX
+    private static func extractSessionId(from text: String) -> String? {
+        // Search from the end (most recent session) backwards
+        guard let range = text.range(of: "session_[A-Za-z0-9]+", options: [.regularExpression, .backwards]) else {
+            return nil
+        }
+        return String(text[range])
     }
 
     /// Map terminal title patterns to agent status.
