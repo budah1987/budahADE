@@ -776,7 +776,12 @@ final class PlanCanvasState: ObservableObject {
     }
 
     private func restoreTerminalPanels() {
-        // Check root elements
+        // Skip terminal restoration if worktree doesn't exist
+        guard FileManager.default.fileExists(atPath: worktreePath) else {
+            print("[PlanCanvasState] Skipping terminal restore — worktree doesn't exist: \(worktreePath)")
+            return
+        }
+
         for i in elements.indices {
             if case .tile(.terminal(let panelId, let agent)) = elements[i].kind {
                 if terminals[panelId] == nil {
@@ -785,7 +790,6 @@ final class PlanCanvasState: ObservableObject {
                     elements[i].kind = .tile(.terminal(panelId: panel.id, agent: agent))
                 }
             }
-            // Check frame children
             if case .frame(var frameData) = elements[i].kind {
                 var changed = false
                 for j in frameData.children.indices {
