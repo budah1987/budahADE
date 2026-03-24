@@ -35,11 +35,23 @@ final class TerminalSurface: Identifiable, ObservableObject {
         createSurface(for: view)
     }
 
+    private var createRetryCount = 0
+
     private func createSurface(for view: TerminalSurfaceView) {
         guard let app = GhosttyAppManager.shared.app else {
-            print("[BudahADE] Ghostty app not initialized, cannot create surface")
+            createRetryCount += 1
+            if createRetryCount <= 20 {
+                print("[BudahADE] Ghostty not ready, retrying surface creation (\(createRetryCount)/20)...")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak view] in
+                    guard let self, let view else { return }
+                    self.createSurface(for: view)
+                }
+            } else {
+                print("[BudahADE] Ghostty app not initialized after 5s, giving up")
+            }
             return
         }
+        createRetryCount = 0
 
         var surfaceConfig = ghostty_surface_config_new()
         surfaceConfig.platform_tag = GHOSTTY_PLATFORM_MACOS

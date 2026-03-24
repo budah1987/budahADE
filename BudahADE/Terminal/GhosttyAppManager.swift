@@ -103,6 +103,7 @@ final class GhosttyAppManager {
         if let created = ghostty_app_new(&runtimeConfig, primaryConfig) {
             self.app = created
             self.config = primaryConfig
+            print("[BudahADE] Ghostty initialized successfully")
         } else {
             print("[BudahADE] ghostty_app_new failed, trying fallback config")
             ghostty_config_free(primaryConfig)
