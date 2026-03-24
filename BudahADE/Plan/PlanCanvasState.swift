@@ -27,9 +27,10 @@ final class PlanCanvasState: ObservableObject {
     @Published var guides: [AlignmentGuide] = []
     @Published var mutationCount: Int = 0
 
-    // Connection drag state
+    // Connection interaction
     @Published var connectionDragSource: UUID?
     @Published var connectionDragEndpoint: CGPoint?
+    @Published var hoveredTileId: UUID?
 
     let worktreePath: String
     let taskName: String

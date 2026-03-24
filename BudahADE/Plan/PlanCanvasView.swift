@@ -37,6 +37,12 @@ struct PlanCanvasView: View {
                 canvasContent
                     .allowsHitTesting(!isSpacePanning)
 
+                // Connection ports layer (above tiles so drag gesture wins)
+                ConnectionPortsLayer(canvas: canvas, hoveredElementId: canvas.hoveredTileId)
+                    .scaleEffect(localZoom, anchor: .topLeading)
+                    .offset(localPanOffset)
+                    .allowsHitTesting(!isSpacePanning)
+
                 // Smart guides overlay (in canvas coords, transformed)
                 SmartGuidesOverlay(guides: canvas.guides)
                     .scaleEffect(localZoom, anchor: .topLeading)

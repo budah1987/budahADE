@@ -88,10 +88,6 @@ struct CanvasElementView: View {
                                 .animation(.easeOut(duration: 0.2), value: isSelected)
                         }
                     }
-                    // Connection ports (visible on hover or during drag)
-                    .overlay {
-                        ConnectionPortOverlay(element: element, canvas: canvas, isHovered: isHovered)
-                    }
                     // Destination highlight during connection drag
                     .overlay {
                         ConnectionDestinationHighlight(element: element, canvas: canvas)
@@ -111,6 +107,11 @@ struct CanvasElementView: View {
                     }
                     .onHover { hovering in
                         isHovered = hovering
+                        if hovering {
+                            canvas.hoveredTileId = element.id
+                        } else if canvas.hoveredTileId == element.id {
+                            canvas.hoveredTileId = nil
+                        }
                         if !hovering {
                             NSCursor.arrow.set()
                         }

@@ -182,41 +182,58 @@ private struct ConnectionHitTarget: View {
 
 // MARK: - Connection Port Overlay
 
-/// Small port circles on tile edges for initiating drag-to-connect.
-struct ConnectionPortOverlay: View {
-    let element: CanvasElement
+/// Port circles rendered directly in canvas space (not inside CanvasElementView).
+/// This avoids gesture conflicts with tile drag gestures.
+struct ConnectionPortsLayer: View {
     @ObservedObject var canvas: PlanCanvasState
-    let isHovered: Bool
+    let hoveredElementId: UUID?
 
-    private var showPorts: Bool {
-        isHovered || canvas.connectionDragSource != nil
-    }
+    private let portSize: CGFloat = 12
 
     var body: some View {
-        if showPorts, case .tile = element.kind {
-            // Output port (right edge)
-            GeometryReader { geo in
-                let portSize: CGFloat = 12
+        ForEach(canvas.elements.filter { isTile($0) }) { element in
+            let showPorts = hoveredElementId == element.id || canvas.connectionDragSource != nil
 
-                // Output port — right center
+            if showPorts {
+                // Output port — right edge center
                 Circle()
-                    .fill(Theme.surface2)
+                    .fill(canvas.connectionDragSource == element.id ? Theme.accent : Theme.surface2)
                     .overlay(
                         Circle()
                             .strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1.5)
                     )
                     .frame(width: portSize, height: portSize)
-                    .position(x: geo.size.width + portSize / 2, y: geo.size.height / 2)
-                    .gesture(connectionDragGesture(elementId: element.id, elementSize: element.size, elementPosition: element.position))
+                    .position(
+                        x: element.position.x + element.size.width,
+                        y: element.position.y + element.size.height / 2
+                    )
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                canvas.connectionDragSource = element.id
+                                // Convert drag translation to canvas-space endpoint
+                                let startX = element.position.x + element.size.width
+                                let startY = element.position.y + element.size.height / 2
+                                canvas.connectionDragEndpoint = CGPoint(
+                                    x: startX + value.translation.width,
+                                    y: startY + value.translation.height
+                                )
+                            }
+                            .onEnded { value in
+                                if let endpoint = canvas.connectionDragEndpoint,
+                                   let targetId = canvas.elementAt(point: endpoint),
+                                   targetId != element.id {
+                                    canvas.addConnection(sourceId: element.id, destinationId: targetId)
+                                }
+                                canvas.connectionDragSource = nil
+                                canvas.connectionDragEndpoint = nil
+                            }
+                    )
                     .onHover { hovering in
-                        if hovering {
-                            NSCursor.crosshair.push()
-                        } else {
-                            NSCursor.pop()
-                        }
+                        if hovering { NSCursor.crosshair.push() } else { NSCursor.pop() }
                     }
 
-                // Input port — left center
+                // Input port — left edge center (visual only)
                 Circle()
                     .fill(Theme.surface2)
                     .overlay(
@@ -224,27 +241,18 @@ struct ConnectionPortOverlay: View {
                             .strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1.5)
                     )
                     .frame(width: portSize, height: portSize)
-                    .position(x: -portSize / 2, y: geo.size.height / 2)
-                    .allowsHitTesting(false)  // input ports are just visual indicators
+                    .position(
+                        x: element.position.x,
+                        y: element.position.y + element.size.height / 2
+                    )
+                    .allowsHitTesting(false)
             }
         }
     }
 
-    private func connectionDragGesture(elementId: UUID, elementSize: CGSize, elementPosition: CGPoint) -> some Gesture {
-        DragGesture(coordinateSpace: .named("canvasContent"))
-            .onChanged { value in
-                canvas.connectionDragSource = elementId
-                canvas.connectionDragEndpoint = value.location
-            }
-            .onEnded { value in
-                let endpoint = value.location
-                if let targetId = canvas.elementAt(point: endpoint),
-                   targetId != elementId {
-                    canvas.addConnection(sourceId: elementId, destinationId: targetId)
-                }
-                canvas.connectionDragSource = nil
-                canvas.connectionDragEndpoint = nil
-            }
+    private func isTile(_ element: CanvasElement) -> Bool {
+        if case .tile = element.kind { return true }
+        return false
     }
 }
 
