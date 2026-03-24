@@ -38,6 +38,9 @@ final class TerminalPanel: ObservableObject, Identifiable {
             .store(in: &cancellables)
     }
 
+    /// Whether the Ghostty surface is ready to receive input.
+    var isSurfaceReady: Bool { surface.surface != nil }
+
     func sendText(_ text: String) { surface.sendText(text) }
     func sendCommand(_ text: String) { surface.sendCommand(text) }
     func sendEnter() { surface.sendEnter() }
@@ -45,6 +48,21 @@ final class TerminalPanel: ObservableObject, Identifiable {
     func focus() { surface.setFocus(true) }
     func unfocus() { surface.setFocus(false) }
     func close() { surface.requestClose() }
+
+    /// Send a command, retrying until the surface is ready (up to ~5 seconds).
+    func sendCommandWhenReady(_ text: String, retryCount: Int = 0) {
+        if isSurfaceReady {
+            sendCommand(text)
+            return
+        }
+        if retryCount >= 20 { // 20 × 0.25s = 5s max
+            print("[TerminalPanel] Surface never became ready, dropping command: \(text.prefix(60))")
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.sendCommandWhenReady(text, retryCount: retryCount + 1)
+        }
+    }
 
     /// Capture current terminal scrollback text. Returns nil if unavailable.
     func readScrollback() -> String? {

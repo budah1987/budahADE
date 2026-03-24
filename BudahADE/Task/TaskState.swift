@@ -158,9 +158,7 @@ final class TaskState: ObservableObject, Identifiable {
            let sessionName = tmuxSession,
            TmuxSessionManager.sessionExists(sessionName) {
             print("[TaskState] Reattaching tmux session: \(sessionName)")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                panel.sendCommand(TmuxSessionManager.attachCommand(name: sessionName))
-            }
+            panel.sendCommandWhenReady(TmuxSessionManager.attachCommand(name: sessionName))
             return
         }
 
@@ -192,19 +190,17 @@ final class TaskState: ObservableObject, Identifiable {
         }
 
         if TmuxSessionManager.isAvailable {
-            // Launch inside a new tmux session
+            // Launch inside a new tmux session, then run Claude inside it
             let sessionName = tmuxSession ?? TmuxSessionManager.sessionName(for: tabId)
             print("[TaskState] Creating tmux session: \(sessionName)")
 
-            // Create tmux session and run Claude inside it
             let tmuxCmd = TmuxSessionManager.newSessionCommand(
                 name: sessionName, workingDirectory: worktreePath
             )
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                panel.sendCommand(tmuxCmd)
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                panel.sendCommand(claudeCommand)
+            // Wait for surface, send tmux, then send Claude after tmux starts
+            panel.sendCommandWhenReady(tmuxCmd)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                panel.sendCommandWhenReady(claudeCommand)
             }
 
             // Track tmux session on the tab
@@ -212,10 +208,8 @@ final class TaskState: ObservableObject, Identifiable {
                 self.tabs[idx].tmuxSession = sessionName
             }
         } else {
-            // No tmux — launch Claude directly (old behavior)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                panel.sendCommand(claudeCommand)
-            }
+            // No tmux — launch Claude directly
+            panel.sendCommandWhenReady(claudeCommand)
         }
     }
 
