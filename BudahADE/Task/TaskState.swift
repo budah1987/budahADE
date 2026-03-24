@@ -297,11 +297,8 @@ final class TaskState: ObservableObject, Identifiable {
             tabs.append(tab)
             terminals[tabId] = panel
 
-            // Relaunch Claude with --resume if this tab had an active session
-            if let sessionId = tabSnapshot.claudeSessionId {
-                let agentMode = tab.agentMode
-                launchClaudeInTab(tabId, agent: agentMode, resumeSessionId: sessionId)
-            }
+            // Always relaunch Claude — with --resume if we have a session ID
+            launchClaudeInTab(tabId, agent: tab.agentMode, resumeSessionId: tabSnapshot.claudeSessionId)
         }
 
         // Restore selected tab — map by position since UUIDs are new
