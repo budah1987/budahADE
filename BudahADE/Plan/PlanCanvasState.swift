@@ -27,6 +27,7 @@ final class PlanCanvasState: ObservableObject {
     let worktreePath: String
     let taskName: String
     let branchName: String
+    private var saveDebounce: DispatchWorkItem?
 
     init(worktreePath: String, taskName: String, branchName: String) {
         self.worktreePath = worktreePath
@@ -609,6 +610,69 @@ final class PlanCanvasState: ObservableObject {
         try? FileManager.default.removeItem(atPath: docPath)
     }
 
+    // MARK: - Persistence
+
+    func snapshot() -> CanvasSnapshot {
+        var chatMessages: [UUID: [ChatMessage]] = [:]
+        for (sessionId, session) in chatSessions {
+            if !session.messages.isEmpty {
+                chatMessages[sessionId] = session.messages
+            }
+        }
+        return CanvasSnapshot(
+            elements: elements,
+            zoom: zoom,
+            panOffsetWidth: panOffset.width,
+            panOffsetHeight: panOffset.height,
+            chatMessages: chatMessages
+        )
+    }
+
+    func restore(from snapshot: CanvasSnapshot) {
+        elements = snapshot.elements
+        zoom = snapshot.zoom
+        panOffset = CGSize(width: snapshot.panOffsetWidth, height: snapshot.panOffsetHeight)
+
+        // Restore chat agent sessions from persisted messages
+        for element in allTiles {
+            if case .tile(.chatAgent(let sessionId, let role)) = element.kind {
+                let restoredSession = AgentSession(
+                    id: sessionId,
+                    model: role.defaultModel,
+                    agentMode: AgentMode(rawValue: role.id),
+                    systemPrompt: role.systemPrompt,
+                    workingDirectory: worktreePath
+                )
+                if let messages = snapshot.chatMessages[sessionId] {
+                    restoredSession.messages = messages
+                    restoredSession.totalInputTokens = messages.reduce(0) { $0 + $1.inputTokens }
+                    restoredSession.totalOutputTokens = messages.reduce(0) { $0 + $1.outputTokens }
+                }
+                chatManager.sessions[sessionId] = restoredSession
+                chatSessions[sessionId] = restoredSession
+            }
+        }
+    }
+
+    func saveNow() {
+        do {
+            try CanvasPersistence.save(snapshot(), to: worktreePath)
+        } catch {
+            print("[CanvasPersistence] Save failed: \(error)")
+        }
+    }
+
+    private func scheduleSave() {
+        saveDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                self?.saveNow()
+            }
+        }
+        saveDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
+    }
+
     // MARK: - Cleanup
 
     func closeAll() {
@@ -628,6 +692,7 @@ final class PlanCanvasState: ObservableObject {
     private func didMutate() {
         mutationCount += 1
         ContextManifest.write(canvas: self)
+        scheduleSave()
     }
 
     func findElement(_ id: UUID) -> CanvasElement? {

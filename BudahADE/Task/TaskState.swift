@@ -101,11 +101,15 @@ final class TaskState: ObservableObject, Identifiable {
 
     func enterPlanMode() {
         if planCanvas == nil {
-            planCanvas = PlanCanvasState(
+            let canvas = PlanCanvasState(
                 worktreePath: worktreePath,
                 taskName: name,
                 branchName: branchName
             )
+            if let snapshot = CanvasPersistence.load(from: worktreePath) {
+                canvas.restore(from: snapshot)
+            }
+            planCanvas = canvas
         }
         mode = .plan
     }
@@ -243,6 +247,7 @@ final class TaskState: ObservableObject, Identifiable {
         selectedTabId = nil
         specWatcher?.stopWatching()
         buildStatusWatcher?.stopWatching()
+        planCanvas?.saveNow()
         planCanvas?.closeAll()
     }
 

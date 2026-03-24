@@ -12,6 +12,13 @@ struct BudahADEApp: App {
                 .frame(minWidth: 900, minHeight: 600)
                 .background(Theme.appBackground)
                 .preferredColorScheme(.dark)
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    for workspace in appState.workspaces {
+                        for task in workspace.tasks {
+                            task.planCanvas?.saveNow()
+                        }
+                    }
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1400, height: 900)
