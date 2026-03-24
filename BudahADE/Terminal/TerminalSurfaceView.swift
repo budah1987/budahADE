@@ -76,25 +76,10 @@ final class TerminalSurfaceView: NSView {
         }
 
         let mods = modsFromEvent(event)
-        let isOptionHeld = event.modifierFlags.contains(.option)
 
-        // Option+key: write ESC+char directly to the PTY as the Alt sequence.
-        // Ghostty's embedded API doesn't handle macos-option-as-alt the same
-        // way standalone Ghostty does, so we handle it ourselves.
-        if isOptionHeld, let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
-            // Filter out function keys (private-use area)
-            if let scalar = chars.unicodeScalars.first,
-               scalar.value >= 0xF700, scalar.value <= 0xF8FF {
-                // Fall through to normal handling for function keys
-            } else {
-                let escSeq = "\u{1b}" + chars
-                escSeq.withCString { ptr in
-                    ghostty_surface_text(surface, ptr, UInt(escSeq.utf8.count))
-                }
-                return
-            }
-        }
-
+        // Filter out characters in the Unicode private-use area (U+F700–U+F8FF).
+        // Arrow keys, function keys, Home/End etc. produce these special characters
+        // which must NOT be sent as text — only the keycode matters for those keys.
         let text: String? = {
             guard let chars = event.characters, !chars.isEmpty else { return nil }
             if let scalar = chars.unicodeScalars.first,
@@ -285,13 +270,6 @@ final class TerminalSurfaceView: NSView {
         // for focus traversal. Forward them to keyDown instead.
         let keyCode = event.keyCode
         if Self.terminalClaimedKeyCodes.contains(keyCode) && flags.isEmpty {
-            keyDown(with: event)
-            return true
-        }
-
-        // Claim Option+key and Ctrl+key events so SwiftUI/AppKit don't intercept them.
-        // These need to reach the terminal for Claude CLI shortcuts (Opt+P model switch, etc.)
-        if flags == .option || flags == .control || flags == [.option, .shift] {
             keyDown(with: event)
             return true
         }
