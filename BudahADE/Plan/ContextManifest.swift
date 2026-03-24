@@ -70,6 +70,17 @@ enum ContextManifest {
             lines.append("")
         }
 
+        if !canvas.connections.isEmpty {
+            lines.append("## Connections")
+            for conn in canvas.connections {
+                let sourceName = canvas.findElement(conn.sourceId)?.title ?? "unknown"
+                let destName = canvas.findElement(conn.destinationId)?.title ?? "unknown"
+                let status = conn.cachedSummary != nil ? "✓" : "pending"
+                lines.append("- \(sourceName) → \(destName) (\(status))")
+            }
+            lines.append("")
+        }
+
         let content = lines.joined(separator: "\n")
         let path = (dir as NSString).appendingPathComponent("plan-context.md")
         try? content.write(toFile: path, atomically: true, encoding: .utf8)
