@@ -130,7 +130,8 @@ final class TaskState: ObservableObject, Identifiable {
     func createTab(launchAgent: Bool = false, agent: AgentMode? = nil) -> UUID {
         let panel = TerminalPanel(workingDirectory: worktreePath)
         let id = panel.id
-        let tab = TabInfo(id: id, title: "Terminal", isRunning: false)
+        var tab = TabInfo(id: id, title: "Terminal", isRunning: false)
+        tab.agentMode = agent
         tabs.append(tab)
         terminals[id] = panel
         selectedTabId = id
@@ -249,6 +250,35 @@ final class TaskState: ObservableObject, Identifiable {
         buildStatusWatcher?.stopWatching()
         planCanvas?.saveNow()
         planCanvas?.closeAll()
+    }
+
+    // MARK: - Session Persistence
+
+    func saveSessionState() {
+        var tabSnapshots: [TabSnapshot] = []
+
+        for tab in tabs {
+            var scrollbackPath: String?
+            if let panel = terminals[tab.id] {
+                if let text = panel.readScrollback(), !text.isEmpty {
+                    scrollbackPath = try? SessionPersistence.saveScrollback(
+                        text, tabId: tab.id, to: worktreePath
+                    )
+                }
+            }
+
+            tabSnapshots.append(TabSnapshot(
+                id: tab.id,
+                title: tab.title,
+                claudeSessionId: tab.claudeSessionId,
+                agentMode: tab.agentMode?.rawValue,
+                isActive: tab.id == selectedTabId,
+                scrollbackPath: scrollbackPath
+            ))
+        }
+
+        let session = SessionSnapshot(tabs: tabSnapshots, selectedTabId: selectedTabId)
+        try? SessionPersistence.save(session, to: worktreePath)
     }
 
     // MARK: - Private

@@ -30,6 +30,8 @@ struct TabInfo: Identifiable, Equatable {
     var title: String
     var isRunning: Bool
     var agentStatus: AgentStatus = .inactive
+    var claudeSessionId: String?   // For --resume on restart
+    var agentMode: AgentMode?      // Which agent role launched this tab
 
     static func == (lhs: TabInfo, rhs: TabInfo) -> Bool {
         lhs.id == rhs.id &&

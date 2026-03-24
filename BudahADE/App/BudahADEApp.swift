@@ -15,6 +15,7 @@ struct BudahADEApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     for workspace in appState.workspaces {
                         for task in workspace.tasks {
+                            task.saveSessionState()
                             task.planCanvas?.saveNow()
                         }
                     }
