@@ -212,22 +212,22 @@ private struct OutputPort: View {
     private var isDragging: Bool { canvas.connectionDragSource == element.id }
     private var anyDragActive: Bool { canvas.connectionDragSource != nil }
 
-    // Subtle at rest, bright on hover or during drag
     private var opacity: Double {
         if isDragging || isHovered { return 1.0 }
-        if anyDragActive { return 0.6 }
-        return 0.0
+        if anyDragActive { return 0.7 }
+        return 0.25
     }
 
     var body: some View {
         Circle()
             .fill(isDragging ? Theme.accent : Theme.surface2)
             .overlay(
-                Circle().strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1.5)
+                Circle().strokeBorder(Theme.accent.opacity(isHovered ? 0.8 : 0.3), lineWidth: 1.5)
             )
             .frame(width: size, height: size)
+            .scaleEffect(isHovered || isDragging ? 1.0 : 0.7)
             .opacity(opacity)
-            .animation(.easeInOut(duration: 0.15), value: opacity)
+            .animation(.easeInOut(duration: 0.15), value: isHovered)
             .position(
                 x: element.position.x + element.size.width,
                 y: element.position.y + element.size.height / 2
@@ -272,19 +272,20 @@ private struct InputPort: View {
 
     private var opacity: Double {
         if isHovered { return 1.0 }
-        if anyDragActive { return 0.6 }
-        return 0.0
+        if anyDragActive { return 0.7 }
+        return 0.25
     }
 
     var body: some View {
         Circle()
             .fill(Theme.surface2)
             .overlay(
-                Circle().strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1.5)
+                Circle().strokeBorder(Theme.accent.opacity(isHovered ? 0.8 : 0.3), lineWidth: 1.5)
             )
             .frame(width: size, height: size)
+            .scaleEffect(isHovered ? 1.0 : 0.7)
             .opacity(opacity)
-            .animation(.easeInOut(duration: 0.15), value: opacity)
+            .animation(.easeInOut(duration: 0.15), value: isHovered)
             .position(
                 x: element.position.x,
                 y: element.position.y + element.size.height / 2
