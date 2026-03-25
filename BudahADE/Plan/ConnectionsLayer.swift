@@ -207,7 +207,8 @@ private struct OutputPort: View {
     @ObservedObject var canvas: PlanCanvasState
     @State private var isHovered = false
 
-    private let size: CGFloat = 12
+    private let size: CGFloat = 10
+    private let hitSize: CGFloat = 24  // larger invisible hit area
 
     private var isDragging: Bool { canvas.connectionDragSource == element.id }
     private var anyDragActive: Bool { canvas.connectionDragSource != nil }
@@ -219,15 +220,19 @@ private struct OutputPort: View {
     }
 
     var body: some View {
-        Circle()
-            .fill(isDragging ? Theme.accent : Theme.surface2)
-            .overlay(
-                Circle().strokeBorder(Theme.accent.opacity(isHovered ? 0.8 : 0.3), lineWidth: 1.5)
-            )
-            .frame(width: size, height: size)
-            .scaleEffect(isHovered || isDragging ? 1.0 : 0.7)
+        // Larger invisible hit area with visible dot inside
+        Color.clear
+            .frame(width: hitSize, height: hitSize)
+            .contentShape(Circle().size(width: hitSize, height: hitSize))
+            .overlay {
+                Circle()
+                    .fill(isDragging ? Theme.accent : Theme.surface2)
+                    .overlay(
+                        Circle().strokeBorder(Theme.accent.opacity(isHovered ? 0.8 : 0.3), lineWidth: 1.5)
+                    )
+                    .frame(width: size, height: size)
+            }
             .opacity(opacity)
-            .animation(.easeInOut(duration: 0.15), value: isHovered)
             .position(
                 x: element.position.x + element.size.width,
                 y: element.position.y + element.size.height / 2
@@ -267,7 +272,7 @@ private struct InputPort: View {
     @ObservedObject var canvas: PlanCanvasState
     @State private var isHovered = false
 
-    private let size: CGFloat = 12
+    private let size: CGFloat = 10
     private var anyDragActive: Bool { canvas.connectionDragSource != nil }
 
     private var opacity: Double {
@@ -283,9 +288,7 @@ private struct InputPort: View {
                 Circle().strokeBorder(Theme.accent.opacity(isHovered ? 0.8 : 0.3), lineWidth: 1.5)
             )
             .frame(width: size, height: size)
-            .scaleEffect(isHovered ? 1.0 : 0.7)
             .opacity(opacity)
-            .animation(.easeInOut(duration: 0.15), value: isHovered)
             .position(
                 x: element.position.x,
                 y: element.position.y + element.size.height / 2
@@ -293,7 +296,7 @@ private struct InputPort: View {
             .onHover { hovering in
                 isHovered = hovering
             }
-            .allowsHitTesting(anyDragActive) // only hit-testable as drop target during drag
+            .allowsHitTesting(anyDragActive)
     }
 }
 
