@@ -8,6 +8,12 @@ struct ConnectionsLayer: View {
     @ObservedObject var canvas: PlanCanvasState
 
     var body: some View {
+        // Read drag state in the ViewBuilder scope so SwiftUI registers these as
+        // dependencies of this view. Canvas closures are NOT tracked by SwiftUI's
+        // dependency system — without this, the Canvas never redraws during a drag.
+        let dragSource = canvas.connectionDragSource
+        let dragEndpoint = canvas.connectionDragEndpoint
+
         ZStack {
             // Rendered arrows (Canvas draw API — no hit testing)
             Canvas { context, size in
@@ -33,17 +39,22 @@ struct ConnectionsLayer: View {
                 }
 
                 // Draw in-progress drag line
-                if let sourceId = canvas.connectionDragSource,
-                   let endpoint = canvas.connectionDragEndpoint,
+                if let sourceId = dragSource,
+                   let endpoint = dragEndpoint,
                    let source = canvas.findElement(sourceId) {
                     let startPt = rightEdgeCenter(of: source)
                     drawArrow(
                         in: &context,
                         from: startPt,
                         to: endpoint,
-                        color: Color.white.opacity(0.3),
-                        dashed: true
+                        color: Theme.accent.opacity(0.85),
+                        dashed: false,
+                        lineWidth: 2.5
                     )
+
+                    // Endpoint anchor dot
+                    let dotRect = CGRect(x: endpoint.x - 5, y: endpoint.y - 5, width: 10, height: 10)
+                    context.fill(Path(ellipseIn: dotRect), with: .color(Theme.accent))
                 }
             }
             .allowsHitTesting(false)
@@ -73,7 +84,8 @@ struct ConnectionsLayer: View {
         from start: CGPoint,
         to end: CGPoint,
         color: Color,
-        dashed: Bool
+        dashed: Bool,
+        lineWidth: CGFloat = 2
     ) {
         // Bezier curve
         let dx = abs(end.x - start.x) * 0.5
@@ -86,9 +98,9 @@ struct ConnectionsLayer: View {
 
         let style: StrokeStyle
         if dashed {
-            style = StrokeStyle(lineWidth: 2, lineCap: .round, dash: [6, 4])
+            style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, dash: [6, 4])
         } else {
-            style = StrokeStyle(lineWidth: 2, lineCap: .round)
+            style = StrokeStyle(lineWidth: lineWidth, lineCap: .round)
         }
 
         context.stroke(path, with: .color(color), style: style)
@@ -182,7 +194,7 @@ private struct ConnectionHitTarget: View {
 
 // MARK: - Connection Port Overlay
 
-/// Always-visible port circles in canvas space. Subtle at rest, bright on hover.
+/// Port circles in canvas space. Hidden at rest, revealed on tile hover.
 /// Rendered in a separate layer above tiles so drag gestures don't conflict.
 struct ConnectionPortsLayer: View {
     @ObservedObject var canvas: PlanCanvasState
@@ -207,32 +219,54 @@ private struct OutputPort: View {
     @ObservedObject var canvas: PlanCanvasState
     @State private var isHovered = false
 
-    private let size: CGFloat = 10
-    private let hitSize: CGFloat = 24  // larger invisible hit area
+    private let dotSize: CGFloat = 12
+    private let hitSize: CGFloat = 28  // larger invisible hit area
 
     private var isDragging: Bool { canvas.connectionDragSource == element.id }
     private var anyDragActive: Bool { canvas.connectionDragSource != nil }
+    private var isTileHovered: Bool { canvas.hoveredTileId == element.id }
+    // Port stays revealed if tile is hovered OR cursor is directly on the port.
+    // This prevents the dot from vanishing when the cursor moves off the tile onto the dot.
+    private var isRevealed: Bool { isTileHovered || isDragging || isHovered }
 
-    private var opacity: Double {
-        if isDragging || isHovered { return 1.0 }
-        if anyDragActive { return 0.7 }
-        return 0.25
+    private var dotOpacity: Double {
+        if isDragging || isTileHovered || isHovered { return 1.0 }
+        if anyDragActive { return 0.5 }
+        return 0.0
+    }
+
+    private var dotScale: CGFloat {
+        if isDragging { return 1.25 }
+        if isTileHovered || isHovered { return 1.0 }
+        if anyDragActive { return 0.85 }
+        return 0.5
+    }
+
+    private var dotFill: Color {
+        isRevealed ? Color.white.opacity(0.9) : Theme.surface2
     }
 
     var body: some View {
-        // Larger invisible hit area with visible dot inside
+        // Large invisible hit area — always present so the cursor can trigger hover
         Color.clear
             .frame(width: hitSize, height: hitSize)
             .contentShape(Circle().size(width: hitSize, height: hitSize))
             .overlay {
                 Circle()
-                    .fill(isDragging ? Theme.accent : Theme.surface2)
+                    .fill(dotFill)
                     .overlay(
-                        Circle().strokeBorder(Theme.accent.opacity(isHovered ? 0.8 : 0.3), lineWidth: 1.5)
+                        Circle().strokeBorder(
+                            Theme.accent.opacity(isRevealed ? 0.9 : 0.3),
+                            lineWidth: 1.5
+                        )
                     )
-                    .frame(width: size, height: size)
+                    .shadow(color: Theme.accent.opacity(isRevealed ? 0.5 : 0), radius: 6)
+                    .frame(width: dotSize, height: dotSize)
+                    .scaleEffect(dotScale)
+                    .opacity(dotOpacity)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.65), value: dotOpacity)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.65), value: dotScale)
             }
-            .opacity(opacity)
             .position(
                 x: element.position.x + element.size.width,
                 y: element.position.y + element.size.height / 2
@@ -247,9 +281,10 @@ private struct OutputPort: View {
                         canvas.connectionDragSource = element.id
                         let startX = element.position.x + element.size.width
                         let startY = element.position.y + element.size.height / 2
+                        let zoom = max(canvas.zoom, 0.01)
                         canvas.connectionDragEndpoint = CGPoint(
-                            x: startX + value.translation.width,
-                            y: startY + value.translation.height
+                            x: startX + value.translation.width / zoom,
+                            y: startY + value.translation.height / zoom
                         )
                     }
                     .onEnded { _ in
@@ -270,32 +305,47 @@ private struct OutputPort: View {
 private struct InputPort: View {
     let element: CanvasElement
     @ObservedObject var canvas: PlanCanvasState
-    @State private var isHovered = false
 
-    private let size: CGFloat = 10
+    private let dotSize: CGFloat = 12
     private var anyDragActive: Bool { canvas.connectionDragSource != nil }
 
-    private var opacity: Double {
-        if isHovered { return 1.0 }
-        if anyDragActive { return 0.7 }
-        return 0.25
+    private var isHighlighted: Bool {
+        guard let src = canvas.connectionDragSource, src != element.id,
+              let ep = canvas.connectionDragEndpoint else { return false }
+        return CGRect(origin: element.position, size: element.size).contains(ep)
+    }
+
+    private var dotOpacity: Double {
+        if isHighlighted { return 1.0 }
+        if anyDragActive { return 0.6 }
+        return 0.0
+    }
+
+    private var dotScale: CGFloat {
+        if isHighlighted { return 1.25 }
+        if anyDragActive { return 1.0 }
+        return 0.5
     }
 
     var body: some View {
         Circle()
-            .fill(Theme.surface2)
+            .fill(isHighlighted ? Color.white.opacity(0.9) : Theme.surface2)
             .overlay(
-                Circle().strokeBorder(Theme.accent.opacity(isHovered ? 0.8 : 0.3), lineWidth: 1.5)
+                Circle().strokeBorder(
+                    Theme.accent.opacity(isHighlighted ? 0.9 : 0.3),
+                    lineWidth: 1.5
+                )
             )
-            .frame(width: size, height: size)
-            .opacity(opacity)
+            .shadow(color: Theme.accent.opacity(isHighlighted ? 0.5 : 0), radius: 6)
+            .frame(width: dotSize, height: dotSize)
+            .scaleEffect(dotScale)
+            .opacity(dotOpacity)
+            .animation(.spring(response: 0.2, dampingFraction: 0.65), value: dotOpacity)
+            .animation(.spring(response: 0.2, dampingFraction: 0.65), value: dotScale)
             .position(
                 x: element.position.x,
                 y: element.position.y + element.size.height / 2
             )
-            .onHover { hovering in
-                isHovered = hovering
-            }
             .allowsHitTesting(anyDragActive)
     }
 }
