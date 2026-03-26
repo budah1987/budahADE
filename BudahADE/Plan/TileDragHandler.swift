@@ -39,10 +39,12 @@ func tileDragGesture(
 
             let result = SmartGuides.compute(moving: proposedRect, others: otherRects)
             canvas.guides = result.guides
-            dragOffset.wrappedValue = CGSize(
+            let snapped = CGSize(
                 width: translation.width + result.snapDelta.width,
                 height: translation.height + result.snapDelta.height
             )
+            dragOffset.wrappedValue = snapped
+            canvas.activeDragOffset = snapped
 
             // Check if hovering over a frame (for drag-into feedback)
             if case .tile = element.kind {
@@ -109,6 +111,7 @@ func tileDragGesture(
                 }) {
                     canvas.reparent(element.id, into: targetFrame.id, at: canvas.frameInsertIndex)
                     dragOffset.wrappedValue = .zero
+                    canvas.activeDragOffset = .zero
                     canvas.draggingId = nil
                     canvas.hoveredFrameId = nil
                     canvas.frameInsertIndex = nil
@@ -120,6 +123,7 @@ func tileDragGesture(
             let snapped = GridSnap.snapPoint(newPosition)
             canvas.moveElement(element.id, to: snapped)
             dragOffset.wrappedValue = .zero
+            canvas.activeDragOffset = .zero
             canvas.draggingId = nil
             canvas.hoveredFrameId = nil
             canvas.frameInsertIndex = nil

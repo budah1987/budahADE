@@ -21,11 +21,14 @@ final class PlanCanvasState: ObservableObject {
     // Interaction
     @Published var selectedId: UUID?
     @Published var draggingId: UUID?
+    @Published var activeDragOffset: CGSize = .zero
     @Published var resizingId: UUID?
     @Published var hoveredFrameId: UUID?
     @Published var frameInsertIndex: Int?
     @Published var guides: [AlignmentGuide] = []
     @Published var mutationCount: Int = 0
+
+    @Published var hoveredTileId: UUID?
 
     // Connection drag state
     @Published var connectionDragSource: UUID?
@@ -41,6 +44,11 @@ final class PlanCanvasState: ObservableObject {
         self.taskName = taskName
         self.branchName = branchName
         summaryManager.canvas = self
+        chatManager.onSessionComplete = { [weak self] sessionId in
+            print("[AutoForward] onSessionComplete callback fired for \(sessionId)")
+            self?.handleAgentCompletion(sessionId: sessionId)
+        }
+        print("[AutoForward] Callback registered on chatManager")
     }
 
     // MARK: - Add Tile (unified)
@@ -494,8 +502,14 @@ final class PlanCanvasState: ObservableObject {
 
     /// Hit-test: return the topmost element whose rect contains the given canvas-space point
     func elementAt(point: CGPoint) -> UUID? {
+        elementAt(point: point, margin: 0)
+    }
+
+    /// Hit-test with margin — used for connection drops so the port area counts.
+    func elementAt(point: CGPoint, margin: CGFloat) -> UUID? {
         for element in elements.reversed() {
             let rect = CGRect(origin: element.position, size: element.size)
+                .insetBy(dx: -margin, dy: -margin)
             if rect.contains(point) { return element.id }
         }
         return nil
@@ -603,6 +617,96 @@ final class PlanCanvasState: ObservableObject {
 
         case .terminal:
             return nil
+        }
+    }
+
+    // MARK: - Connection Auto-Forward
+
+    /// When a chat agent completes a turn with a substantive result, auto-forward to downstream connected chat tiles
+    private func handleAgentCompletion(sessionId: UUID) {
+        print("[AutoForward] handleAgentCompletion called for session \(sessionId)")
+
+        guard let session = chatSessions[sessionId] else {
+            print("[AutoForward] No session found for \(sessionId)")
+            return
+        }
+
+        let lastText = session.lastAssistantText
+        print("[AutoForward] lastAssistantText length: \(lastText?.count ?? 0)")
+        print("[AutoForward] lastResponseIsSubstantive: \(session.lastResponseIsSubstantive)")
+        print("[AutoForward] messages count: \(session.messages.count), roles: \(session.messages.map { $0.role })")
+
+        guard session.lastResponseIsSubstantive else {
+            print("[AutoForward] Response not substantive, skipping")
+            return
+        }
+        guard let lastText else {
+            print("[AutoForward] No last text, skipping")
+            return
+        }
+
+        // Find the canvas element for this session
+        guard let sourceElement = allTiles.first(where: {
+            if case .tile(.chatAgent(let sid, _)) = $0.kind { return sid == sessionId }
+            return false
+        }) else {
+            print("[AutoForward] No source element found for session \(sessionId)")
+            return
+        }
+
+        let sourceName = sourceElement.title
+        print("[AutoForward] Source: \(sourceName) (element \(sourceElement.id))")
+
+        // Find all downstream connections
+        let downstream = outgoingConnections(for: sourceElement.id)
+        print("[AutoForward] Outgoing connections: \(downstream.count), all connections: \(connections.count)")
+
+        guard !downstream.isEmpty else {
+            print("[AutoForward] No downstream connections, skipping")
+            return
+        }
+
+        // Invalidate summaries (source changed)
+        invalidateConnectionSummaries(sourceId: sourceElement.id)
+
+        for conn in downstream {
+            print("[AutoForward] Processing connection \(conn.id): \(conn.sourceId) → \(conn.destinationId)")
+
+            guard let destElement = findElement(conn.destinationId) else {
+                print("[AutoForward] Destination element not found: \(conn.destinationId)")
+                continue
+            }
+
+            guard case .tile(.chatAgent(let destSessionId, let destRole)) = destElement.kind else {
+                print("[AutoForward] Destination is not a chat agent: \(destElement.kind)")
+                continue
+            }
+
+            guard let destSession = chatSessions[destSessionId] else {
+                print("[AutoForward] No session for destination \(destSessionId)")
+                continue
+            }
+
+            let forwardedPrompt = """
+            The following result was produced by \(sourceName) and forwarded to you automatically via a canvas connection.
+
+            Review and process this according to your role as \(destRole.name).
+
+            --- Result from \(sourceName) ---
+            \(lastText)
+            ---
+            """
+
+            if destSession.status == .idle {
+                print("[AutoForward] Auto-sending to \(destRole.name) (session \(destSessionId))")
+                sendChatMessage(sessionId: destSessionId, prompt: forwardedPrompt, model: destSession.model)
+            } else {
+                print("[AutoForward] \(destRole.name) is busy (\(destSession.status)), staging content")
+                destSession.stagedContent = AgentSession.StagedContent(
+                    content: lastText,
+                    fromAgent: sourceName
+                )
+            }
         }
     }
 

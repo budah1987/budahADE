@@ -5,20 +5,26 @@ import Foundation
 enum AgentModel: String, CaseIterable, Identifiable, Codable {
     case haiku
     case sonnet
+    case sonnet1m
     case opus
 
     var id: String { rawValue }
 
-    var cliFlag: String { rawValue }
+    var cliFlag: String {
+        switch self {
+        case .haiku:    return "haiku"
+        case .sonnet:   return "sonnet"
+        case .sonnet1m: return "sonnet" // TODO: update when Claude CLI exposes 1m-context model ID
+        case .opus:     return "opus"
+        }
+    }
 
     var displayName: String {
         switch self {
-        case .haiku:
-            return "Haiku"
-        case .sonnet:
-            return "Sonnet"
-        case .opus:
-            return "Opus"
+        case .haiku:    return "Haiku"
+        case .sonnet:   return "Sonnet"
+        case .sonnet1m: return "Sonnet (1m context)"
+        case .opus:     return "Opus 4.6"
         }
     }
 }
@@ -152,5 +158,37 @@ final class AgentSession: ObservableObject, Identifiable {
             let formatted = Double(total) / 1000.0
             return String(format: "%.1f", formatted) + "k"
         }
+    }
+
+    // MARK: - Auto-Forward Support
+
+    /// The last assistant text message (skipping tool-only messages)
+    var lastAssistantText: String? {
+        messages.last(where: { $0.role == .assistant && !$0.content.isEmpty })?.content
+    }
+
+    /// Whether the last response is worth auto-forwarding to downstream tiles
+    var lastResponseIsSubstantive: Bool {
+        guard let text = lastAssistantText else { return false }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Too short — likely an acknowledgment
+        if trimmed.count < 80 { return false }
+
+        // Has structure (headers, code blocks, lists) — always substantive
+        let hasStructure = trimmed.contains("## ")
+            || trimmed.contains("```")
+            || trimmed.contains("\n- ")
+            || trimmed.contains("\n* ")
+            || trimmed.contains("\n1. ")
+        if hasStructure && trimmed.count > 150 { return true }
+
+        // Long enough to be a real result
+        if trimmed.count > 300 { return true }
+
+        // Ends with a question — likely asking for clarification, not a result
+        if trimmed.hasSuffix("?") { return false }
+
+        return trimmed.count > 150
     }
 }

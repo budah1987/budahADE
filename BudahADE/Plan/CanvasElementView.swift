@@ -12,6 +12,26 @@ struct CanvasElementView: View {
 
     private var isSelected: Bool { canvas.selectedId == element.id }
 
+    /// Chat tiles clip themselves — skip outer clipShape so the glow shadow isn't clipped.
+    private var isChatAgentTile: Bool {
+        guard case .tile(let t) = element.kind, case .chatAgent = t else { return false }
+        return true
+    }
+
+    @ViewBuilder
+    private func baseContent(clipped: Bool) -> some View {
+        if clipped {
+            elementContent
+                .frame(width: element.size.width, height: element.size.height)
+                .background(TileSelectionChrome.elementBackground(for: element))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        } else {
+            elementContent
+                .frame(width: element.size.width, height: element.size.height)
+                .background(TileSelectionChrome.elementBackground(for: element))
+        }
+    }
+
     var body: some View {
         Group {
             if isInsideFrame {
@@ -42,10 +62,7 @@ struct CanvasElementView: View {
                     )
             } else {
                 // Free on canvas: draggable, positioned, selectable
-                elementContent
-                    .frame(width: element.size.width, height: element.size.height)
-                    .background(TileSelectionChrome.elementBackground(for: element))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                baseContent(clipped: !isChatAgentTile)
                     .overlay(TileSelectionChrome.selectionBorder(isSelected: isSelected, isHovered: isHovered))
                     .overlay(alignment: .topTrailing) {
                         TileSelectionChrome.specSectionBadge(for: element)
@@ -88,10 +105,6 @@ struct CanvasElementView: View {
                                 .animation(.easeOut(duration: 0.2), value: isSelected)
                         }
                     }
-                    // Connection ports (visible on hover or during drag)
-                    .overlay {
-                        ConnectionPortOverlay(element: element, canvas: canvas, isHovered: isHovered)
-                    }
                     // Destination highlight during connection drag
                     .overlay {
                         ConnectionDestinationHighlight(element: element, canvas: canvas)
@@ -111,6 +124,11 @@ struct CanvasElementView: View {
                     }
                     .onHover { hovering in
                         isHovered = hovering
+                        if hovering {
+                            canvas.hoveredTileId = element.id
+                        } else if canvas.hoveredTileId == element.id {
+                            canvas.hoveredTileId = nil
+                        }
                         if !hovering {
                             NSCursor.arrow.set()
                         }

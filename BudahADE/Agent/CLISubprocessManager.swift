@@ -9,6 +9,9 @@ final class CLISubprocessManager: ObservableObject {
 
     @Published var sessions: [UUID: AgentSession] = [:]
 
+    /// Called when a session finishes a turn (status → .done). Used by PlanCanvasState for auto-forwarding.
+    var onSessionComplete: ((UUID) -> Void)?
+
     // MARK: - Session Lifecycle
 
     @discardableResult
@@ -144,6 +147,7 @@ final class CLISubprocessManager: ObservableObject {
 
         do {
             let event = try StreamEvent.parse(from: trimmed)
+            print("[CLISubprocessManager] Event: \(event.debugLabel) for session \(session.id)")
             switch event {
             case .system(let info):
                 session.handleSystemInit(info)
@@ -153,11 +157,14 @@ final class CLISubprocessManager: ObservableObject {
                 session.handleContentDelta(text)
             case .result(let result):
                 session.handleResult(result)
+                print("[CLISubprocessManager] Result event received for \(session.id), callback is \(onSessionComplete == nil ? "NIL" : "SET")")
+                onSessionComplete?(session.id)
             case .unknown:
                 break
             }
         } catch {
-            // Non-JSON lines (e.g., debug output) are silently ignored
+            let preview = trimmed.prefix(100)
+            print("[CLISubprocessManager] Parse failed: \(error) — line: \(preview)")
         }
     }
 
@@ -275,7 +282,11 @@ final class CLISubprocessManager: ObservableObject {
                         print("[CLISubprocessManager] stdout line \(lineCount): \(line.prefix(200))")
                     }
                     await MainActor.run { [weak self] in
-                        self?.processStreamLine(line, session: session)
+                        guard let self else {
+                            print("[CLISubprocessManager] ⚠️ self is nil in processStreamLine dispatch")
+                            return
+                        }
+                        self.processStreamLine(line, session: session)
                     }
                 }
             }
@@ -284,7 +295,11 @@ final class CLISubprocessManager: ObservableObject {
         // Remaining data
         if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
             await MainActor.run { [weak self] in
-                self?.processStreamLine(line, session: session)
+                guard let self else {
+                    print("[CLISubprocessManager] ⚠️ self is nil in remaining-buffer dispatch")
+                    return
+                }
+                self.processStreamLine(line, session: session)
             }
         }
 
@@ -299,6 +314,8 @@ final class CLISubprocessManager: ObservableObject {
                     session.status = .error("Process exited with code \(exitCode)")
                 } else {
                     session.status = .done
+                    print("[CLISubprocessManager] Fallback .done, firing onSessionComplete for \(session.id)")
+                    self.onSessionComplete?(session.id)
                 }
             }
         }

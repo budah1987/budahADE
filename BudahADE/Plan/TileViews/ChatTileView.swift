@@ -17,6 +17,10 @@ struct ChatTileView: View {
     @State private var pendingImage: NSImage?
     @State private var pendingImagePath: String?
     @State private var showFilePicker = false
+    @State private var glowBreathPhase: Bool = false
+    @State private var statusDismissed: Bool = false
+    @State private var showModelMenu: Bool = false
+    @State private var inputTextHeight: CGFloat = 36
 
     init(
         session: AgentSession,
@@ -33,95 +37,140 @@ struct ChatTileView: View {
         self._selectedModel = State(initialValue: role.defaultModel)
     }
 
-    var body: some View {
-        TileChrome(
-            title: role.name,
-            icon: "bubble.left.and.text.bubble.right",
-            dotColor: role.color,
-            onClose: onClose
-        ) {
-            VStack(spacing: 0) {
-                statusBar
-                Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
-                messageList
-                Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
-                inputArea
-            }
-            // Opt+P — cycle model
-            .onKeyPress(characters: CharacterSet(charactersIn: "p"), phases: .down) { press in
-                guard press.modifiers.contains(.option) else { return .ignored }
-                cycleModel()
-                return .handled
-            }
-            // Esc — cancel streaming agent
-            .onKeyPress(.escape) {
-                guard session.status == .streaming else { return .ignored }
-                canvas.chatManager.cancel(sessionId: session.id)
-                return .handled
-            }
-            // Ctrl+V — paste image from clipboard
-            .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
-                guard press.modifiers.contains(.control) else { return .ignored }
-                if pasteImageFromClipboard() { return .handled }
-                return .ignored
-            }
+    private var isRunning: Bool { session.status == .streaming }
+
+    private var statusText: String {
+        switch session.status {
+        case .streaming: return "Running"
+        case .done:      return statusDismissed ? "" : "Completed"
+        case .error:     return "Error"
+        case .idle:      return session.messages.isEmpty ? "Ready" : (statusDismissed ? "" : "Completed")
         }
-    }
-
-    // MARK: - Status Bar
-
-    private var statusBar: some View {
-        HStack(spacing: 6) {
-            // Status dot
-            Circle()
-                .fill(statusColor)
-                .frame(width: 6, height: 6)
-
-            // Model picker
-            Picker("Model", selection: $selectedModel) {
-                ForEach(AgentModel.allCases) { model in
-                    Text(model.displayName).tag(model)
-                }
-            }
-            .pickerStyle(.menu)
-            .font(Theme.caption(12))
-            .labelsHidden()
-            .frame(maxWidth: 80)
-
-            Spacer()
-
-            // Token count
-            if session.totalTokens > 0 {
-                Text(session.formattedTokenCount)
-                    .font(Theme.mono(11))
-                    .foregroundColor(Theme.textMuted)
-            }
-
-            // Ellipsis menu
-            Menu {
-                Button("New Session") { newSession() }
-                Button("Summarize & Compact") { }
-                    .disabled(true)
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Theme.textMuted)
-                    .frame(width: 24, height: 24)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .frame(width: 20, height: 20)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
     }
 
     private var statusColor: Color {
         switch session.status {
-        case .streaming: return .green
+        case .streaming: return Color(hex: 0x68ce6a)
+        case .done:      return Color(hex: 0x4264ef)
         case .error:     return .red
-        default:         return Theme.textMuted
+        case .idle:      return session.messages.isEmpty ? Theme.textMuted : Color(hex: 0x4264ef)
         }
+    }
+
+    private var glowColor: Color? {
+        if statusDismissed { return nil }
+        switch session.status {
+        case .streaming: return Color(hex: 0x4e9a4f)
+        case .done:      return Color(hex: 0x4264ef)
+        case .idle:      return session.messages.isEmpty ? nil : Color(hex: 0x4264ef)
+        case .error:     return nil
+        }
+    }
+
+    private var breathOpacity: Double {
+        glowBreathPhase ? 0.21 : 0.08
+    }
+
+    private struct InputHeightKey: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+            value = max(value, nextValue())
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+        VStack(spacing: 0) {
+            // Header bar
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(role.color)
+                    .frame(width: 10, height: 10)
+
+                Text(role.name)
+                    .font(Theme.mono(13))
+                    .foregroundColor(.white)
+
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 5, height: 5)
+                    Text(statusText)
+                        .font(Theme.mono(13))
+                        .foregroundColor(statusColor)
+                }
+
+                Spacer()
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Theme.textMuted)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.surface2)
+
+            // Messages with fade-out at bottom into input
+            messageList
+                .overlay(alignment: .bottom) {
+                    LinearGradient(
+                        colors: [Color.clear, Color(hex: 0x0b0a0e)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 40)
+                    .allowsHitTesting(false)
+                }
+
+            // Two-layer glassmorphic input
+            inputArea(tileHeight: geo.size.height)
+        }
+        .background(Color(hex: 0x0b0a0e))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color(hex: 0x796e6e).opacity(0.4), lineWidth: 0.5)
+        )
+        .shadow(color: (glowColor ?? .clear).opacity(breathOpacity), radius: 47)
+        .shadow(color: (glowColor ?? .clear).opacity(breathOpacity * 0.7), radius: 15)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                glowBreathPhase = true
+            }
+        }
+        .onChange(of: session.status) { _, newStatus in
+            if newStatus == .streaming { statusDismissed = false }
+        }
+        .simultaneousGesture(TapGesture().onEnded {
+            switch session.status {
+            case .done, .idle where !session.messages.isEmpty:
+                statusDismissed = true
+            default: break
+            }
+        })
+        // Opt+P — cycle model
+        .onKeyPress(characters: CharacterSet(charactersIn: "p"), phases: .down) { press in
+            guard press.modifiers.contains(.option) else { return .ignored }
+            cycleModel()
+            return .handled
+        }
+        // Esc — cancel streaming agent
+        .onKeyPress(.escape) {
+            guard session.status == .streaming else { return .ignored }
+            canvas.chatManager.cancel(sessionId: session.id)
+            return .handled
+        }
+        // Ctrl+V — paste image from clipboard
+        .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
+            guard press.modifiers.contains(.control) else { return .ignored }
+            if pasteImageFromClipboard() { return .handled }
+            return .ignored
+        }
+        } // GeometryReader
     }
 
     // MARK: - Message List
@@ -230,12 +279,12 @@ struct ChatTileView: View {
     private var streamingBubble: some View {
         HStack {
             Text(session.currentStreamingText)
-                .font(Theme.body(14))
-                .foregroundColor(Theme.textPrimary)
+                .font(.system(size: 14))
+                .foregroundColor(.white)
                 .textSelection(.enabled)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Theme.surface2.opacity(0.6))
+                .padding(.horizontal, 11)
+                .padding(.vertical, 10)
+                .background(Color(hex: 0x1b1b1e))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             Spacer()
         }
@@ -247,15 +296,15 @@ struct ChatTileView: View {
             HStack(spacing: 3) {
                 ForEach(0..<3, id: \.self) { i in
                     Circle()
-                        .fill(Theme.textMuted)
+                        .fill(Color.white)
                         .frame(width: 5, height: 5)
-                        .opacity(i == phase ? 1.0 : 0.3)
+                        .opacity(i == phase ? 0.8 : 0.2)
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Theme.surface2.opacity(0.6))
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
+        .background(Color(hex: 0x1b1b1e))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
@@ -273,7 +322,9 @@ struct ChatTileView: View {
 
     // MARK: - Input Area
 
-    private var inputArea: some View {
+    @ViewBuilder
+    private func inputArea(tileHeight: CGFloat) -> some View {
+        let maxInputHeight = max(60, tileHeight * 0.15)
         VStack(spacing: 0) {
             // Pending image preview
             if let img = pendingImage {
@@ -281,122 +332,205 @@ struct ChatTileView: View {
                     Image(nsImage: img)
                         .resizable()
                         .scaledToFit()
-                        .frame(maxHeight: 60)
+                        .frame(maxHeight: 50)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                     Button {
                         pendingImage = nil
                         pendingImagePath = nil
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
+                            .font(.system(size: 12))
                             .foregroundColor(Theme.textMuted)
                     }
                     .buttonStyle(.plain)
                     Spacer()
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 8)
                 .padding(.top, 6)
             }
 
-            // Staged content preview (from "Send to" action)
+            // Staged content preview
             if let staged = session.stagedContent {
                 HStack(spacing: 6) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("From \(staged.fromAgent)")
-                            .font(Theme.caption(12))
+                            .font(Theme.caption(11))
                             .foregroundColor(Theme.textMuted)
-                        Text(staged.content.prefix(120) + (staged.content.count > 120 ? "..." : ""))
-                            .font(Theme.body(13))
+                        Text(staged.content.prefix(100) + (staged.content.count > 100 ? "..." : ""))
+                            .font(Theme.body(12))
                             .foregroundColor(Theme.textSecondary)
-                            .lineLimit(3)
+                            .lineLimit(2)
                     }
                     Spacer()
                     Button {
                         session.stagedContent = nil
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundColor(Theme.textMuted)
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(8)
+                .padding(6)
                 .background(Theme.accent.opacity(0.06))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Theme.accent.opacity(0.2), lineWidth: 0.5)
-                )
                 .clipShape(RoundedRectangle(cornerRadius: 6))
-                .padding(.horizontal, 10)
-                .padding(.top, 6)
+                .padding(.horizontal, 8)
+                .padding(.top, 4)
             }
 
-            HStack(spacing: 6) {
-                // Attach image from file
-                Button { showFilePicker = true } label: {
-                    Image(systemName: "paperclip")
-                        .font(.system(size: 14))
-                        .foregroundColor(Theme.textMuted)
+            // Layer 1: Model selector row (dark background)
+            HStack(spacing: 4) {
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        showModelMenu.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(selectedModel.displayName.lowercased())
+                            .font(Theme.mono(14))
+                            .foregroundColor(Color(hex: 0x938d8d))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(hex: 0x938d8d))
+                    }
                 }
                 .buttonStyle(.plain)
-                .help("Attach image")
 
+                Spacer()
+
+                // Token count
+                if session.totalTokens > 0 {
+                    Text(session.formattedTokenCount)
+                        .font(Theme.mono(10))
+                        .foregroundColor(Color(hex: 0x938d8d))
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .overlay(alignment: .topLeading) {
+                if showModelMenu {
+                    ModelSelectorMenu(selectedModel: $selectedModel, isShowing: $showModelMenu)
+                        .padding(.top, 30)
+                        .padding(.leading, 8)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
+                }
+            }
+            .zIndex(showModelMenu ? 100 : 0)
+
+            // Layer 2: Text input (lighter glassmorphic surface)
+            VStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    // Placeholder text
                     if inputText.isEmpty {
                         Text(session.stagedContent != nil
                             ? "What should \(role.name) do with this?"
-                            : "Message \(role.name)...")
-                            .font(Theme.body(14))
+                            : "Hi, \(role.name). I need help with something")
+                            .font(.system(size: 13))
                             .foregroundColor(Theme.textMuted)
                             .padding(.top, 2)
                             .allowsHitTesting(false)
                     }
                     TextEditor(text: $inputText)
-                        .font(Theme.body(14))
-                        .foregroundColor(Theme.textPrimary)
-                        .frame(minHeight: 20, maxHeight: 120)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white)
+                        .frame(height: min(max(inputTextHeight + 10, 34), maxInputHeight))
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
-                        // Plain Return → submit; Shift+Return → let TextEditor insert newline naturally
+                        .background(
+                            // Hidden text mirror to measure natural content height
+                            Text(inputText.isEmpty ? "A" : inputText)
+                                .font(.system(size: 13))
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .opacity(0)
+                                .background(GeometryReader { textGeo in
+                                    Color.clear.preference(
+                                        key: InputHeightKey.self,
+                                        value: textGeo.size.height
+                                    )
+                                })
+                        )
+                        .onPreferenceChange(InputHeightKey.self) { h in
+                            if h > 0 { inputTextHeight = h }
+                        }
                         .onKeyPress(.return, phases: .down) { press in
                             guard !press.modifiers.contains(.shift) else { return .ignored }
                             sendMessage()
                             return .handled
                         }
-                        .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down, action: { press in
-                            // Cmd+V — paste image from clipboard if available
+                        .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
                             guard press.modifiers.contains(.command) else { return .ignored }
                             if pasteImageFromClipboard() { return .handled }
-                            return .ignored  // fall through to normal text paste
-                        })
+                            return .ignored
+                        }
                 }
+                .padding(.horizontal, 8)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
 
-                if session.status == .streaming {
-                    Button {
-                        canvas.chatManager.cancel(sessionId: session.id)
-                    } label: {
-                        Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.red.opacity(0.8))
+                // Action row: paperclip left, send/stop right
+                HStack(spacing: 8) {
+                    Button { showFilePicker = true } label: {
+                        Image(systemName: "paperclip")
+                            .font(.system(size: 13))
+                            .foregroundColor(Color(hex: 0x938d8d))
                     }
                     .buttonStyle(.plain)
-                } else {
-                    Button(action: sendMessage) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(
-                                canSend ? Theme.accent : Theme.textMuted
-                            )
+                    .help("Attach image")
+
+                    Spacer()
+
+                    if session.status == .streaming {
+                        Button {
+                            canvas.chatManager.cancel(sessionId: session.id)
+                        } label: {
+                            Image(systemName: "stop.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.red.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button(action: sendMessage) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(
+                                    canSend ? Theme.accent : Theme.textMuted
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canSend)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!canSend)
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
+            }
+            .background(Color(hex: 0x6e6e6e).opacity(0.2))
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 12,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 12
+                )
+            )
+            .overlay(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 12,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 12
+                )
+                .strokeBorder(Color(hex: 0x9b8989).opacity(0.55), lineWidth: 0.75)
+            )
+            .onTapGesture {
+                if showModelMenu {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        showModelMenu = false
+                    }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
         }
-        .background(Theme.surface2.opacity(0.4))
+        .background(Color.clear)
         .onDrop(of: ["public.image", "public.file-url"], isTargeted: nil) { providers in
             handleDrop(providers: providers)
         }
@@ -588,38 +722,31 @@ private struct MessageBubble: View {
         HStack {
             Spacer(minLength: 40)
             Text(message.content)
-                .font(Theme.body(14))
-                .foregroundColor(Theme.textPrimary)
+                .font(.system(size: 14))
+                .foregroundColor(.white)
                 .textSelection(.enabled)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Theme.accent.opacity(0.15))
+                .padding(.horizontal, 11)
+                .padding(.vertical, 10)
+                .background(Color(hex: 0x30221f))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
     }
 
     private var assistantBubble: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .bottom, spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
-                    // Tool calls disclosure
+                    // Tool calls — compact inline
                     if let tools = message.toolCalls, !tools.isEmpty {
-                        DisclosureGroup("> \(tools.count) tool call\(tools.count == 1 ? "" : "s")") {
-                            ForEach(tools, id: \.id) { tool in
-                                HStack(alignment: .top, spacing: 4) {
-                                    Image(systemName: "wrench.and.screwdriver")
-                                        .font(.system(size: 9))
-                                        .foregroundColor(Theme.textMuted)
-                                    Text("\(tool.name)")
-                                        .font(Theme.mono(11))
-                                        .foregroundColor(Theme.textMuted)
-                                }
-                                .padding(.leading, 8)
-                                .padding(.top, 2)
-                            }
+                        HStack(spacing: 4) {
+                            Image(systemName: "wrench.and.screwdriver")
+                                .font(.system(size: 9))
+                                .foregroundColor(Theme.textMuted)
+                            Text("\(tools.count) tool\(tools.count == 1 ? "" : "s")")
+                                .font(Theme.mono(10))
+                                .foregroundColor(Theme.textMuted)
                         }
-                        .font(Theme.caption(12))
-                        .foregroundColor(Theme.textMuted)
+                        .padding(.bottom, 2)
                     }
 
                     if !message.content.isEmpty {
@@ -629,32 +756,33 @@ private struct MessageBubble: View {
                             .textSelection(.enabled)
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Theme.surface2.opacity(0.6))
+                .padding(.horizontal, 11)
+                .padding(.vertical, 10)
+                .background(Color(hex: 0x1b1b1e))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 Spacer(minLength: 40)
             }
 
-            // Send-to button (always visible for messages with text)
-            if !message.content.isEmpty {
+            // Send-to button — only on hover
+            if !message.content.isEmpty && isHovered {
                 Button {
                     withAnimation(.easeOut(duration: 0.12)) {
                         showSendToMenu = showSendToMenu == message.id ? nil : message.id
                     }
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Image(systemName: "arrow.up.forward.square")
-                            .font(.system(size: 10))
+                            .font(.system(size: 9))
                         Text("Send to")
-                            .font(Theme.caption(12))
+                            .font(Theme.caption(11))
                     }
                     .foregroundColor(Theme.textMuted)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
                 }
                 .buttonStyle(.plain)
+                .transition(.opacity)
             }
         }
     }
@@ -688,5 +816,55 @@ private struct MessageBubble: View {
         case .assistant: return .leading
         case .system:    return .leading
         }
+    }
+}
+
+// MARK: - ModelSelectorMenu
+
+private struct ModelSelectorMenu: View {
+    @Binding var selectedModel: AgentModel
+    @Binding var isShowing: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(AgentModel.allCases) { model in
+                Button {
+                    selectedModel = model
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        isShowing = false
+                    }
+                } label: {
+                    HStack {
+                        Text(model.displayName)
+                            .font(Theme.mono(13))
+                            .foregroundColor(model == selectedModel ? .white : Color(hex: 0x938d8d))
+                        Spacer()
+                        if model == selectedModel {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(model == selectedModel ? Color.white.opacity(0.06) : Color.clear)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(
+            ZStack {
+                GlassBackground(material: .popover, cornerRadius: 8)
+                Color(hex: 0x1b1b1e).opacity(0.85)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+        )
+        .frame(width: 180)
+        .shadow(color: .black.opacity(0.4), radius: 12)
     }
 }

@@ -59,6 +59,16 @@ enum StreamEvent: Equatable {
     case result(ResultInfo)
     case unknown
 
+    var debugLabel: String {
+        switch self {
+        case .system: return "system"
+        case .assistant: return "assistant"
+        case .contentDelta: return "contentDelta"
+        case .result: return "result"
+        case .unknown: return "unknown"
+        }
+    }
+
     struct SystemInfo: Equatable, Codable {
         let sessionId: String
         let tools: [String]?
