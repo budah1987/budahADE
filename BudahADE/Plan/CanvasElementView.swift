@@ -89,7 +89,9 @@ struct CanvasElementView: View {
                         }
                     }
                     .overlay {
-                        if isSelected, case .tile = element.kind {
+                        if isChatAgentTile {
+                            ChatTileResizeOverlay(elementId: element.id, canvas: canvas)
+                        } else if isSelected, case .tile = element.kind {
                             ResizeHandles(element: element, canvas: canvas)
                         }
                         if isSelected, case .text = element.kind {
@@ -118,10 +120,10 @@ struct CanvasElementView: View {
                         x: element.position.x + element.size.width / 2 + dragOffset.width,
                         y: element.position.y + element.size.height / 2 + dragOffset.height
                     )
-                    .onTapGesture {
+                    .simultaneousGesture(TapGesture().onEnded {
                         canvas.selectedId = element.id
                         canvas.bringToFront(element.id)
-                    }
+                    })
                     .onHover { hovering in
                         isHovered = hovering
                         if hovering {

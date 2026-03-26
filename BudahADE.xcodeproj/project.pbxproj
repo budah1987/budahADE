@@ -1679,6 +1679,17 @@
 			<key>sourceTree</key>
 			<string>&lt;group&gt;</string>
 		</dict>
+		<key>CR01000100010001CR010001</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>ChatTileResizeOverlay.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
 		<key>BB1B001B001B001BBB1B001B</key>
 		<dict>
 			<key>isa</key>
@@ -1810,6 +1821,13 @@
 			<key>isa</key>
 			<string>PBXBuildFile</string>
 		</dict>
+		<key>CR02000200020002CR020002</key>
+		<dict>
+			<key>fileRef</key>
+			<string>CR01000100010001CR010001</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
 		<key>CC01000100010001CC010001</key>
 		<dict>
 			<key>children</key>
@@ -1826,6 +1844,7 @@
 				<string>BB12001200120012BB120012</string>
 				<string>BB1C001C001C001CBB1C001C</string>
 				<string>BB1A001A001A001ABB1A001A</string>
+				<string>CR01000100010001CR010001</string>
 				<string>BB1D001D001D001DBB1D001D</string>
 				<string>BB01000100010001BB010001</string>
 				<string>CC02000200020002CC020002</string>
@@ -2237,6 +2256,7 @@
 				<string>TC11111111111111TC111111</string>
 				<string>CL05000500050006CL050006</string>
 				<string>CS02000200020002CS020002</string>
+				<string>CR02000200020002CR020002</string>
 			</array>
 			<key>isa</key>
 			<string>PBXSourcesBuildPhase</string>
