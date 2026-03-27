@@ -18,3 +18,4 @@ build/
 # BudahADE plan context (auto-generated)
 .budahade/
 .superpowers/
+.worktrees/
