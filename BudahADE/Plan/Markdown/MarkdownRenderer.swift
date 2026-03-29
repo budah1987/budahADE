@@ -201,3 +201,206 @@ private struct BlockWalker: MarkupWalker {
         return lines[startLine...endLine].joined(separator: "\n")
     }
 }
+
+// MARK: - Inline Nodes View
+
+struct InlineNodesView: View {
+    let nodes: [InlineNode]
+
+    var body: some View {
+        nodes.reduce(SwiftUI.Text("")) { result, node in
+            result + renderInline(node)
+        }
+        .textSelection(.enabled)
+    }
+
+    private func renderInline(_ node: InlineNode) -> SwiftUI.Text {
+        switch node {
+        case .text(let string):
+            return SwiftUI.Text(string)
+
+        case .code(let code):
+            return SwiftUI.Text(code)
+                .font(Theme.mono(13))
+                .foregroundColor(Theme.textPrimary)
+
+        case .emphasis(let children):
+            return children.reduce(SwiftUI.Text("")) { result, child in
+                result + renderInline(child)
+            }
+            .italic()
+            .foregroundColor(Theme.textSecondary)
+
+        case .strong(let children):
+            return children.reduce(SwiftUI.Text("")) { result, child in
+                result + renderInline(child)
+            }
+            .bold()
+            .foregroundColor(.white)
+
+        case .link(let destination, let children):
+            let label = children.reduce(SwiftUI.Text("")) { result, child in
+                result + renderInline(child)
+            }
+            return label
+                .foregroundColor(Theme.accent)
+                .underline()
+
+        case .lineBreak:
+            return SwiftUI.Text("\n")
+        }
+    }
+}
+
+// MARK: - Markdown Renderer View
+
+struct MarkdownRenderer: View {
+    let content: String
+    let isStreaming: Bool
+
+    init(_ content: String, isStreaming: Bool = false) {
+        self.content = content
+        self.isStreaming = isStreaming
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if isStreaming {
+                streamingContent
+            } else {
+                renderedBlocks(from: content)
+            }
+        }
+    }
+
+    // MARK: - Streaming
+
+    @ViewBuilder
+    private var streamingContent: some View {
+        let (stable, tail) = MarkdownParser.splitAtStableBoundary(content)
+
+        if !stable.isEmpty {
+            renderedBlocks(from: stable)
+        }
+
+        if !tail.isEmpty {
+            Text(tail)
+                .font(Theme.body(14))
+                .foregroundColor(Theme.textPrimary)
+                .textSelection(.enabled)
+                .padding(.top, stable.isEmpty ? 0 : 8)
+        }
+    }
+
+    // MARK: - Block Rendering
+
+    @ViewBuilder
+    private func renderedBlocks(from markdown: String) -> some View {
+        let blocks = MarkdownParser.parse(markdown)
+        ForEach(blocks) { block in
+            blockView(for: block)
+        }
+    }
+
+    @ViewBuilder
+    private func blockView(for block: MarkdownBlockItem) -> some View {
+        switch block.kind {
+        case .heading(let level, let inlines):
+            headingView(level: level, inlines: inlines)
+
+        case .paragraph(let inlines):
+            InlineNodesView(nodes: inlines)
+                .font(Theme.body(14))
+                .foregroundColor(Theme.textPrimary)
+                .padding(.bottom, 8)
+
+        case .codeBlock(let language, let code):
+            CodeBlockView(code: code, language: language)
+                .padding(.vertical, 4)
+
+        case .unorderedList(let items):
+            unorderedListView(items: items)
+                .padding(.bottom, 8)
+
+        case .orderedList(let start, let items):
+            orderedListView(start: start, items: items)
+                .padding(.bottom, 8)
+
+        case .table(let headers, let rows, let alignments):
+            MarkdownTableView(headers: headers, rows: rows, alignments: alignments)
+                .padding(.vertical, 4)
+
+        case .thematicBreak:
+            Rectangle()
+                .fill(Theme.borderSubtle)
+                .frame(height: 1)
+                .padding(.vertical, 12)
+        }
+    }
+
+    // MARK: - Headings
+
+    @ViewBuilder
+    private func headingView(level: Int, inlines: [InlineNode]) -> some View {
+        let (font, topPad, bottomPad): (Font, CGFloat, CGFloat) = {
+            switch level {
+            case 1: return (Theme.headline(22), 20, 8)
+            case 2: return (Theme.headline(18), 16, 6)
+            default: return (Theme.label(15), 12, 4)
+            }
+        }()
+
+        InlineNodesView(nodes: inlines)
+            .font(font)
+            .foregroundColor(Theme.textPrimary)
+            .padding(.top, topPad)
+            .padding(.bottom, bottomPad)
+    }
+
+    // MARK: - Lists
+
+    @ViewBuilder
+    private func unorderedListView(items: [ListItem], indent: CGFloat = 0) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("•")
+                        .font(Theme.body(14))
+                        .foregroundColor(Theme.textMuted)
+                    InlineNodesView(nodes: item.content)
+                        .font(Theme.body(14))
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .padding(.leading, indent)
+
+                ForEach(item.children) { child in
+                    blockView(for: child)
+                        .padding(.leading, indent + 20)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func orderedListView(start: Int, items: [ListItem], indent: CGFloat = 0) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(items.enumerated()), id: \.offset) { idx, item in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(start + idx).")
+                        .font(Theme.body(14))
+                        .foregroundColor(Theme.textMuted)
+                        .frame(minWidth: 20, alignment: .trailing)
+                    InlineNodesView(nodes: item.content)
+                        .font(Theme.body(14))
+                        .foregroundColor(Theme.textPrimary)
+                }
+                .padding(.leading, indent)
+
+                ForEach(item.children) { child in
+                    blockView(for: child)
+                        .padding(.leading, indent + 20)
+                }
+            }
+        }
+    }
+}
