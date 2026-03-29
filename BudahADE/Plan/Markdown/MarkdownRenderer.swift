@@ -202,55 +202,6 @@ private struct BlockWalker: MarkupWalker {
     }
 }
 
-// MARK: - Inline Nodes View
-
-struct InlineNodesView: View {
-    let nodes: [InlineNode]
-
-    var body: some View {
-        Self.render(nodes)
-            .textSelection(.enabled)
-    }
-
-    static func render(_ nodes: [InlineNode]) -> SwiftUI.Text {
-        var result = SwiftUI.Text("")
-        for node in nodes {
-            result = result + renderInline(node)
-        }
-        return result
-    }
-
-    private static func renderInline(_ node: InlineNode) -> SwiftUI.Text {
-        switch node {
-        case .text(let string):
-            return SwiftUI.Text(string)
-
-        case .code(let code):
-            return SwiftUI.Text(code)
-                .font(Theme.mono(13))
-                .foregroundColor(Theme.textPrimary)
-
-        case .emphasis(let children):
-            return render(children)
-                .italic()
-                .foregroundColor(Theme.textSecondary)
-
-        case .strong(let children):
-            return render(children)
-                .bold()
-                .foregroundColor(.white)
-
-        case .link(_, let children):
-            return render(children)
-                .foregroundColor(Theme.accent)
-                .underline()
-
-        case .lineBreak:
-            return SwiftUI.Text("\n")
-        }
-    }
-}
-
 // MARK: - Markdown Renderer View
 
 struct MarkdownRenderer: View {
@@ -272,8 +223,6 @@ struct MarkdownRenderer: View {
         }
     }
 
-    // MARK: - Streaming
-
     @ViewBuilder
     private var streamingContent: some View {
         let (stable, tail) = MarkdownParser.splitAtStableBoundary(content)
@@ -283,15 +232,13 @@ struct MarkdownRenderer: View {
         }
 
         if !tail.isEmpty {
-            Text(tail)
+            SwiftUI.Text(tail)
                 .font(Theme.body(14))
                 .foregroundColor(Theme.textPrimary)
                 .textSelection(.enabled)
                 .padding(.top, stable.isEmpty ? 0 : 8)
         }
     }
-
-    // MARK: - Block Rendering
 
     @ViewBuilder
     private func renderedBlocks(from markdown: String) -> some View {
@@ -337,8 +284,6 @@ struct MarkdownRenderer: View {
         }
     }
 
-    // MARK: - Headings
-
     @ViewBuilder
     private func headingView(level: Int, inlines: [InlineNode]) -> some View {
         let (font, topPad, bottomPad): (Font, CGFloat, CGFloat) = {
@@ -356,14 +301,12 @@ struct MarkdownRenderer: View {
             .padding(.bottom, bottomPad)
     }
 
-    // MARK: - Lists
-
     @ViewBuilder
     private func unorderedListView(items: [ListItem], indent: CGFloat = 0) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("•")
+                    SwiftUI.Text("\u{2022}")
                         .font(Theme.body(14))
                         .foregroundColor(Theme.textMuted)
                     InlineNodesView(nodes: item.content)
@@ -385,7 +328,7 @@ struct MarkdownRenderer: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(items.enumerated()), id: \.offset) { idx, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(start + idx).")
+                    SwiftUI.Text("\(start + idx).")
                         .font(Theme.body(14))
                         .foregroundColor(Theme.textMuted)
                         .frame(minWidth: 20, alignment: .trailing)
@@ -401,106 +344,5 @@ struct MarkdownRenderer: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Editable Markdown Renderer
-
-struct EditableMarkdownRenderer: View {
-    @Binding var content: String
-    let onDone: () -> Void
-
-    @State private var editingBlockId: UUID?
-    @State private var editText: String = ""
-    @State private var hoveredBlockId: UUID?
-
-    var body: some View {
-        let blocks = MarkdownParser.parse(content)
-
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(blocks) { block in
-                if block.id == editingBlockId {
-                    editableBlock(block: block)
-                } else {
-                    renderableBlock(block: block)
-                }
-            }
-
-            // Done button
-            HStack {
-                Spacer()
-                Button("Done") {
-                    commitEdit()
-                    onDone()
-                }
-                .font(Theme.label(12))
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Theme.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .buttonStyle(.plain)
-            }
-            .padding(.top, 8)
-        }
-    }
-
-    @ViewBuilder
-    private func renderableBlock(block: MarkdownBlockItem) -> some View {
-        MarkdownRenderer(block.sourceText)
-            .padding(4)
-            .contentShape(Rectangle())
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(
-                        hoveredBlockId == block.id ? Theme.borderSubtle : Color.clear,
-                        lineWidth: 1
-                    )
-            )
-            .background(
-                hoveredBlockId == block.id ? Theme.hoverFill : Color.clear
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .onHover { hovering in
-                hoveredBlockId = hovering ? block.id : nil
-                if hovering {
-                    NSCursor.iBeam.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-            .onTapGesture {
-                commitEdit()
-                editingBlockId = block.id
-                editText = block.sourceText
-            }
-    }
-
-    @ViewBuilder
-    private func editableBlock(block: MarkdownBlockItem) -> some View {
-        TextEditor(text: $editText)
-            .font(Theme.mono(13))
-            .foregroundColor(Theme.textPrimary)
-            .scrollContentBackground(.hidden)
-            .frame(minHeight: 60)
-            .padding(8)
-            .background(Theme.surface2)
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Theme.borderActive, lineWidth: 1)
-            )
-    }
-
-    private func commitEdit() {
-        guard let blockId = editingBlockId else { return }
-        let blocks = MarkdownParser.parse(content)
-        guard let block = blocks.first(where: { $0.id == blockId }) else { return }
-
-        if let range = content.range(of: block.sourceText) {
-            content.replaceSubrange(range, with: editText)
-        }
-
-        editingBlockId = nil
-        editText = ""
     }
 }

@@ -64,6 +64,7 @@
 		9451ECD75854EDB839C75613 /* CanvasPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D81BC97619FB88DB6761DE6 /* CanvasPersistenceTests.swift */; };
 		9591F45CC67A3B7F0014BA52 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6BAB7A597B9483594284F5 /* Theme.swift */; };
 		9995F4FD64D8D5F7F0FBD10D /* CodeBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1BD4E20C8A1B0252942678 /* CodeBlockView.swift */; };
+		99A05E4B6A1A4E159D8C4A8D /* InlineNodesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E23D256BEFB8D9BE4995FB2F /* InlineNodesView.swift */; };
 		9A591DEA92F5E2CBEC8B1BF1 /* PlanChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B13B8012976BD523DA1A788 /* PlanChatView.swift */; };
 		9A7599FBE37CE99F39DB634A /* GhosttyAppManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD6E9C66553BA0289C0B3306 /* GhosttyAppManager.swift */; };
 		9CBAF5D0CCF1CC42303D581D /* ChatTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD395B8B091F42A4F27AF847 /* ChatTileView.swift */; };
@@ -76,6 +77,7 @@
 		AF213BD23071867AEAF312C2 /* GitRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B70FCB3FE6B21E44E638F8 /* GitRepository.swift */; };
 		B1A14E416C7049CBAB06DA25 /* SendToMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D65695A23854CAF943DA171 /* SendToMenu.swift */; };
 		B42AE7BA6B493E509D9C97AB /* WorkspaceDropdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CA70F9F879881BC4BECBC75 /* WorkspaceDropdown.swift */; };
+		B5EA5B5FCB5F2A0A8B9BC96A /* EditableMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B3E11D3A9FF310934B5569 /* EditableMarkdownRenderer.swift */; };
 		B637F69B5A385EC7D882E5C1 /* GitWorktreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A658A83DDCAA7B7F63B1827 /* GitWorktreeManager.swift */; };
 		B68A9BA58C76081C1BD3C20A /* GitPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B705CFF356264227986EFC3 /* GitPanelView.swift */; };
 		B95C32539457698DEAB58ECB /* PlanCanvasState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD8144AB5B9FEA46F501828 /* PlanCanvasState.swift */; };
@@ -213,6 +215,7 @@
 		C08E0CF750B2777728F76B48 /* NewTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTaskSheet.swift; sourceTree = "<group>"; };
 		C491CAA31843BB6BB3F78EAB /* SyntaxHighlighter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntaxHighlighter.swift; sourceTree = "<group>"; };
 		C656A43063C051F8EB3ED2D7 /* CanvasNodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNodeTests.swift; sourceTree = "<group>"; };
+		C6B3E11D3A9FF310934B5569 /* EditableMarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableMarkdownRenderer.swift; sourceTree = "<group>"; };
 		CAC261905BA378E2DFD57D4F /* CanvasNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNode.swift; sourceTree = "<group>"; };
 		CAD8144AB5B9FEA46F501828 /* PlanCanvasState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCanvasState.swift; sourceTree = "<group>"; };
 		CDDE6DF907D1800819FC9F49 /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
@@ -221,6 +224,7 @@
 		E1492F0DCA16FEBCBDFA3D73 /* TmuxSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxSessionManager.swift; sourceTree = "<group>"; };
 		E1AD75E3820536BF544B2378 /* FrameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameContainerView.swift; sourceTree = "<group>"; };
 		E1DF69F7E258333429E8776A /* BrowserTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserTileView.swift; sourceTree = "<group>"; };
+		E23D256BEFB8D9BE4995FB2F /* InlineNodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineNodesView.swift; sourceTree = "<group>"; };
 		E484D66678820F7CAC8411B7 /* GitSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitSidebarView.swift; sourceTree = "<group>"; };
 		E64217C9EFDA0169D85E6BD3 /* TileSelectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileSelectionManager.swift; sourceTree = "<group>"; };
 		FB4701DD02EBF21C6E4814EE /* AgentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSession.swift; sourceTree = "<group>"; };
@@ -378,6 +382,8 @@
 			isa = PBXGroup;
 			children = (
 				0A1BD4E20C8A1B0252942678 /* CodeBlockView.swift */,
+				C6B3E11D3A9FF310934B5569 /* EditableMarkdownRenderer.swift */,
+				E23D256BEFB8D9BE4995FB2F /* InlineNodesView.swift */,
 				230207878D2083CDEF0BAAE4 /* MarkdownRenderer.swift */,
 				802CA2FC66F91ECCC5393BCD /* MarkdownTableView.swift */,
 				C491CAA31843BB6BB3F78EAB /* SyntaxHighlighter.swift */,
@@ -612,6 +618,7 @@
 				2FCD4DADADAE0B13FB060D80 /* ConnectionsLayer.swift in Sources */,
 				449169319080787A9AFD1CEB /* ContextManifest.swift in Sources */,
 				4D85A7FAD126CCC450B6E2D2 /* DiffView.swift in Sources */,
+				B5EA5B5FCB5F2A0A8B9BC96A /* EditableMarkdownRenderer.swift in Sources */,
 				50255C428DE574A26CBA9184 /* FilePreviewView.swift in Sources */,
 				E1D8E3F7F0E6ED1A2E02A930 /* FileTreeNode.swift in Sources */,
 				DCE5831F073A29D3341884FA /* FileTreeView.swift in Sources */,
@@ -624,6 +631,7 @@
 				117F4B5D662757E5F411C604 /* GitSidebarView.swift in Sources */,
 				B637F69B5A385EC7D882E5C1 /* GitWorktreeManager.swift in Sources */,
 				F843DD275A7276A1294F9524 /* ImageTileView.swift in Sources */,
+				99A05E4B6A1A4E159D8C4A8D /* InlineNodesView.swift in Sources */,
 				EB4A4870B0D12CBF87A327B5 /* KeyboardShortcuts.swift in Sources */,
 				316F072D79A27D01CE4A8364 /* LeftPanelView.swift in Sources */,
 				21F8F23BF02F16D69A53976A /* MarkdownRenderer.swift in Sources */,
