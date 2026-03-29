@@ -83,8 +83,19 @@ struct PlanChatView: View {
                         }
 
                         ForEach(session.messages) { message in
-                            PlanMessageBubble(message: message)
-                                .id(message.id)
+                            PlanMessageBubble(
+                                message: message,
+                                isSpec: message.role == .assistant && state.looksLikeSpec(message.content),
+                                onBuild: {
+                                    state.pendingSpec = message.content
+                                    print("[PlanChat] Build requested for spec (\(message.content.count) chars)")
+                                },
+                                onEdit: {
+                                    state.editingMessageId = message.id
+                                    state.pendingSpec = message.content
+                                }
+                            )
+                            .id(message.id)
                         }
 
                         // Streaming text bubble
@@ -489,13 +500,28 @@ struct PlanChatView: View {
 
 private struct PlanMessageBubble: View {
     let message: ChatMessage
+    let isSpec: Bool
+    let onBuild: (() -> Void)?
+    let onEdit: (() -> Void)?
+
+    init(message: ChatMessage, isSpec: Bool = false, onBuild: (() -> Void)? = nil, onEdit: (() -> Void)? = nil) {
+        self.message = message
+        self.isSpec = isSpec
+        self.onBuild = onBuild
+        self.onEdit = onEdit
+    }
 
     var body: some View {
         switch message.role {
         case .user:
             userBubble
         case .assistant:
-            assistantBubble
+            VStack(alignment: .leading, spacing: 0) {
+                assistantBubble
+                if isSpec {
+                    specActionButtons
+                }
+            }
         case .system:
             systemBubble
         }
@@ -534,6 +560,49 @@ private struct PlanMessageBubble: View {
                 MarkdownRenderer(message.content)
             }
         }
+    }
+
+    private var specActionButtons: some View {
+        HStack(spacing: 8) {
+            Spacer()
+
+            Button {
+                onEdit?()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11))
+                    Text("Edit")
+                        .font(Theme.label(12))
+                }
+                .foregroundColor(Theme.textSecondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Theme.borderSubtle, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                onBuild?()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "hammer.fill")
+                        .font(.system(size: 11))
+                    Text("Build")
+                        .font(Theme.label(12))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Theme.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 8)
     }
 
     private var systemBubble: some View {

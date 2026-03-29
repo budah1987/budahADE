@@ -34,6 +34,8 @@ final class PlanChatState: ObservableObject {
     }
     @Published var conversationState: PlanConversationState = .idle
     @Published var selectedModel: AgentModel = .sonnet
+    @Published var pendingSpec: String?
+    @Published var editingMessageId: UUID?
     private var sessionCancellable: AnyCancellable?
 
     // MARK: - Init
@@ -94,6 +96,26 @@ final class PlanChatState: ObservableObject {
         let path = "\(imageDir)/\(filename)"
         guard fm.createFile(atPath: path, contents: data) else { return nil }
         return path
+    }
+
+    // MARK: - Spec Detection
+
+    func looksLikeSpec(_ content: String) -> Bool {
+        let lowered = content.lowercased()
+        let hasSpecHeading = lowered.contains("# spec") ||
+            lowered.contains("# plan") ||
+            lowered.contains("# implementation plan") ||
+            lowered.contains("# design") ||
+            lowered.contains("# architecture") ||
+            lowered.contains("## spec") ||
+            lowered.contains("## plan") ||
+            lowered.contains("## implementation plan") ||
+            lowered.contains("## design") ||
+            lowered.contains("## architecture")
+
+        let hasList = content.contains("\n- ") || content.contains("\n1. ") || content.contains("\n* ")
+
+        return hasSpecHeading && hasList
     }
 
     // MARK: - Planner Prompt
