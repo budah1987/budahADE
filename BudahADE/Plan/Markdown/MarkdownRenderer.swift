@@ -208,13 +208,19 @@ struct InlineNodesView: View {
     let nodes: [InlineNode]
 
     var body: some View {
-        nodes.reduce(SwiftUI.Text("")) { result, node in
-            result + renderInline(node)
-        }
-        .textSelection(.enabled)
+        Self.render(nodes)
+            .textSelection(.enabled)
     }
 
-    private func renderInline(_ node: InlineNode) -> SwiftUI.Text {
+    static func render(_ nodes: [InlineNode]) -> SwiftUI.Text {
+        var result = SwiftUI.Text("")
+        for node in nodes {
+            result = result + renderInline(node)
+        }
+        return result
+    }
+
+    private static func renderInline(_ node: InlineNode) -> SwiftUI.Text {
         switch node {
         case .text(let string):
             return SwiftUI.Text(string)
@@ -225,24 +231,17 @@ struct InlineNodesView: View {
                 .foregroundColor(Theme.textPrimary)
 
         case .emphasis(let children):
-            return children.reduce(SwiftUI.Text("")) { result, child in
-                result + renderInline(child)
-            }
-            .italic()
-            .foregroundColor(Theme.textSecondary)
+            return render(children)
+                .italic()
+                .foregroundColor(Theme.textSecondary)
 
         case .strong(let children):
-            return children.reduce(SwiftUI.Text("")) { result, child in
-                result + renderInline(child)
-            }
-            .bold()
-            .foregroundColor(.white)
+            return render(children)
+                .bold()
+                .foregroundColor(.white)
 
-        case .link(let destination, let children):
-            let label = children.reduce(SwiftUI.Text("")) { result, child in
-                result + renderInline(child)
-            }
-            return label
+        case .link(_, let children):
+            return render(children)
                 .foregroundColor(Theme.accent)
                 .underline()
 
