@@ -60,3 +60,17 @@ targets:
     dependencies:
       - package: swift-markdown
         product: Markdown
+
+  BudahADETests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: BudahADETests
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.budah.ade.tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: BudahADE
