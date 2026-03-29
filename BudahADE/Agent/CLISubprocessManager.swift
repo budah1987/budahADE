@@ -1,5 +1,21 @@
 import Foundation
 
+private func logTiming(_ msg: String) {
+    let line = "[\(Date().timeIntervalSince1970)] \(msg)\n"
+    print(msg)
+    if let data = line.data(using: .utf8) {
+        if FileManager.default.fileExists(atPath: "/tmp/budahade-timing.log") {
+            if let fh = FileHandle(forWritingAtPath: "/tmp/budahade-timing.log") {
+                fh.seekToEndOfFile()
+                fh.write(data)
+                fh.closeFile()
+            }
+        } else {
+            FileManager.default.createFile(atPath: "/tmp/budahade-timing.log", contents: data)
+        }
+    }
+}
+
 // MARK: - CLISubprocessManager
 
 @MainActor
@@ -9,7 +25,7 @@ final class CLISubprocessManager: ObservableObject {
 
     @Published var sessions: [UUID: AgentSession] = [:]
 
-    /// Called when a session finishes a turn (status → .done). Used by PlanCanvasState for auto-forwarding.
+    /// Called when a session finishes a turn (status → .done). Used for auto-forwarding.
     var onSessionComplete: ((UUID) -> Void)?
 
     // MARK: - Session Lifecycle
@@ -19,52 +35,63 @@ final class CLISubprocessManager: ObservableObject {
         model: AgentModel,
         agentMode: AgentMode? = nil,
         systemPrompt: String,
-        workingDirectory: String
+        workingDirectory: String,
+        enableAgentTeams: Bool = false,
+        disableMcp: Bool = false
     ) -> AgentSession {
         let session = AgentSession(
             model: model,
             agentMode: agentMode,
             systemPrompt: systemPrompt,
-            workingDirectory: workingDirectory
+            workingDirectory: workingDirectory,
+            enableAgentTeams: enableAgentTeams,
+            disableMcp: disableMcp
         )
         sessions[session.id] = session
         return session
     }
 
     func send(sessionId: UUID, prompt: String, model: AgentModel? = nil) {
-        guard let session = sessions[sessionId] else { return }
+        let t0 = CFAbsoluteTimeGetCurrent()
+        logTiming("[TIMING] T0 send() called")
 
-        // Detect model change — if user switched models, fork the session
-        // so the new model is actually used (--resume locks to original model)
-        let modelChanged = model != nil && model != session.model
+        guard let session = sessions[sessionId] else {
+            print("[CLISubprocessManager] ⚠️ No session found for \(sessionId)")
+            return
+        }
+
         if let model = model {
             session.model = model
         }
 
+        // Guard: don't send while already running
+        if session.status == .connecting || session.status == .streaming {
+            print("[CLISubprocessManager] ⚠️ Ignoring send while \(session.status)")
+            return
+        }
+
         session.addUserMessage(prompt)
-        session.status = .streaming
+        session.status = .connecting
+        session.currentStreamingText = ""
 
         let systemPromptPath = writeSystemPrompt(session: session)
-        let resumeId: String?
-        if modelChanged {
-            // Model changed — don't resume, start fresh subprocess
-            // (Claude CLI --resume uses the original session's model)
-            resumeId = nil
-        } else {
-            resumeId = session.claudeSessionId
-        }
+        let resumeId = session.claudeSessionId
         let command = buildCommand(
             prompt: prompt,
             model: session.model,
             systemPromptPath: systemPromptPath,
             sessionId: resumeId,
             allowedTools: session.agentMode?.chatAllowedTools,
-            maxTurns: session.agentMode?.chatMaxTurns
+            maxTurns: session.agentMode?.chatMaxTurns,
+            disableMcp: session.disableMcp
         )
 
+        logTiming("[TIMING] T1 command built, resume=\(resumeId?.prefix(8) ?? "nil") (+\(CFAbsoluteTimeGetCurrent() - t0)s)")
+
         let workDir = session.workingDirectory
+        let agentTeamsEnabled = session.enableAgentTeams
         Task {
-            await self.runSubprocess(command: command, workingDirectory: workDir, session: session)
+            await self.runSubprocess(command: command, workingDirectory: workDir, session: session, agentTeamsEnabled: agentTeamsEnabled, t0: t0)
         }
     }
 
@@ -98,7 +125,7 @@ final class CLISubprocessManager: ObservableObject {
     }
 
     var activeSessionCount: Int {
-        sessions.values.filter { $0.status == .streaming || $0.status == .done }.count
+        sessions.values.filter { $0.status == .connecting || $0.status == .streaming || $0.status == .done }.count
     }
 
     // MARK: - Command Building
@@ -109,7 +136,8 @@ final class CLISubprocessManager: ObservableObject {
         systemPromptPath: String,
         sessionId: String?,
         allowedTools: [String]? = nil,
-        maxTurns: Int? = nil
+        maxTurns: Int? = nil,
+        disableMcp: Bool = false
     ) -> [String] {
         var command = [
             "claude",
@@ -119,6 +147,10 @@ final class CLISubprocessManager: ObservableObject {
             "--system-prompt-file", systemPromptPath,
             "--dangerously-skip-permissions",
         ]
+
+        if disableMcp {
+            command += ["--strict-mcp-config"]
+        }
 
         if let tools = allowedTools {
             if tools.isEmpty {
@@ -147,24 +179,29 @@ final class CLISubprocessManager: ObservableObject {
 
         do {
             let event = try StreamEvent.parse(from: trimmed)
-            print("[CLISubprocessManager] Event: \(event.debugLabel) for session \(session.id)")
             switch event {
             case .system(let info):
+                // Only log the init event (has tools), skip hook events
+                if info.tools != nil {
+                    logTiming("[TIMING] T4 system init received")
+                }
                 session.handleSystemInit(info)
             case .assistant(let msg):
                 session.handleAssistantMessage(msg)
             case .contentDelta(let text):
+                if session.currentStreamingText.isEmpty {
+                    logTiming("[TIMING] T6 first contentDelta received")
+                }
                 session.handleContentDelta(text)
             case .result(let result):
+                logTiming("[TIMING] T7 result event received")
                 session.handleResult(result)
-                print("[CLISubprocessManager] Result event received for \(session.id), callback is \(onSessionComplete == nil ? "NIL" : "SET")")
                 onSessionComplete?(session.id)
             case .unknown:
                 break
             }
         } catch {
-            let preview = trimmed.prefix(100)
-            print("[CLISubprocessManager] Parse failed: \(error) — line: \(preview)")
+            // Silently skip unparseable lines (hook events, etc.)
         }
     }
 
@@ -181,9 +218,6 @@ final class CLISubprocessManager: ObservableObject {
 
     // MARK: - Private: Find Claude Binary
 
-    /// Resolve the `claude` executable path. GUI apps don't inherit shell PATH,
-    /// so we search common install locations explicitly.
-    /// (nonisolated to avoid MainActor isolation inherited from the class)
     nonisolated(unsafe) static let claudePath: String = {
         let candidates = [
             "\(NSHomeDirectory())/.local/bin/claude",
@@ -193,23 +227,23 @@ final class CLISubprocessManager: ObservableObject {
         ]
         for path in candidates {
             if FileManager.default.isExecutableFile(atPath: path) {
-                print("[CLISubprocessManager] Found claude at: \(path)")
                 return path
             }
         }
-        // Fallback — hope it's on PATH (works when launched from terminal)
-        print("[CLISubprocessManager] claude not found at known paths, falling back to /usr/bin/env")
         return "/usr/bin/env"
     }()
 
     // MARK: - Private: Run Subprocess
 
-    private nonisolated func runSubprocess(command: [String], workingDirectory: String, session: AgentSession) async {
+    /// Launches a claude subprocess for a single message turn.
+    /// Uses -p mode with the prompt as argument. For follow-up messages,
+    /// --resume is used to continue the conversation.
+    /// readabilityHandler provides non-blocking stdout processing.
+    private nonisolated func runSubprocess(command: [String], workingDirectory: String, session: AgentSession, agentTeamsEnabled: Bool, t0: CFAbsoluteTime) async {
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
 
-        // Use resolved claude path directly if found, otherwise /usr/bin/env
         let claudeBin = Self.claudePath
         if claudeBin == "/usr/bin/env" {
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -221,6 +255,7 @@ final class CLISubprocessManager: ObservableObject {
 
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        process.standardInput = FileHandle.nullDevice  // No stdin needed — prompt is in -p arg
 
         var env = ProcessInfo.processInfo.environment
         let extraPaths = [
@@ -231,21 +266,30 @@ final class CLISubprocessManager: ObservableObject {
         ]
         let existingPath = env["PATH"] ?? "/usr/bin:/bin"
         env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
+
+        if agentTeamsEnabled {
+            env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
+        }
+
         process.environment = env
 
-        process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: workingDirectory) else {
+            await MainActor.run {
+                session.status = .error("Working directory not found: \(workingDirectory)")
+            }
+            return
+        }
 
+        process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
         await MainActor.run { session.process = process }
 
-        let fullCommand = ([claudeBin] + (process.arguments ?? [])).joined(separator: " ")
-        print("[CLISubprocessManager] Launching: \(fullCommand)")
-        print("[CLISubprocessManager] Working dir: \(workingDirectory)")
+        logTiming("[TIMING] T2 about to process.run() (+\(CFAbsoluteTimeGetCurrent() - t0)s)")
 
         do {
             try process.run()
-            print("[CLISubprocessManager] Process launched (pid: \(process.processIdentifier))")
+            logTiming("[TIMING] T2b process launched (pid: \(process.processIdentifier)) (+\(CFAbsoluteTimeGetCurrent() - t0)s)")
         } catch {
-            print("[CLISubprocessManager] Launch failed: \(error)")
             await MainActor.run {
                 session.status = .error("Failed to launch: \(error.localizedDescription)")
                 session.process = nil
@@ -253,69 +297,75 @@ final class CLISubprocessManager: ObservableObject {
             return
         }
 
-        // Read stderr in background for diagnostics
-        let stderrHandle = stderrPipe.fileHandleForReading
+        // Read stderr in background
         Task.detached {
-            let errData = stderrHandle.readDataToEndOfFile()
+            let errData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
             if let errStr = String(data: errData, encoding: .utf8), !errStr.isEmpty {
                 print("[CLISubprocessManager] STDERR: \(errStr.prefix(500))")
             }
         }
 
-        // Read stdout line by line — lineCount tracked as nonisolated mutable
-        // to avoid "captured var in concurrent code" warning
+        // Non-blocking stdout reading via readabilityHandler
         let handle = stdoutPipe.fileHandleForReading
-        var buffer = Data()
-        nonisolated(unsafe) var lineCount = 0
+        nonisolated(unsafe) var buffer = Data()
+        nonisolated(unsafe) var firstChunkLogged = false
+        weak var weakSelf = self
+        let capturedT0 = t0
 
-        while process.isRunning || !buffer.isEmpty {
-            let chunk = handle.availableData
-            if chunk.isEmpty && !process.isRunning { break }
+        handle.readabilityHandler = { fileHandle in
+            let chunk = fileHandle.availableData
+
+            if !firstChunkLogged && !chunk.isEmpty {
+                firstChunkLogged = true
+                logTiming("[TIMING] T3 first stdout chunk (\(chunk.count) bytes) (+\(CFAbsoluteTimeGetCurrent() - capturedT0)s)")
+            }
+
+            if chunk.isEmpty {
+                // EOF — process closed stdout
+                fileHandle.readabilityHandler = nil
+                if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
+                    let capturedLine = line
+                    DispatchQueue.main.async {
+                        guard let mgr = weakSelf else { return }
+                        mgr.processStreamLine(capturedLine, session: session)
+                    }
+                }
+                return
+            }
+
             buffer.append(chunk)
 
             while let newlineRange = buffer.range(of: Data("\n".utf8)) {
                 let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange.lowerBound)
                 buffer.removeSubrange(buffer.startIndex...newlineRange.lowerBound)
                 if let line = String(data: lineData, encoding: .utf8) {
-                    lineCount += 1
-                    if lineCount <= 3 {
-                        print("[CLISubprocessManager] stdout line \(lineCount): \(line.prefix(200))")
-                    }
-                    await MainActor.run { [weak self] in
-                        guard let self else {
-                            print("[CLISubprocessManager] ⚠️ self is nil in processStreamLine dispatch")
-                            return
+                    let capturedLine = line
+                    DispatchQueue.main.async {
+                        guard let mgr = weakSelf else { return }
+                        if session.status == .connecting {
+                            session.status = .streaming
                         }
-                        self.processStreamLine(line, session: session)
+                        mgr.processStreamLine(capturedLine, session: session)
                     }
                 }
             }
         }
 
-        // Remaining data
-        if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
-            await MainActor.run { [weak self] in
-                guard let self else {
-                    print("[CLISubprocessManager] ⚠️ self is nil in remaining-buffer dispatch")
-                    return
-                }
-                self.processStreamLine(line, session: session)
-            }
-        }
-
-        process.waitUntilExit()
-        let exitCode = process.terminationStatus
-        print("[CLISubprocessManager] Process exited (code: \(exitCode), lines read: \(lineCount))")
-
-        await MainActor.run {
-            session.process = nil
-            if session.status == .streaming {
-                if exitCode != 0 && lineCount == 0 {
-                    session.status = .error("Process exited with code \(exitCode)")
-                } else {
-                    session.status = .done
-                    print("[CLISubprocessManager] Fallback .done, firing onSessionComplete for \(session.id)")
-                    self.onSessionComplete?(session.id)
+        // Handle process termination
+        process.terminationHandler = { proc in
+            let exitCode = proc.terminationStatus
+            logTiming("[TIMING] Process exited (code: \(exitCode))")
+            DispatchQueue.main.async {
+                session.process = nil
+                if session.status == .streaming || session.status == .connecting {
+                    if exitCode != 0 {
+                        session.status = .error("Process exited with code \(exitCode)")
+                    } else {
+                        // Normal exit — mark as done if result event didn't already
+                        if session.status != .done {
+                            session.status = .done
+                        }
+                    }
                 }
             }
         }

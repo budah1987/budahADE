@@ -26,10 +26,9 @@ struct WorkspaceView: View {
                 VStack(spacing: 0) {
                     // Content
                     if let task = state.activeTask, task.mode == .plan,
-                       let canvas = task.planCanvas {
-                        // Plan mode: full-width canvas
-                        PlanCanvasView(canvas: canvas)
-                            .clipped()
+                       let planChat = task.planChat {
+                        // Plan mode: conversation UI
+                        PlanChatView(state: planChat)
                     } else {
                         // Build mode: sidebar + terminal area + git panel
                         HStack(spacing: 0) {

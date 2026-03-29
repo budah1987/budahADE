@@ -166,7 +166,7 @@ class AppState: ObservableObject {
         for workspace in workspaces {
             for task in workspace.tasks {
                 task.saveSessionState()
-                task.planCanvas?.saveNow()
+                // Plan chat is stateless — no persistence needed
             }
         }
         // Save app-level state (which projects/tasks are open)
@@ -229,7 +229,6 @@ class AppState: ObservableObject {
         // Save state before closing terminals
         for task in workspace.tasks {
             task.saveSessionState()
-            task.planCanvas?.saveNow()
             task.closeAllTerminals()
         }
         workspaces.remove(at: index)

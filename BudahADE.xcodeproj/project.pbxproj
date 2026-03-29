@@ -1274,6 +1274,34 @@
 			<key>isa</key>
 			<string>PBXBuildFile</string>
 		</dict>
+		<key>PC01000100010001PC010001</key>
+		<dict>
+			<key>fileRef</key>
+			<string>PC01FF0100010001PC01FF01</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
+		<key>PC02000200020002PC020002</key>
+		<dict>
+			<key>fileRef</key>
+			<string>PC02FF0200020002PC02FF02</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
+		<key>PT01000100010001PT010001</key>
+		<dict>
+			<key>fileRef</key>
+			<string>PT01FF0100010001PT01FF01</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
+		<key>PT02000200020002PT020002</key>
+		<dict>
+			<key>fileRef</key>
+			<string>PT02FF0200020002PT02FF02</string>
+			<key>isa</key>
+			<string>PBXBuildFile</string>
+		</dict>
 		<key>AA30003000300030AA300030</key>
 		<dict>
 			<key>isa</key>
@@ -1778,6 +1806,50 @@
 			<key>sourceTree</key>
 			<string>&lt;group&gt;</string>
 		</dict>
+		<key>PC01FF0100010001PC01FF01</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>PlanChatView.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>PC02FF0200020002PC02FF02</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>PlanChatState.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>PT01FF0100010001PT01FF01</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>PlanTabBar.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
+		<key>PT02FF0200020002PT02FF02</key>
+		<dict>
+			<key>isa</key>
+			<string>PBXFileReference</string>
+			<key>lastKnownFileType</key>
+			<string>sourcecode.swift</string>
+			<key>path</key>
+			<string>PlanTabInfo.swift</string>
+			<key>sourceTree</key>
+			<string>&lt;group&gt;</string>
+		</dict>
 		<key>BB99999999999999BB999999</key>
 		<dict>
 			<key>isa</key>
@@ -1851,6 +1923,10 @@
 				<string>TC22222222222222TC222222</string>
 				<string>CL05000500050005CL050005</string>
 				<string>CS01000100010001CS010001</string>
+				<string>PC01FF0100010001PC01FF01</string>
+				<string>PC02FF0200020002PC02FF02</string>
+				<string>PT01FF0100010001PT01FF01</string>
+				<string>PT02FF0200020002PT02FF02</string>
 			</array>
 			<key>isa</key>
 			<string>PBXGroup</string>
@@ -2257,6 +2333,10 @@
 				<string>CL05000500050006CL050006</string>
 				<string>CS02000200020002CS020002</string>
 				<string>CR02000200020002CR020002</string>
+				<string>PC01000100010001PC010001</string>
+				<string>PC02000200020002PC020002</string>
+				<string>PT01000100010001PT010001</string>
+				<string>PT02000200020002PT020002</string>
 			</array>
 			<key>isa</key>
 			<string>PBXSourcesBuildPhase</string>

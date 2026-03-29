@@ -30,7 +30,7 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var tabs: [TabInfo] = []
     @Published var selectedTabId: UUID?
     @Published var terminals: [UUID: TerminalPanel] = [:]
-    @Published var planCanvas: PlanCanvasState?  // Legacy — kept for existing canvas references
+    @Published var planChat: PlanChatState?
     @Published var planTabId: UUID?  // Dedicated plan conversation tab
     let specState = SpecState()
     let buildStatus = BuildStatusState()
@@ -105,16 +105,12 @@ final class TaskState: ObservableObject, Identifiable {
     // MARK: - Plan/Build Mode
 
     func enterPlanMode() {
-        if planCanvas == nil {
-            let canvas = PlanCanvasState(
+        if planChat == nil {
+            planChat = PlanChatState(
                 worktreePath: worktreePath,
                 taskName: name,
                 branchName: branchName
             )
-            if let snapshot = CanvasPersistence.load(from: worktreePath) {
-                canvas.restore(from: snapshot)
-            }
-            planCanvas = canvas
         }
         mode = .plan
     }
@@ -304,8 +300,8 @@ final class TaskState: ObservableObject, Identifiable {
         selectedTabId = nil
         specWatcher?.stopWatching()
         buildStatusWatcher?.stopWatching()
-        planCanvas?.saveNow()
-        planCanvas?.closeAll()
+        planChat?.cancel()
+        planChat = nil
     }
 
     // MARK: - Session Persistence

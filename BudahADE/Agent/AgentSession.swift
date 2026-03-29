@@ -33,6 +33,7 @@ enum AgentModel: String, CaseIterable, Identifiable, Codable {
 
 enum AgentSessionStatus: Equatable {
     case idle
+    case connecting  // Subprocess launched, awaiting first output
     case streaming
     case done
     case error(String)
@@ -47,6 +48,8 @@ final class AgentSession: ObservableObject, Identifiable {
     let agentMode: AgentMode?
     let systemPrompt: String
     let workingDirectory: String
+    let enableAgentTeams: Bool
+    let disableMcp: Bool
 
     @Published var status: AgentSessionStatus = .idle
     @Published var messages: [ChatMessage] = []
@@ -68,13 +71,17 @@ final class AgentSession: ObservableObject, Identifiable {
         model: AgentModel,
         agentMode: AgentMode?,
         systemPrompt: String,
-        workingDirectory: String
+        workingDirectory: String,
+        enableAgentTeams: Bool = false,
+        disableMcp: Bool = false
     ) {
         self.id = id
         self.model = model
         self.agentMode = agentMode
         self.systemPrompt = systemPrompt
         self.workingDirectory = workingDirectory
+        self.enableAgentTeams = enableAgentTeams
+        self.disableMcp = disableMcp
     }
 
     // MARK: - Message Handling

@@ -283,7 +283,7 @@ struct GlowBar: View {
 
 // MARK: - New Tab Button
 
-private struct NewAgentTabButton: View {
+struct NewAgentTabButton: View {
     let action: () -> Void
     @State private var isHovered = false
 

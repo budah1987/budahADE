@@ -159,7 +159,6 @@ final class WorkspaceState: ObservableObject, Identifiable {
         let worktreePath = task.worktreePath
 
         task.saveSessionState()
-        task.planCanvas?.saveNow()
         task.closeAllTerminals()
 
         if let index = tasks.firstIndex(where: { $0.id == id }) {

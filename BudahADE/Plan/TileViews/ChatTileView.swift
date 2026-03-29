@@ -37,33 +37,36 @@ struct ChatTileView: View {
         self._selectedModel = State(initialValue: role.defaultModel)
     }
 
-    private var isRunning: Bool { session.status == .streaming }
+    private var isRunning: Bool { session.status == .streaming || session.status == .connecting }
 
     private var statusText: String {
         switch session.status {
-        case .streaming: return "Running"
-        case .done:      return statusDismissed ? "" : "Completed"
-        case .error:     return "Error"
-        case .idle:      return session.messages.isEmpty ? "Ready" : (statusDismissed ? "" : "Completed")
+        case .connecting: return "Connecting"
+        case .streaming:  return "Running"
+        case .done:       return statusDismissed ? "" : "Completed"
+        case .error:      return "Error"
+        case .idle:       return session.messages.isEmpty ? "Ready" : (statusDismissed ? "" : "Completed")
         }
     }
 
     private var statusColor: Color {
         switch session.status {
-        case .streaming: return Color(hex: 0x68ce6a)
-        case .done:      return Color(hex: 0x4264ef)
-        case .error:     return .red
-        case .idle:      return session.messages.isEmpty ? Theme.textMuted : Color(hex: 0x4264ef)
+        case .connecting: return Color(hex: 0x68ce6a).opacity(0.6)
+        case .streaming:  return Color(hex: 0x68ce6a)
+        case .done:       return Color(hex: 0x4264ef)
+        case .error:      return .red
+        case .idle:       return session.messages.isEmpty ? Theme.textMuted : Color(hex: 0x4264ef)
         }
     }
 
     private var glowColor: Color? {
         if statusDismissed { return nil }
         switch session.status {
-        case .streaming: return Color(hex: 0x4e9a4f)
-        case .done:      return Color(hex: 0x4264ef)
-        case .idle:      return session.messages.isEmpty ? nil : Color(hex: 0x4264ef)
-        case .error:     return nil
+        case .connecting: return Color(hex: 0x4e9a4f).opacity(0.5)
+        case .streaming:  return Color(hex: 0x4e9a4f)
+        case .done:       return Color(hex: 0x4264ef)
+        case .idle:       return session.messages.isEmpty ? nil : Color(hex: 0x4264ef)
+        case .error:      return nil
         }
     }
 
@@ -143,7 +146,7 @@ struct ChatTileView: View {
             }
         }
         .onChange(of: session.status) { _, newStatus in
-            if newStatus == .streaming { statusDismissed = false }
+            if newStatus == .streaming || newStatus == .connecting { statusDismissed = false }
         }
         .simultaneousGesture(TapGesture().onEnded {
             switch session.status {
@@ -160,7 +163,7 @@ struct ChatTileView: View {
         }
         // Esc — cancel streaming agent
         .onKeyPress(.escape) {
-            guard session.status == .streaming else { return .ignored }
+            guard session.status == .streaming || session.status == .connecting else { return .ignored }
             canvas.chatManager.cancel(sessionId: session.id)
             return .handled
         }
@@ -179,7 +182,7 @@ struct ChatTileView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    if session.messages.isEmpty && session.status != .streaming {
+                    if session.messages.isEmpty && session.status != .streaming && session.status != .connecting {
                         emptyState
                             .frame(maxWidth: .infinity)
                             .padding(.top, 40)
@@ -201,7 +204,7 @@ struct ChatTileView: View {
                     }
 
                     // Streaming indicator
-                    if session.status == .streaming {
+                    if session.status == .streaming || session.status == .connecting {
                         if !session.currentStreamingText.isEmpty {
                             streamingBubble
                                 .id("streaming")
