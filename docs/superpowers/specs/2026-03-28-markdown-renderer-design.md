@@ -70,6 +70,10 @@ enum MarkdownBlock: Identifiable {
     case orderedList(start: Int, items: [ListItem])
     case table(headers: [InlineNode], rows: [[InlineNode]], alignments: [TableAlignment?])
     case thematicBreak
+
+    /// Character range in the original markdown string (from swift-markdown's SourceRange).
+    /// Used by inline block editing to splice edits back into the source.
+    var sourceRange: Range<String.Index>
 }
 
 struct ListItem {
@@ -216,7 +220,28 @@ When detected, show a button row below the assistant message:
 ### Behavior
 
 - **Build**: For now, stores the message content on `PlanChatState` as `pendingSpec: String?` and prints a log message. This will be wired to the builder agent / Build mode in a future spec.
-- **Edit**: Opens the spec content in a modal text editor (a `TextEditor` sheet) where the user can revise before building. On save, updates the stored spec content. On cancel, dismisses.
+- **Edit**: Enables inline block-level editing within the rendered markdown view (see below).
+
+### Inline Block Editing (Edit Mode)
+
+Clicking Edit toggles the message into edit mode. The rich markdown rendering is preserved — the user stays in the same visual environment.
+
+**Interaction model (Notion-style):**
+
+1. User clicks **Edit** → message enters edit mode. Each rendered block gets a subtle hover affordance: a `borderSubtle` outline appears on hover, with a faint `hoverFill` background.
+2. User clicks a block → that block flips to a `TextEditor` showing the raw markdown for just that block. The TextEditor is styled to match the block's dimensions and position (same horizontal padding, similar height). All other blocks remain rendered.
+3. User edits the raw markdown → clicks away or presses Escape → the block re-renders with the updated content. The underlying markdown string is reconstructed from all blocks.
+4. Only one block is editable at a time. Clicking another block commits the current edit and opens the new one.
+5. **Done** button (replaces Edit button while in edit mode) exits edit mode and finalizes all changes back to `pendingSpec`.
+
+**Block granularity:** Each `MarkdownBlock` is independently editable — a heading, a paragraph, a code block, a list, a table, a horizontal rule. Nested list items are edited as part of their parent list block.
+
+**Visual cues in edit mode:**
+- Active (being edited) block: `borderActive` outline, `TextEditor` with monospace font
+- Hoverable blocks: `borderSubtle` outline on hover, cursor changes to text cursor
+- Non-hovered blocks: no outline, rendered normally
+
+**Raw markdown reconstruction:** Each `MarkdownBlock` stores its `sourceRange` from the swift-markdown AST (character offsets into the original string). When a block is edited, the original string is spliced at those offsets with the new content. This preserves formatting of untouched blocks exactly.
 
 ---
 
