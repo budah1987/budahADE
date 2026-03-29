@@ -86,6 +86,11 @@ struct PlanChatView: View {
                             PlanMessageBubble(
                                 message: message,
                                 isSpec: message.role == .assistant && state.looksLikeSpec(message.content),
+                                isEditing: state.editingMessageId == message.id,
+                                editableContent: Binding(
+                                    get: { state.pendingSpec ?? message.content },
+                                    set: { state.pendingSpec = $0 }
+                                ),
                                 onBuild: {
                                     state.pendingSpec = message.content
                                     print("[PlanChat] Build requested for spec (\(message.content.count) chars)")
@@ -93,6 +98,9 @@ struct PlanChatView: View {
                                 onEdit: {
                                     state.editingMessageId = message.id
                                     state.pendingSpec = message.content
+                                },
+                                onDoneEditing: {
+                                    state.editingMessageId = nil
                                 }
                             )
                             .id(message.id)
@@ -501,14 +509,28 @@ struct PlanChatView: View {
 private struct PlanMessageBubble: View {
     let message: ChatMessage
     let isSpec: Bool
+    let isEditing: Bool
+    @Binding var editableContent: String
     let onBuild: (() -> Void)?
     let onEdit: (() -> Void)?
+    let onDoneEditing: (() -> Void)?
 
-    init(message: ChatMessage, isSpec: Bool = false, onBuild: (() -> Void)? = nil, onEdit: (() -> Void)? = nil) {
+    init(
+        message: ChatMessage,
+        isSpec: Bool = false,
+        isEditing: Bool = false,
+        editableContent: Binding<String> = .constant(""),
+        onBuild: (() -> Void)? = nil,
+        onEdit: (() -> Void)? = nil,
+        onDoneEditing: (() -> Void)? = nil
+    ) {
         self.message = message
         self.isSpec = isSpec
+        self.isEditing = isEditing
+        self._editableContent = editableContent
         self.onBuild = onBuild
         self.onEdit = onEdit
+        self.onDoneEditing = onDoneEditing
     }
 
     var body: some View {
@@ -517,9 +539,15 @@ private struct PlanMessageBubble: View {
             userBubble
         case .assistant:
             VStack(alignment: .leading, spacing: 0) {
-                assistantBubble
-                if isSpec {
-                    specActionButtons
+                if isEditing {
+                    EditableMarkdownRenderer(content: $editableContent) {
+                        onDoneEditing?()
+                    }
+                } else {
+                    assistantBubble
+                    if isSpec {
+                        specActionButtons
+                    }
                 }
             }
         case .system:
