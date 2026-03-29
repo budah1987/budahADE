@@ -191,17 +191,7 @@ struct PlanChatView: View {
     }
 
     private func streamingBubble(_ text: String) -> some View {
-        HStack {
-            Text(text)
-                .font(Theme.body(14))
-                .foregroundColor(Theme.textPrimary)
-                .textSelection(.enabled)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Theme.surface2)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            Spacer(minLength: 80)
-        }
+        MarkdownRenderer(text, isStreaming: true)
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
@@ -541,17 +531,7 @@ private struct PlanMessageBubble: View {
             }
 
             if !message.content.isEmpty {
-                HStack {
-                    Text(message.content)
-                        .font(Theme.body(14))
-                        .foregroundColor(Theme.textPrimary)
-                        .textSelection(.enabled)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Theme.surface2)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    Spacer(minLength: 80)
-                }
+                MarkdownRenderer(message.content)
             }
         }
     }
