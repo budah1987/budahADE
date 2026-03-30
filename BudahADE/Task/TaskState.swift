@@ -106,10 +106,8 @@ final class TaskState: ObservableObject, Identifiable {
     // MARK: - Plan/Build Mode
 
     func enterPlanMode() {
-        if planTabs.isEmpty {
-            createPlanTab()
-        }
         mode = .plan
+        // Role selection modal handles tab creation — don't auto-create here
     }
 
     func enterBuildMode() {
@@ -131,15 +129,15 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     @discardableResult
-    func createPlanTab() -> UUID {
+    func createPlanTab(role: AgentMode) -> UUID {
         let tabId = UUID()
         let chatState = PlanChatState(
             worktreePath: worktreePath,
             taskName: name,
-            branchName: branchName
+            branchName: branchName,
+            role: role
         )
-        let tabNumber = planTabs.count + 1
-        let tab = PlanTabInfo(id: tabId, title: "Plan \(tabNumber)")
+        let tab = PlanTabInfo(id: tabId, title: role.displayName, role: role)
         planTabs.append(tab)
         planChats[tabId] = chatState
         selectedPlanTabId = tabId
@@ -165,10 +163,7 @@ final class TaskState: ObservableObject, Identifiable {
             }
         }
 
-        // If last tab closed, create a new empty one
-        if planTabs.isEmpty {
-            createPlanTab()
-        }
+        // If last tab closed, leave empty — role selection modal will appear in WorkspaceView
     }
 
     func selectPlanTab(_ id: UUID) {
@@ -517,6 +512,11 @@ final class TaskState: ObservableObject, Identifiable {
                 print("[AgentStatus] title=\"\(title)\" → \(newStatus)")
                 let oldStatus = self.previousStatuses[surfaceId] ?? .inactive
                 self.previousStatuses[surfaceId] = newStatus
+
+                // Mark tab as having had activity once Claude runs
+                if newStatus == .working || newStatus == .thinking {
+                    self.tabs[index].hadActivity = true
+                }
 
                 // Transition from active → idle: mark completed (persists until user opens tab)
                 if (oldStatus == .working || oldStatus == .thinking) && newStatus == .inactive {

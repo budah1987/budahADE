@@ -82,6 +82,7 @@
 		B637F69B5A385EC7D882E5C1 /* GitWorktreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A658A83DDCAA7B7F63B1827 /* GitWorktreeManager.swift */; };
 		B68A9BA58C76081C1BD3C20A /* GitPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B705CFF356264227986EFC3 /* GitPanelView.swift */; };
 		B95C32539457698DEAB58ECB /* PlanCanvasState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD8144AB5B9FEA46F501828 /* PlanCanvasState.swift */; };
+		4AF230FE91BE4ED29EFDFA03 /* RoleSelectionModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 547367CB4F2C498C9C011270 /* RoleSelectionModal.swift */; };
 		B9E8125A92533B1BE418C116 /* PlanTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF2963B910167F6F17F353CD /* PlanTabBar.swift */; };
 		BFD0853E7FEB2689A97101F0 /* SessionPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B298CF533118ED5109DDB4 /* SessionPersistenceTests.swift */; };
 		BFD578FE7958B66754A04103 /* StagingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0BB662F1E68870408AB79C0 /* StagingView.swift */; };
@@ -239,6 +240,7 @@
 		FD6E9C66553BA0289C0B3306 /* GhosttyAppManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyAppManager.swift; sourceTree = "<group>"; };
 		FD75DF3790A8DDCC1EF44F5A /* ImageTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageTileView.swift; sourceTree = "<group>"; };
 		FE4F0D74F215CD570C46CDF7 /* RestoredTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoredTerminalView.swift; sourceTree = "<group>"; };
+		547367CB4F2C498C9C011270 /* RoleSelectionModal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleSelectionModal.swift; sourceTree = "<group>"; };
 		FF2963B910167F6F17F353CD /* PlanTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanTabBar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -316,6 +318,7 @@
 				0B13B8012976BD523DA1A788 /* PlanChatView.swift */,
 				FF2963B910167F6F17F353CD /* PlanTabBar.swift */,
 				44797B9C62EDBFA7C53FC905 /* PlanTabInfo.swift */,
+				547367CB4F2C498C9C011270 /* RoleSelectionModal.swift */,
 				6C3EF5BB2ADCB65A6F16E122 /* ScrollWheelMonitor.swift */,
 				FC8076CAE8B058A6546DFC05 /* SmartGuides.swift */,
 				D8A1D43F4D8C488C552F26E4 /* TileConnection.swift */,
@@ -658,6 +661,7 @@
 				9A591DEA92F5E2CBEC8B1BF1 /* PlanChatView.swift in Sources */,
 				B9E8125A92533B1BE418C116 /* PlanTabBar.swift in Sources */,
 				8D614A6C2D45D57D424989FF /* PlanTabInfo.swift in Sources */,
+				4AF230FE91BE4ED29EFDFA03 /* RoleSelectionModal.swift in Sources */,
 				A7D399BBD879DA2E9E981942 /* ProjectPickerView.swift in Sources */,
 				64FC5DA81A3FACFE44D1AA80 /* ProjectStore.swift in Sources */,
 				D8F81F365F4CE4AADB9F6AF2 /* RestoredTerminalView.swift in Sources */,

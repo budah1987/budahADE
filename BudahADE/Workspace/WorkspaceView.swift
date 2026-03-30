@@ -9,6 +9,13 @@ struct WorkspaceView: View {
     @State private var renameText: String = ""
     @FocusState private var renameFieldFocused: Bool
 
+    /// Tab close confirmation
+    @State private var tabCloseRequest: TabCloseRequest? = nil
+    @State private var showCloseConfirmation: Bool = false
+
+    /// Role selection modal (shown as sheet when adding new plan tab)
+    @State private var showRoleModal: Bool = false
+
     var body: some View {
         ZStack {
             Theme.appBackground.ignoresSafeArea()
@@ -26,22 +33,41 @@ struct WorkspaceView: View {
                 VStack(spacing: 0) {
                     // Content
                     if let task = state.activeTask, task.mode == .plan {
-                        // Plan mode: tab bar + full-width chat
-                        VStack(spacing: 0) {
-                            PlanTabBar(
-                                selectedTabID: Binding(
-                                    get: { task.selectedPlanTabId ?? UUID() },
-                                    set: { task.selectPlanTab($0) }
-                                ),
-                                tabs: task.planTabs,
-                                onSelectTab: { task.selectPlanTab($0) },
-                                onCloseTab: { task.closePlanTab($0) },
-                                onNewTab: { task.createPlanTab() }
-                            )
+                        // Plan mode: show role modal when no tabs, otherwise tab bar + chat
+                        if task.planTabs.isEmpty {
+                            ZStack {
+                                Theme.appBackground
+                                RoleSelectionModal { role in
+                                    task.createPlanTab(role: role)
+                                }
+                            }
+                        } else {
+                            VStack(spacing: 0) {
+                                PlanTabBar(
+                                    selectedTabID: Binding(
+                                        get: { task.selectedPlanTabId ?? UUID() },
+                                        set: { task.selectPlanTab($0) }
+                                    ),
+                                    tabs: task.planTabs,
+                                    onSelectTab: { task.selectPlanTab($0) },
+                                    onCloseTab: { requestCloseTab(.plan($0)) },
+                                    onNewTab: { showRoleModal = true }
+                                )
 
-                            if let planChat = task.activePlanChat {
-                                PlanChatView(state: planChat)
-                                    .id(task.selectedPlanTabId)
+                                if let planChat = task.activePlanChat {
+                                    PlanChatView(state: planChat)
+                                        .id(task.selectedPlanTabId)
+                                }
+                            }
+                            .sheet(isPresented: $showRoleModal) {
+                                if let task = state.activeTask {
+                                    RoleSelectionModal { role in
+                                        task.createPlanTab(role: role)
+                                        showRoleModal = false
+                                    }
+                                    .padding(24)
+                                    .background(Theme.appBackground)
+                                }
                             }
                         }
                     } else {
@@ -92,6 +118,20 @@ struct WorkspaceView: View {
             NewTaskSheet(workspace: state)
                 .background(Theme.appBackground)
         }
+        .alert("Close conversation?", isPresented: $showCloseConfirmation) {
+            Button("Cancel", role: .cancel) {
+                tabCloseRequest = nil
+            }
+            Button("Close") {
+                if let request = tabCloseRequest {
+                    performCloseTab(request)
+                }
+                tabCloseRequest = nil
+            }
+            .keyboardShortcut(.defaultAction)
+        } message: {
+            Text("This conversation has messages that will be lost.")
+        }
         .onReceive(NotificationCenter.default.publisher(for: .toggleLeftPanel)) { _ in
             state.leftPanelVisible.toggle()
         }
@@ -101,7 +141,7 @@ struct WorkspaceView: View {
         .onReceive(NotificationCenter.default.publisher(for: .newTerminalTab)) { _ in
             if let task = state.activeTask {
                 if task.mode == .plan {
-                    task.createPlanTab()
+                    showRoleModal = true
                 } else {
                     task.createTab()
                 }
@@ -111,11 +151,11 @@ struct WorkspaceView: View {
             if let task = state.activeTask {
                 if task.mode == .plan {
                     if let id = task.selectedPlanTabId {
-                        task.closePlanTab(id)
+                        requestCloseTab(.plan(id))
                     }
                 } else {
                     if let id = task.selectedTabId {
-                        task.closeTab(id)
+                        requestCloseTab(.build(id))
                     }
                 }
             }
@@ -181,7 +221,7 @@ struct WorkspaceView: View {
                     tabs: task.tabs,
                     renameTarget: renameTarget,
                     onSelectTab: { task.selectTab($0) },
-                    onCloseTab: { task.closeTab($0) },
+                    onCloseTab: { requestCloseTab(.build($0)) },
                     onNewTab: { task.createTab() }
                 )
 
@@ -338,6 +378,45 @@ struct WorkspaceView: View {
         renameText = ""
         renameFieldFocused = false
     }
+
+    // MARK: - Tab Close with Confirmation
+
+    private func requestCloseTab(_ request: TabCloseRequest) {
+        guard let task = state.activeTask else { return }
+
+        let hasDialogue: Bool
+        switch request {
+        case .plan(let id):
+            hasDialogue = task.planChats[id]?.plannerSession?.messages.isEmpty == false
+        case .build(let id):
+            let tab = task.tabs.first(where: { $0.id == id })
+            hasDialogue = tab?.hadActivity == true
+        }
+
+        if hasDialogue {
+            tabCloseRequest = request
+            showCloseConfirmation = true
+        } else {
+            performCloseTab(request)
+        }
+    }
+
+    private func performCloseTab(_ request: TabCloseRequest) {
+        guard let task = state.activeTask else { return }
+        switch request {
+        case .plan(let id):
+            task.closePlanTab(id)
+        case .build(let id):
+            task.closeTab(id)
+        }
+    }
+}
+
+// MARK: - Tab Close Request
+
+enum TabCloseRequest {
+    case plan(UUID)
+    case build(UUID)
 }
 
 // MARK: - Rename Spotlight Preference
