@@ -26,6 +26,7 @@
 		413C4EEA79F17A69DA0D4310 /* BrowserTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DF69F7E258333429E8776A /* BrowserTileView.swift */; };
 		43D022ED6150174EFAFC7842 /* BuildStatusState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6793A0F29FC48F428D7551AC /* BuildStatusState.swift */; };
 		449169319080787A9AFD1CEB /* ContextManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C8F8EFE9D0875190D83149 /* ContextManifest.swift */; };
+		4785E3EA50862FC7F50DF21C /* ActivityFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD34AFA74441FB323B2CD6F9 /* ActivityFeedView.swift */; };
 		4A25D41B5AED10D8711A0303 /* FrameContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AD75E3820536BF544B2378 /* FrameContainerView.swift */; };
 		4CE1E4AE6F3E316D80DAB7EA /* SpecState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569312B838ACACD366CC8090 /* SpecState.swift */; };
 		4D85A7FAD126CCC450B6E2D2 /* DiffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA31CD9CFC2F1AF11FB20450 /* DiffView.swift */; };
@@ -220,6 +221,7 @@
 		CAD8144AB5B9FEA46F501828 /* PlanCanvasState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCanvasState.swift; sourceTree = "<group>"; };
 		CDDE6DF907D1800819FC9F49 /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
 		D8A1D43F4D8C488C552F26E4 /* TileConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileConnection.swift; sourceTree = "<group>"; };
+		DD34AFA74441FB323B2CD6F9 /* ActivityFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFeedView.swift; sourceTree = "<group>"; };
 		E0BB662F1E68870408AB79C0 /* StagingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StagingView.swift; sourceTree = "<group>"; };
 		E1492F0DCA16FEBCBDFA3D73 /* TmuxSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxSessionManager.swift; sourceTree = "<group>"; };
 		E1AD75E3820536BF544B2378 /* FrameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameContainerView.swift; sourceTree = "<group>"; };
@@ -293,6 +295,7 @@
 		320506BC4593ADBFBD0B9817 /* Plan */ = {
 			isa = PBXGroup;
 			children = (
+				DD34AFA74441FB323B2CD6F9 /* ActivityFeedView.swift */,
 				1CDF50E67156ED3F76A0BE03 /* AddTileMenu.swift */,
 				62AD068CF25E28A75B6B32B3 /* AgentPrompts.swift */,
 				1BC9007B2EB655C83C85950F /* CanvasElementView.swift */,
@@ -591,6 +594,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4785E3EA50862FC7F50DF21C /* ActivityFeedView.swift in Sources */,
 				FA090C7F8F09D8B03C20FE4F /* AddTileMenu.swift in Sources */,
 				2938C456FFF461F3E288470C /* AgentPrompts.swift in Sources */,
 				8D755546EB10A32DB66C6D7D /* AgentRole.swift in Sources */,

@@ -84,6 +84,11 @@ struct BudahADEApp: App {
                     NotificationCenter.default.post(name: .toggleRightPanel, object: nil)
                 }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
+
+                Button("Focus Input") {
+                    NotificationCenter.default.post(name: .focusInput, object: nil)
+                }
+                .keyboardShortcut("l", modifiers: .command)
             }
 
             // Cmd+1..9 — switch agent tabs within active task
@@ -302,4 +307,5 @@ extension Notification.Name {
     static let canvasZoomToFit = Notification.Name("budahADE.canvasZoomToFit")
     static let closeTask = Notification.Name("budahADE.closeTask")
     static let toggleRightPanel = Notification.Name("budahADE.toggleRightPanel")
+    static let focusInput = Notification.Name("budahADE.focusInput")
 }

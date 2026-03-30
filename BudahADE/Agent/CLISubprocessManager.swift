@@ -181,13 +181,19 @@ final class CLISubprocessManager: ObservableObject {
             let event = try StreamEvent.parse(from: trimmed)
             switch event {
             case .system(let info):
-                // Only log the init event (has tools), skip hook events
                 if info.tools != nil {
                     logTiming("[TIMING] T4 system init received")
                 }
                 session.handleSystemInit(info)
             case .assistant(let msg):
                 session.handleAssistantMessage(msg)
+                // Emit tool use events from assistant content blocks
+                if let tools = msg.toolCalls {
+                    for tool in tools {
+                        let toolEvent = ToolUseEvent(id: tool.id, name: tool.name, inputJSON: tool.input)
+                        session.handleToolUse(toolEvent)
+                    }
+                }
             case .contentDelta(let text):
                 if session.currentStreamingText.isEmpty {
                     logTiming("[TIMING] T6 first contentDelta received")
@@ -197,6 +203,16 @@ final class CLISubprocessManager: ObservableObject {
                 logTiming("[TIMING] T7 result event received")
                 session.handleResult(result)
                 onSessionComplete?(session.id)
+            case .toolUse(let event):
+                session.handleToolUse(event)
+            case .toolResult(let event):
+                session.handleToolResult(event)
+            case .thinking(let text):
+                session.handleThinking(text)
+            case .rateLimitEvent(let info):
+                session.handleRateLimit(info)
+            case .hookStarted, .hookResponse:
+                break  // Log only, no UI action
             case .unknown:
                 break
             }

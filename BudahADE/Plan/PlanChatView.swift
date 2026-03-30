@@ -14,8 +14,7 @@ struct PlanChatView: View {
     @State private var showModelMenu: Bool = false
     @State private var inputTextHeight: CGFloat = 36
     @State private var thinkingStartDate: Date?
-    @State private var activityLog: [ActivityEntry] = []
-    @State private var lastToolCallCount: Int = 0
+    @FocusState private var inputFocused: Bool
 
     private var session: AgentSession? { state.plannerSession }
     private var isRunning: Bool {
@@ -43,6 +42,30 @@ struct PlanChatView: View {
                     .allowsHitTesting(false)
                 }
 
+            // Option buttons sheet — slides up from input
+            if let session,
+               !session.optionsDismissed,
+               let lastMsg = session.messages.last,
+               lastMsg.role == .assistant,
+               !lastMsg.content.isEmpty,
+               let options = session.detectOptions(in: lastMsg.content) {
+                OptionButtonsSheet(
+                    options: options,
+                    onSelect: { option in
+                        session.optionsDismissed = true
+                        state.sendMessage("\(option.label). \(option.text)")
+                    },
+                    onDismiss: {
+                        session.optionsDismissed = true
+                    },
+                    onCustomResponse: { text in
+                        session.optionsDismissed = true
+                        state.sendMessage(text)
+                    }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             // Input area
             inputArea
         }
@@ -61,6 +84,9 @@ struct PlanChatView: View {
             guard press.modifiers.contains(.control) else { return .ignored }
             if pasteImageFromClipboard() { return .handled }
             return .ignored
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusInput)) { _ in
+            inputFocused = true
         }
     }
 
@@ -112,11 +138,12 @@ struct PlanChatView: View {
                                 .id("streaming")
                         }
 
-                        // Unified thinking indicator — connecting, thinking, or tool activity
+                        // Activity feed — tool calls, thinking, rate limits
                         if session.status == .connecting ||
                            (session.status == .streaming && session.currentStreamingText.isEmpty) {
-                            ThinkingIndicator(
-                                activityLog: activityLog,
+                            ActivityFeedView(
+                                activityFeed: session.activityFeed,
+                                isThinking: session.isThinking,
                                 startDate: thinkingStartDate
                             )
                             .id("thinking")
@@ -129,38 +156,18 @@ struct PlanChatView: View {
             .onChange(of: session?.messages.count) { _, _ in
                 scrollToBottom(proxy: proxy)
             }
-            .onChange(of: session?.currentStreamingText) { _, newText in
+            .onChange(of: session?.currentStreamingText) { _, _ in
                 scrollToBottom(proxy: proxy)
-                // When streaming text begins, mark it in the activity log
-                if let text = newText, !text.isEmpty,
-                   activityLog.last?.label != "Responding..." {
-                    activityLog.append(ActivityEntry(label: "Responding..."))
-                }
             }
-            .onChange(of: session?.status) { oldValue, newValue in
+            .onChange(of: session?.status) { _, newValue in
                 if newValue == .connecting {
                     thinkingStartDate = Date()
-                    activityLog = [ActivityEntry(label: "Connecting...")]
-                    lastToolCallCount = 0
-                } else if newValue == .streaming && oldValue == .connecting {
-                    activityLog.append(ActivityEntry(label: "Thinking..."))
+                    session?.activityFeed = []
+                    session?.isThinking = false
                 } else if newValue == .idle || newValue == .done || newValue == nil {
                     thinkingStartDate = nil
                 } else if case .error = newValue {
                     thinkingStartDate = nil
-                }
-            }
-            .onChange(of: session?.pendingToolCalls.count) { oldCount, newCount in
-                guard let tools = session?.pendingToolCalls,
-                      let newCount, let oldCount,
-                      newCount > oldCount else { return }
-                // Append new tool calls as activity entries
-                for tool in tools.suffix(newCount - oldCount) {
-                    let label = ActivityEntry.label(for: tool.name)
-                    // Avoid duplicating the same label consecutively
-                    if activityLog.last?.label != label {
-                        activityLog.append(ActivityEntry(label: label))
-                    }
                 }
             }
         }
@@ -314,6 +321,7 @@ struct PlanChatView: View {
                         .frame(height: min(max(inputTextHeight + 10, 36), 200))
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
+                        .focused($inputFocused)
                         .background(
                             Text(inputText.isEmpty ? "A" : inputText)
                                 .font(.system(size: 14))
@@ -649,153 +657,185 @@ private struct PlanMessageBubble: View {
     }
 }
 
-// MARK: - Activity Entry
 
-struct ActivityEntry: Identifiable, Equatable {
-    let id = UUID()
-    let label: String
-    let timestamp = Date()
+// MARK: - Option Buttons Sheet
 
-    static func == (lhs: ActivityEntry, rhs: ActivityEntry) -> Bool {
-        lhs.id == rhs.id
-    }
+private struct OptionButtonsSheet: View {
+    let options: [AgentSession.DetectedOption]
+    let onSelect: (AgentSession.DetectedOption) -> Void
+    let onDismiss: () -> Void
+    let onCustomResponse: (String) -> Void
 
-    static func label(for toolName: String) -> String {
-        switch toolName {
-        case "Read", "Glob":
-            return "Reading files..."
-        case "Grep":
-            return "Searching codebase..."
-        case "Edit", "Write":
-            return "Editing code..."
-        case "Bash":
-            return "Running command..."
-        case "Agent":
-            return "Researching..."
-        case "WebSearch", "WebFetch":
-            return "Browsing web..."
-        default:
-            return "Working..."
+    @State private var customText: String = ""
+    @FocusState private var sheetFocused: Bool
+    @FocusState private var customFieldFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // Header with close button
+            HStack {
+                Spacer()
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(Theme.textMuted)
+                        .frame(width: 20, height: 20)
+                        .background(Theme.hoverFill)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.trailing, 4)
+
+            // Option rows
+            ForEach(options) { option in
+                OptionSheetRow(option: option, onSelect: onSelect)
+            }
+
+            // "Something else" free-text input
+            HStack(spacing: 8) {
+                Text("↵")
+                    .font(Theme.mono(12))
+                    .foregroundColor(Theme.textMuted)
+                    .frame(width: 18, alignment: .trailing)
+                TextField("Something else...", text: $customText)
+                    .font(Theme.body(13))
+                    .foregroundColor(Theme.textPrimary)
+                    .textFieldStyle(.plain)
+                    .focused($customFieldFocused)
+                    .onSubmit {
+                        let trimmed = customText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        onCustomResponse(trimmed)
+                    }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Theme.hoverFill.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .padding(.top, 2)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Theme.surface2.opacity(0.6))
+        .focusable()
+        .focused($sheetFocused)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                sheetFocused = true
+            }
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "123456789"), phases: .down) { press in
+            guard !customFieldFocused else { return .ignored }
+            guard let char = press.characters.first,
+                  let num = Int(String(char)),
+                  num >= 1, num <= options.count else { return .ignored }
+            if let option = options.first(where: { $0.label == String(num) }) {
+                withAnimation(.easeOut(duration: 0.15)) { onSelect(option) }
+                return .handled
+            }
+            let idx = num - 1
+            if idx < options.count {
+                withAnimation(.easeOut(duration: 0.15)) { onSelect(options[idx]) }
+                return .handled
+            }
+            return .ignored
+        }
+        .onKeyPress(.escape) {
+            if customFieldFocused {
+                customFieldFocused = false
+                sheetFocused = true
+                return .handled
+            }
+            withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
+            return .handled
         }
     }
 }
 
-// MARK: - Thinking Indicator
+private struct OptionSheetRow: View {
+    let option: AgentSession.DetectedOption
+    let onSelect: (AgentSession.DetectedOption) -> Void
 
-private struct ThinkingIndicator: View {
-    let activityLog: [ActivityEntry]
-    let startDate: Date?
-
-    // Carousel shows up to 5 rows: 2 past (faded) + current (white) + 2 future (empty/dim)
-    private let visibleSlots = 5
-    private let rowHeight: CGFloat = 20
-
-    private static let brailleFrames: [String] = [
-        "\u{280B}", "\u{2819}", "\u{2839}", "\u{2838}",
-        "\u{283C}", "\u{2834}", "\u{2826}", "\u{2827}",
-        "\u{2807}", "\u{280F}"
-    ]
+    @State private var isHovered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Activity carousel
-            activityCarousel
-
-            // Braille spinner + timer row
+        Button {
+            withAnimation(.easeOut(duration: 0.15)) {
+                onSelect(option)
+            }
+        } label: {
             HStack(spacing: 8) {
-                TimelineView(.animation(minimumInterval: 0.08)) { timeline in
-                    let idx = Int(timeline.date.timeIntervalSinceReferenceDate / 0.08) % Self.brailleFrames.count
-                    Text(Self.brailleFrames[idx])
-                        .font(.system(size: 14, design: .monospaced))
-                        .foregroundColor(Theme.textSecondary)
-                }
-
-                if let startDate {
-                    TimelineView(.animation(minimumInterval: 0.1)) { timeline in
-                        let elapsed = timeline.date.timeIntervalSince(startDate)
-                        Text(String(format: "%.1fs", elapsed))
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(Theme.textMuted)
-                    }
-                }
-
+                Text(option.label)
+                    .font(Theme.mono(12))
+                    .foregroundColor(Theme.accent)
+                    .frame(width: 18, alignment: .trailing)
+                InlineBoldText(option.text)
+                    .font(Theme.body(13))
+                    .foregroundColor(isHovered ? .white : Theme.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
                 Spacer()
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(isHovered ? Theme.hoverFill : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 6)
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
+// MARK: - Inline Bold Text
+
+/// Parses **bold** markers in a string and renders them as bold Text segments
+private struct InlineBoldText: View {
+    let source: String
+
+    init(_ source: String) {
+        self.source = source
     }
 
-    private var activityCarousel: some View {
-        let activeIndex = activityLog.count - 1
+    var body: some View {
+        parsedText
+    }
 
-        return VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(visibleEntries.enumerated()), id: \.element.id) { offset, entry in
-                let slotIndex = offset
-                let distanceFromActive = slotIndex - activeSlotPosition
+    private var parsedText: Text {
+        var result = Text("")
+        var remaining = source[source.startIndex..<source.endIndex]
 
-                Text(entry.label)
-                    .font(Theme.caption(12))
-                    .foregroundColor(colorForDistance(distanceFromActive))
-                    .frame(height: rowHeight, alignment: .leading)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .move(edge: .top).combined(with: .opacity)
-                    ))
+        while let boldStart = remaining.range(of: "**") {
+            // Text before the bold marker
+            let before = remaining[remaining.startIndex..<boldStart.lowerBound]
+            if !before.isEmpty {
+                result = result + Text(before)
             }
-        }
-        .animation(.easeOut(duration: 0.3), value: activityLog.count)
-        .mask(
-            VStack(spacing: 0) {
-                // Top fade — past items fade out
-                LinearGradient(
-                    colors: [.clear, .white],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: rowHeight)
 
-                // Full opacity middle
-                Rectangle().fill(.white)
-
-                // Bottom fade — subtle shadow
-                LinearGradient(
-                    colors: [.white, .white.opacity(0.3)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: rowHeight * 0.5)
+            // Find closing **
+            let afterOpen = boldStart.upperBound
+            guard afterOpen < remaining.endIndex,
+                  let boldEnd = remaining[afterOpen...].range(of: "**") else {
+                // No closing marker — render the rest as plain text
+                result = result + Text(remaining[boldStart.lowerBound...])
+                return result
             }
-        )
-    }
 
-    /// The entries visible in the carousel window
-    private var visibleEntries: [ActivityEntry] {
-        let count = activityLog.count
-        if count == 0 { return [ActivityEntry(label: "Thinking...")] }
-
-        // Show up to 2 previous + current
-        let startIdx = max(0, count - 3)
-        return Array(activityLog[startIdx..<count])
-    }
-
-    /// Position of the active (latest) entry within visibleEntries
-    private var activeSlotPosition: Int {
-        visibleEntries.count - 1
-    }
-
-    private func colorForDistance(_ distance: Int) -> Color {
-        if distance == 0 {
-            // Active — subtle white
-            return Color.white.opacity(0.85)
-        } else if distance < 0 {
-            // Past — progressively faded
-            let fade = max(0.15, 0.4 + Double(distance) * 0.15)
-            return Color.white.opacity(fade)
-        } else {
-            // Future placeholder slots
-            return Color.white.opacity(0.1)
+            let boldContent = remaining[afterOpen..<boldEnd.lowerBound]
+            result = result + Text(boldContent).bold()
+            remaining = remaining[boldEnd.upperBound...]
         }
+
+        // Remaining text after last bold
+        if !remaining.isEmpty {
+            result = result + Text(remaining)
+        }
+
+        return result
     }
 }
 

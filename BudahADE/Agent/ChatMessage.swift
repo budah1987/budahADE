@@ -52,11 +52,45 @@ struct ChatMessage: Identifiable, Equatable, Codable {
 
 // MARK: - StreamEvent
 
+// MARK: - New Event Structs
+
+struct ToolUseEvent: Equatable {
+    let id: String
+    let name: String
+    let inputJSON: String  // Raw JSON string — parse specific keys on demand
+}
+
+struct ToolResultEvent: Equatable {
+    let toolUseId: String
+    let content: String
+    let isError: Bool
+}
+
+struct RateLimitInfo: Equatable {
+    let status: String
+    let resetsAt: String?
+    let rateLimitType: String?
+}
+
+struct HookEvent: Equatable {
+    let hookId: String
+    let hookName: String
+    let hookEvent: String
+}
+
+// MARK: - StreamEvent
+
 enum StreamEvent: Equatable {
     case system(SystemInfo)
     case assistant(AssistantMessage)
     case contentDelta(String)
     case result(ResultInfo)
+    case toolUse(ToolUseEvent)
+    case toolResult(ToolResultEvent)
+    case thinking(String)
+    case rateLimitEvent(RateLimitInfo)
+    case hookStarted(HookEvent)
+    case hookResponse(HookEvent)
     case unknown
 
     var debugLabel: String {
@@ -65,6 +99,12 @@ enum StreamEvent: Equatable {
         case .assistant: return "assistant"
         case .contentDelta: return "contentDelta"
         case .result: return "result"
+        case .toolUse: return "toolUse"
+        case .toolResult: return "toolResult"
+        case .thinking: return "thinking"
+        case .rateLimitEvent: return "rateLimitEvent"
+        case .hookStarted: return "hookStarted"
+        case .hookResponse: return "hookResponse"
         case .unknown: return "unknown"
         }
     }
@@ -126,21 +166,30 @@ enum StreamEvent: Equatable {
     struct ResultInfo: Equatable, Codable {
         let costUSD: Double
         let durationMs: Int?
+        let durationApiMs: Int?
         let sessionId: String?
+        let numTurns: Int?
+        let stopReason: String?
         let inputTokens: Int
         let outputTokens: Int
 
         enum CodingKeys: String, CodingKey {
-            case costUSD = "cost_usd"
+            case costUSD = "total_cost_usd"
             case durationMs = "duration_ms"
+            case durationApiMs = "duration_api_ms"
             case sessionId = "session_id"
+            case numTurns = "num_turns"
+            case stopReason = "stop_reason"
             case inputTokens, outputTokens
         }
 
-        init(costUSD: Double, durationMs: Int? = nil, sessionId: String? = nil, inputTokens: Int = 0, outputTokens: Int = 0) {
+        init(costUSD: Double, durationMs: Int? = nil, durationApiMs: Int? = nil, sessionId: String? = nil, numTurns: Int? = nil, stopReason: String? = nil, inputTokens: Int = 0, outputTokens: Int = 0) {
             self.costUSD = costUSD
             self.durationMs = durationMs
+            self.durationApiMs = durationApiMs
             self.sessionId = sessionId
+            self.numTurns = numTurns
+            self.stopReason = stopReason
             self.inputTokens = inputTokens
             self.outputTokens = outputTokens
         }
@@ -149,7 +198,10 @@ enum StreamEvent: Equatable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             self.costUSD = try container.decode(Double.self, forKey: .costUSD)
             self.durationMs = try container.decodeIfPresent(Int.self, forKey: .durationMs)
+            self.durationApiMs = try container.decodeIfPresent(Int.self, forKey: .durationApiMs)
             self.sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
+            self.numTurns = try container.decodeIfPresent(Int.self, forKey: .numTurns)
+            self.stopReason = try container.decodeIfPresent(String.self, forKey: .stopReason)
 
             // Parse usage object
             let usage = try container.nestedContainer(keyedBy: UsageCodingKeys.self, forKey: .inputTokens)
@@ -161,7 +213,10 @@ enum StreamEvent: Equatable {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(costUSD, forKey: .costUSD)
             try container.encodeIfPresent(durationMs, forKey: .durationMs)
+            try container.encodeIfPresent(durationApiMs, forKey: .durationApiMs)
             try container.encodeIfPresent(sessionId, forKey: .sessionId)
+            try container.encodeIfPresent(numTurns, forKey: .numTurns)
+            try container.encodeIfPresent(stopReason, forKey: .stopReason)
 
             var usage = container.nestedContainer(keyedBy: UsageCodingKeys.self, forKey: .inputTokens)
             try usage.encode(inputTokens, forKey: .inputTokens)
@@ -187,6 +242,16 @@ enum StreamEvent: Equatable {
 
             switch typeStr {
             case "system":
+                // Check subtype for hooks vs init
+                let subtype = decoded["subtype"]?.stringValue
+                if subtype == "hook_started" || subtype == "hook_response" {
+                    let hook = HookEvent(
+                        hookId: decoded["hook_id"]?.stringValue ?? "",
+                        hookName: decoded["hook_name"]?.stringValue ?? "",
+                        hookEvent: decoded["hook_event"]?.stringValue ?? ""
+                    )
+                    return subtype == "hook_started" ? .hookStarted(hook) : .hookResponse(hook)
+                }
                 let info = SystemInfo(
                     sessionId: decoded["session_id"]?.stringValue ?? "",
                     tools: decoded["tools"]?.arrayValue?.compactMap { $0.stringValue },
@@ -199,43 +264,44 @@ enum StreamEvent: Equatable {
                     throw StreamParseError.invalidData
                 }
 
-                // Parse content array
                 var textContent = ""
                 var toolCalls: [ToolCall]?
+                var toolUseEvents: [ToolUseEvent] = []
+                var thinkingText = ""
 
                 if let contentArray = messageObj["content"]?.arrayValue {
                     var tools: [ToolCall] = []
 
                     for item in contentArray {
-                        if let itemObj = item.objectValue {
-                            if itemObj["type"]?.stringValue == "text" {
-                                if let text = itemObj["text"]?.stringValue {
-                                    if !textContent.isEmpty {
-                                        textContent += "\n"
-                                    }
-                                    textContent += text
-                                }
-                            } else if itemObj["type"]?.stringValue == "tool_use" {
-                                if let id = itemObj["id"]?.stringValue,
-                                   let name = itemObj["name"]?.stringValue {
-                                    let inputObj = itemObj["input"] ?? AnyCodable(value: [:] as [String: String])
-                                    let inputStr = try formatJSON(inputObj)
-                                    tools.append(ToolCall(id: id, name: name, input: inputStr))
-                                }
+                        guard let itemObj = item.objectValue else { continue }
+                        let blockType = itemObj["type"]?.stringValue
+
+                        if blockType == "text" {
+                            if let text = itemObj["text"]?.stringValue {
+                                if !textContent.isEmpty { textContent += "\n" }
+                                textContent += text
+                            }
+                        } else if blockType == "tool_use" {
+                            if let id = itemObj["id"]?.stringValue,
+                               let name = itemObj["name"]?.stringValue {
+                                let inputObj = itemObj["input"] ?? AnyCodable(value: [:] as [String: String])
+                                let inputStr = try formatJSON(inputObj)
+                                tools.append(ToolCall(id: id, name: name, input: inputStr))
+                                toolUseEvents.append(ToolUseEvent(id: id, name: name, inputJSON: inputStr))
+                            }
+                        } else if blockType == "thinking" {
+                            if let text = itemObj["thinking"]?.stringValue {
+                                thinkingText += text
                             }
                         }
                     }
 
-                    if !tools.isEmpty {
-                        toolCalls = tools
-                    }
+                    if !tools.isEmpty { toolCalls = tools }
                 }
 
-                // Parse usage
                 let usage = messageObj["usage"]?.objectValue ?? [:]
                 let inputTokens = usage["input_tokens"]?.intValue ?? 0
                 let outputTokens = usage["output_tokens"]?.intValue ?? 0
-
                 let role = MessageRole(rawValue: messageObj["role"]?.stringValue ?? "assistant") ?? .assistant
                 let model = messageObj["model"]?.stringValue
 
@@ -247,19 +313,64 @@ enum StreamEvent: Equatable {
                     outputTokens: outputTokens,
                     model: model
                 )
+                // Note: toolUseEvents and thinkingText are emitted separately
+                // by processStreamLine after handling the assistant message
                 return .assistant(assistantMsg)
+
+            case "user":
+                // Tool result events
+                if let contentArray = decoded["content"]?.arrayValue {
+                    for item in contentArray {
+                        guard let itemObj = item.objectValue else { continue }
+                        if itemObj["type"]?.stringValue == "tool_result" {
+                            let toolUseId = itemObj["tool_use_id"]?.stringValue ?? ""
+                            let isError = itemObj["is_error"]?.boolValue ?? false
+                            // Content can be string or array of blocks
+                            let content: String
+                            if let str = itemObj["content"]?.stringValue {
+                                content = str
+                            } else if let arr = itemObj["content"]?.arrayValue {
+                                content = arr.compactMap { block in
+                                    block.objectValue?["text"]?.stringValue
+                                }.joined(separator: "\n")
+                            } else {
+                                content = ""
+                            }
+                            return .toolResult(ToolResultEvent(
+                                toolUseId: toolUseId, content: content, isError: isError
+                            ))
+                        }
+                    }
+                }
+                return .unknown
 
             case "content_block_delta":
                 guard let delta = decoded["delta"]?.objectValue else {
                     throw StreamParseError.invalidData
                 }
+                let deltaType = delta["type"]?.stringValue ?? ""
+                if deltaType == "thinking_delta" {
+                    let text = delta["thinking"]?.stringValue ?? ""
+                    return .thinking(text)
+                }
                 let text = delta["text"]?.stringValue ?? ""
                 return .contentDelta(text)
 
+            case "rate_limit_event":
+                let info = RateLimitInfo(
+                    status: decoded["status"]?.stringValue ?? "",
+                    resetsAt: decoded["resets_at"]?.stringValue,
+                    rateLimitType: decoded["rate_limit_type"]?.stringValue
+                )
+                return .rateLimitEvent(info)
+
             case "result":
-                let costUSD = decoded["cost_usd"]?.doubleValue ?? 0.0
+                let costUSD = decoded["total_cost_usd"]?.doubleValue ?? decoded["cost_usd"]?.doubleValue ?? 0.0
                 let durationMs = decoded["duration_ms"]?.intValue
+                let durationApiMs = decoded["duration_api_ms"]?.intValue
                 let sessionId = decoded["session_id"]?.stringValue
+                let numTurns = decoded["num_turns"]?.intValue
+                let stopReason = decoded["stop_reason"]?.stringValue
 
                 let usage = decoded["usage"]?.objectValue ?? [:]
                 let inputTokens = usage["input_tokens"]?.intValue ?? 0
@@ -268,7 +379,10 @@ enum StreamEvent: Equatable {
                 let resultInfo = ResultInfo(
                     costUSD: costUSD,
                     durationMs: durationMs,
+                    durationApiMs: durationApiMs,
                     sessionId: sessionId,
+                    numTurns: numTurns,
+                    stopReason: stopReason,
                     inputTokens: inputTokens,
                     outputTokens: outputTokens
                 )
@@ -374,6 +488,11 @@ enum AnyCodable: Codable, Equatable {
         case .object(let object):
             try container.encode(object)
         }
+    }
+
+    var boolValue: Bool? {
+        guard case .bool(let value) = self else { return nil }
+        return value
     }
 
     var stringValue: String? {

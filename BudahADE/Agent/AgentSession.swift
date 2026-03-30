@@ -29,6 +29,38 @@ enum AgentModel: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+// MARK: - ActivityFeedEntry
+
+struct ActivityFeedEntry: Identifiable, Equatable {
+    let id: String
+    let kind: ActivityKind
+    let label: String
+    var detail: String?
+    let timestamp: Date
+    var status: ActivityStatus
+
+    enum ActivityStatus: Equatable {
+        case inProgress
+        case completed
+        case failed
+    }
+}
+
+enum ActivityKind: Equatable {
+    case thinking
+    case toolRead(filePath: String)
+    case toolGrep(pattern: String)
+    case toolGlob(pattern: String)
+    case toolBash(command: String)
+    case toolEdit(filePath: String)
+    case toolWrite(filePath: String)
+    case toolAgent(description: String)
+    case toolWebSearch(query: String)
+    case toolWebFetch(url: String)
+    case toolOther(name: String)
+    case rateLimit
+}
+
 // MARK: - AgentSessionStatus Enum
 
 enum AgentSessionStatus: Equatable {
@@ -59,6 +91,12 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var currentStreamingText: String = ""
     /// Content staged via "Send to" from another agent, awaiting user instruction
     @Published var stagedContent: StagedContent?
+    /// Live activity entries — tool calls in progress and completed
+    @Published var activityFeed: [ActivityFeedEntry] = []
+    /// Current rate limit status
+    @Published var rateLimitStatus: RateLimitInfo?
+    /// Whether Claude is in extended thinking
+    @Published var isThinking: Bool = false
     var process: Process?
 
     struct StagedContent {
@@ -134,6 +172,7 @@ final class AgentSession: ObservableObject, Identifiable {
         )
         messages.append(message)
         currentStreamingText = ""
+        optionsDismissed = false
     }
 
     func handleContentDelta(_ text: String) {
@@ -149,6 +188,221 @@ final class AgentSession: ObservableObject, Identifiable {
         if claudeSessionId == nil, let sessionId = result.sessionId {
             claudeSessionId = sessionId
         }
+        // Mark all in-progress activity entries as completed
+        for i in activityFeed.indices where activityFeed[i].status == .inProgress {
+            activityFeed[i].status = .completed
+        }
+        isThinking = false
+    }
+
+    // MARK: - Activity Feed Handlers
+
+    func handleToolUse(_ event: ToolUseEvent) {
+        isThinking = false
+        let (label, kind) = activityLabel(for: event)
+        let entry = ActivityFeedEntry(
+            id: event.id,
+            kind: kind,
+            label: label,
+            detail: nil,
+            timestamp: Date(),
+            status: .inProgress
+        )
+        activityFeed.append(entry)
+    }
+
+    func handleToolResult(_ event: ToolResultEvent) {
+        guard let index = activityFeed.firstIndex(where: { $0.id == event.toolUseId }) else { return }
+        activityFeed[index].status = event.isError ? .failed : .completed
+        activityFeed[index].detail = summarizeToolResult(event, kind: activityFeed[index].kind)
+    }
+
+    func handleThinking(_ text: String) {
+        if !isThinking {
+            isThinking = true
+            let entry = ActivityFeedEntry(
+                id: "thinking-\(UUID().uuidString)",
+                kind: .thinking,
+                label: "Reasoning...",
+                detail: nil,
+                timestamp: Date(),
+                status: .inProgress
+            )
+            activityFeed.append(entry)
+        }
+    }
+
+    func handleRateLimit(_ info: RateLimitInfo) {
+        rateLimitStatus = info
+        if info.status == "throttled" {
+            let entry = ActivityFeedEntry(
+                id: UUID().uuidString,
+                kind: .rateLimit,
+                label: "Rate limited — waiting...",
+                detail: info.resetsAt,
+                timestamp: Date(),
+                status: .inProgress
+            )
+            activityFeed.append(entry)
+        }
+    }
+
+    private func activityLabel(for event: ToolUseEvent) -> (String, ActivityKind) {
+        // Parse specific keys from inputJSON on demand
+        let input = parseInputJSON(event.inputJSON)
+
+        switch event.name {
+        case "Read":
+            let path = input["file_path"] ?? ""
+            let filename = (path as NSString).lastPathComponent
+            return ("Reading \(filename)", .toolRead(filePath: path))
+        case "Grep":
+            let pattern = input["pattern"] ?? ""
+            return ("Searching for \(pattern)", .toolGrep(pattern: pattern))
+        case "Glob":
+            let pattern = input["pattern"] ?? ""
+            return ("Finding files \(pattern)", .toolGlob(pattern: pattern))
+        case "Bash":
+            let command = input["command"] ?? ""
+            let truncated = String(command.prefix(50))
+            return ("Running \(truncated)", .toolBash(command: command))
+        case "Edit":
+            let path = input["file_path"] ?? ""
+            let filename = (path as NSString).lastPathComponent
+            return ("Editing \(filename)", .toolEdit(filePath: path))
+        case "Write":
+            let path = input["file_path"] ?? ""
+            let filename = (path as NSString).lastPathComponent
+            return ("Writing \(filename)", .toolWrite(filePath: path))
+        case "Agent":
+            let desc = input["description"] ?? input["prompt"] ?? ""
+            let truncated = String(desc.prefix(40))
+            return ("Researching: \(truncated)", .toolAgent(description: desc))
+        case "WebSearch":
+            let query = input["query"] ?? ""
+            return ("Searching web: \(query)", .toolWebSearch(query: query))
+        case "WebFetch":
+            let url = input["url"] ?? ""
+            let domain = URL(string: url)?.host ?? url
+            return ("Fetching \(domain)", .toolWebFetch(url: url))
+        default:
+            return ("Using \(event.name)", .toolOther(name: event.name))
+        }
+    }
+
+    private func parseInputJSON(_ json: String) -> [String: String] {
+        guard let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        var result: [String: String] = [:]
+        for (key, value) in obj {
+            if let str = value as? String {
+                result[key] = str
+            }
+        }
+        return result
+    }
+
+    private func summarizeToolResult(_ event: ToolResultEvent, kind: ActivityKind) -> String {
+        if event.isError {
+            return String(event.content.prefix(40))
+        }
+        switch kind {
+        case .toolRead:
+            let lineCount = event.content.components(separatedBy: "\n").count
+            return "\(lineCount) lines"
+        case .toolGrep:
+            let matchCount = event.content.components(separatedBy: "\n").count
+            return "\(matchCount) matches"
+        case .toolGlob:
+            let fileCount = event.content.components(separatedBy: "\n").filter { !$0.isEmpty }.count
+            return "\(fileCount) files"
+        case .toolBash:
+            let firstLine = event.content.components(separatedBy: "\n").first ?? ""
+            return String(firstLine.prefix(40))
+        case .toolEdit, .toolWrite, .toolAgent:
+            return "done"
+        default:
+            return String(event.content.prefix(40))
+        }
+    }
+
+    // MARK: - Interactive Options
+
+    /// Whether option buttons have been dismissed (reset on new assistant message)
+    @Published var optionsDismissed: Bool = false
+
+    struct DetectedOption: Identifiable {
+        let id: Int
+        let label: String
+        let text: String
+    }
+
+    func detectOptions(in text: String) -> [DetectedOption]? {
+        let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard !lines.isEmpty else { return nil }
+
+        // Check for a question — last non-empty line ends with ?, or contains a question pattern
+        let nonEmptyLines = lines.filter { !$0.isEmpty }
+        let hasQuestion: Bool = {
+            if let last = nonEmptyLines.last, last.hasSuffix("?") { return true }
+            let questionPattern = try? NSRegularExpression(pattern: "which.*prefer|would you like|should I|do you want|what approach|which option", options: .caseInsensitive)
+            return nonEmptyLines.contains { line in
+                let range = NSRange(line.startIndex..<line.endIndex, in: line)
+                return questionPattern?.firstMatch(in: line, range: range) != nil
+            }
+        }()
+        guard hasQuestion else { return nil }
+
+        // Find option lines — numbered, lettered, or bulleted
+        let numberedPattern = try! NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.+)$"#)
+        let letteredPattern = try! NSRegularExpression(pattern: #"^([A-Za-z])[.)]\s+(.+)$"#)
+        let bulletPattern = try! NSRegularExpression(pattern: #"^[-•]\s+\*{0,2}(.+?)\*{0,2}$"#)
+
+        // Track which lines are inside code fences
+        var inCodeBlock = false
+        var options: [DetectedOption] = []
+
+        for line in lines {
+            if line.hasPrefix("```") { inCodeBlock.toggle(); continue }
+            if inCodeBlock { continue }
+
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+
+            if let match = numberedPattern.firstMatch(in: line, range: range),
+               let labelRange = Range(match.range(at: 1), in: line),
+               let textRange = Range(match.range(at: 2), in: line) {
+                let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
+                options.append(DetectedOption(
+                    id: options.count,
+                    label: String(line[labelRange]),
+                    text: rawText
+                ))
+            } else if let match = letteredPattern.firstMatch(in: line, range: range),
+                      let labelRange = Range(match.range(at: 1), in: line),
+                      let textRange = Range(match.range(at: 2), in: line) {
+                let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
+                options.append(DetectedOption(
+                    id: options.count,
+                    label: String(line[labelRange]),
+                    text: rawText
+                ))
+            } else if let match = bulletPattern.firstMatch(in: line, range: range),
+                      let textRange = Range(match.range(at: 1), in: line) {
+                let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
+                options.append(DetectedOption(
+                    id: options.count,
+                    label: "\(options.count + 1)",
+                    text: rawText
+                ))
+            }
+        }
+
+        // Must have 2-6 options
+        guard options.count >= 2 && options.count <= 6 else { return nil }
+
+        return options
     }
 
     // MARK: - Token Formatting
