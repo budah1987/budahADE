@@ -44,8 +44,8 @@ final class CrossTabContextTests: XCTestCase {
         XCTAssertTrue(context.contains("## Context from other planning conversations"))
 
         // Assert role names are present
-        XCTAssertTrue(context.contains("Research Expert"))
-        XCTAssertTrue(context.contains("Ideation Partner"))
+        XCTAssertTrue(context.contains("Researcher"))
+        XCTAssertTrue(context.contains("Ideator"))
 
         // Assert message content is present
         XCTAssertTrue(context.contains("Research the current Swift concurrency best practices"))
@@ -55,8 +55,8 @@ final class CrossTabContextTests: XCTestCase {
 
         // Assert proper formatting
         XCTAssertTrue(context.contains("**User:**"))
-        XCTAssertTrue(context.contains("**Research Expert:**"))
-        XCTAssertTrue(context.contains("**Ideation Partner:**"))
+        XCTAssertTrue(context.contains("**Researcher:**"))
+        XCTAssertTrue(context.contains("**Ideator:**"))
     }
 
     func testEmptySiblingsProducesEmptyBlock() {
@@ -84,11 +84,11 @@ final class CrossTabContextTests: XCTestCase {
 
         // Assert header and role are present
         XCTAssertTrue(context.contains("## Context from other planning conversations"))
-        XCTAssertTrue(context.contains("Senior Architect"))
+        XCTAssertTrue(context.contains("Developer"))
 
         // Assert messages are formatted correctly
         XCTAssertTrue(context.contains("**User:**"))
-        XCTAssertTrue(context.contains("**Senior Architect:**"))
+        XCTAssertTrue(context.contains("**Developer:**"))
         XCTAssertTrue(context.contains("What is the project architecture?"))
         XCTAssertTrue(context.contains("The architecture follows a modular pattern"))
     }

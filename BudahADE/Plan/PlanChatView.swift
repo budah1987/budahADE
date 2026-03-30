@@ -40,6 +40,19 @@ struct PlanChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Role indicator
+            HStack(spacing: 6) {
+                Image(systemName: state.role.iconName)
+                    .foregroundStyle(state.role.dotColor)
+                Text(state.role.displayName)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
             // Messages
             messageList
                 .overlay(alignment: .bottom) {

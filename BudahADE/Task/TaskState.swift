@@ -131,15 +131,16 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     @discardableResult
-    func createPlanTab() -> UUID {
+    func createPlanTab(role: AgentMode = .researcher) -> UUID {
         let tabId = UUID()
         let chatState = PlanChatState(
+            tabId: tabId,
             worktreePath: worktreePath,
             taskName: name,
-            branchName: branchName
+            branchName: branchName,
+            role: role
         )
-        let tabNumber = planTabs.count + 1
-        let tab = PlanTabInfo(id: tabId, title: "Plan \(tabNumber)")
+        let tab = PlanTabInfo(id: tabId, title: role.displayName, status: .idle, role: role)
         planTabs.append(tab)
         planChats[tabId] = chatState
         selectedPlanTabId = tabId
