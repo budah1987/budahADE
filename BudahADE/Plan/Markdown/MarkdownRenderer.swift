@@ -248,57 +248,86 @@ struct MarkdownRenderer: View {
         }
     }
 
-    @ViewBuilder
-    private func blockView(for block: MarkdownBlockItem) -> some View {
+    // AnyView erasure breaks the recursive @ViewBuilder type explosion
+    // (blockView → listView → blockView causes exponential type-checker work)
+    private func blockView(for block: MarkdownBlockItem) -> AnyView {
         switch block.kind {
         case .heading(let level, let inlines):
-            headingView(level: level, inlines: inlines)
+            AnyView(headingView(level: level, inlines: inlines))
 
         case .paragraph(let inlines):
-            InlineNodesView(nodes: inlines)
-                .font(Theme.body(14))
-                .foregroundColor(Theme.textPrimary)
-                .padding(.bottom, 8)
+            AnyView(
+                InlineNodesView(nodes: inlines)
+                    .font(Theme.body(14))
+                    .foregroundColor(Theme.textPrimary)
+                    .padding(.bottom, 8)
+            )
 
         case .codeBlock(let language, let code):
-            CodeBlockView(code: code, language: language)
-                .padding(.vertical, 4)
+            AnyView(
+                CodeBlockView(code: code, language: language)
+                    .padding(.vertical, 4)
+            )
 
         case .unorderedList(let items):
-            unorderedListView(items: items)
-                .padding(.bottom, 8)
+            AnyView(
+                unorderedListView(items: items)
+                    .padding(.bottom, 8)
+            )
 
         case .orderedList(let start, let items):
-            orderedListView(start: start, items: items)
-                .padding(.bottom, 8)
+            AnyView(
+                orderedListView(start: start, items: items)
+                    .padding(.bottom, 8)
+            )
 
         case .table(let headers, let rows, let alignments):
-            MarkdownTableView(headers: headers, rows: rows, alignments: alignments)
-                .padding(.vertical, 4)
+            AnyView(
+                MarkdownTableView(headers: headers, rows: rows, alignments: alignments)
+                    .padding(.vertical, 4)
+            )
 
         case .thematicBreak:
-            Rectangle()
-                .fill(Theme.borderSubtle)
-                .frame(height: 1)
-                .padding(.vertical, 12)
+            AnyView(
+                Rectangle()
+                    .fill(Theme.borderSubtle)
+                    .frame(height: 1)
+                    .padding(.vertical, 12)
+            )
+        }
+    }
+
+    private func headingFont(for level: Int) -> Font {
+        switch level {
+        case 1: return Theme.headline(22)
+        case 2: return Theme.headline(18)
+        default: return Theme.label(15)
+        }
+    }
+
+    private func headingTopPadding(for level: Int) -> CGFloat {
+        switch level {
+        case 1: return 20
+        case 2: return 16
+        default: return 12
+        }
+    }
+
+    private func headingBottomPadding(for level: Int) -> CGFloat {
+        switch level {
+        case 1: return 8
+        case 2: return 6
+        default: return 4
         }
     }
 
     @ViewBuilder
     private func headingView(level: Int, inlines: [InlineNode]) -> some View {
-        let (font, topPad, bottomPad): (Font, CGFloat, CGFloat) = {
-            switch level {
-            case 1: return (Theme.headline(22), 20, 8)
-            case 2: return (Theme.headline(18), 16, 6)
-            default: return (Theme.label(15), 12, 4)
-            }
-        }()
-
         InlineNodesView(nodes: inlines)
-            .font(font)
+            .font(headingFont(for: level))
             .foregroundColor(Theme.textPrimary)
-            .padding(.top, topPad)
-            .padding(.bottom, bottomPad)
+            .padding(.top, headingTopPadding(for: level))
+            .padding(.bottom, headingBottomPadding(for: level))
     }
 
     @ViewBuilder
