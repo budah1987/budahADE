@@ -8,7 +8,8 @@ build/
 *.mode2v3
 *.perspectivev3
 *.xcworkspace
-!*.xcodeproj/project.pbxproj
+# XcodeGen generates the .xcodeproj — don't track it
+*.xcodeproj/
 *.moved-aside
 *.hmap
 *.ipa
@@ -19,3 +20,7 @@ build/
 .budahade/
 .superpowers/
 .worktrees/
+
+# Large binary frameworks (symlinked, not tracked)
+GhosttyKit.xcframework/
+*.profraw

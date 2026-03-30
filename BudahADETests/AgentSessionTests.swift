@@ -221,7 +221,8 @@ final class AgentSessionTests: XCTestCase {
         let systemInfo = StreamEvent.SystemInfo(
             sessionId: "test-session-123",
             tools: ["search", "calculate"],
-            model: "claude-3-5-sonnet-20241022"
+            model: "claude-3-5-sonnet-20241022",
+            slashCommands: nil
         )
         session.handleSystemInit(systemInfo)
 
@@ -263,7 +264,8 @@ final class AgentSessionTests: XCTestCase {
         let systemInfo = StreamEvent.SystemInfo(
             sessionId: "initial-session",
             tools: nil,
-            model: nil
+            model: nil,
+            slashCommands: nil
         )
         session.handleSystemInit(systemInfo)
 

@@ -118,17 +118,17 @@ final class PlanBuildBridgeTests: XCTestCase {
             repoPath: dir
         )
 
-        // Enter plan mode once — creates the first tab
+        // Enter plan mode and manually create a tab (modal would do this in UI)
         task.enterPlanMode()
-        let firstTabId = task.planTabs.first?.id
-        XCTAssertNotNil(firstTabId, "Should have a plan tab after first enterPlanMode")
+        let tabId = task.createPlanTab(role: .researcher)
+        XCTAssertEqual(task.planTabs.count, 1, "Should have 1 tab after manual creation")
 
         // Simulate going to build mode then back to plan
         task.mode = .build
         task.enterPlanMode()
 
         XCTAssertEqual(task.planTabs.count, 1, "Should still have exactly 1 tab after re-entering plan mode")
-        XCTAssertEqual(task.planTabs.first?.id, firstTabId, "Tab ID should be unchanged")
+        XCTAssertEqual(task.planTabs.first?.id, tabId, "Tab ID should be unchanged")
         XCTAssertEqual(task.mode, .plan, "Mode should be .plan")
     }
 }
