@@ -25,10 +25,25 @@ struct WorkspaceView: View {
                 // ── CONTENT ZONE ──
                 VStack(spacing: 0) {
                     // Content
-                    if let task = state.activeTask, task.mode == .plan,
-                       let planChat = task.planChat {
-                        // Plan mode: conversation UI
-                        PlanChatView(state: planChat)
+                    if let task = state.activeTask, task.mode == .plan {
+                        // Plan mode: tab bar + full-width chat
+                        VStack(spacing: 0) {
+                            PlanTabBar(
+                                selectedTabID: Binding(
+                                    get: { task.selectedPlanTabId ?? UUID() },
+                                    set: { task.selectPlanTab($0) }
+                                ),
+                                tabs: task.planTabs,
+                                onSelectTab: { task.selectPlanTab($0) },
+                                onCloseTab: { task.closePlanTab($0) },
+                                onNewTab: { task.createPlanTab() }
+                            )
+
+                            if let planChat = task.activePlanChat {
+                                PlanChatView(state: planChat)
+                                    .id(task.selectedPlanTabId)
+                            }
+                        }
                     } else {
                         // Build mode: sidebar + terminal area + git panel
                         HStack(spacing: 0) {
@@ -84,11 +99,25 @@ struct WorkspaceView: View {
             state.rightPanelVisible.toggle()
         }
         .onReceive(NotificationCenter.default.publisher(for: .newTerminalTab)) { _ in
-            state.activeTask?.createTab()
+            if let task = state.activeTask {
+                if task.mode == .plan {
+                    task.createPlanTab()
+                } else {
+                    task.createTab()
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .closeTerminalTab)) { _ in
-            if let id = state.activeTask?.selectedTabId {
-                state.activeTask?.closeTab(id)
+            if let task = state.activeTask {
+                if task.mode == .plan {
+                    if let id = task.selectedPlanTabId {
+                        task.closePlanTab(id)
+                    }
+                } else {
+                    if let id = task.selectedTabId {
+                        task.closeTab(id)
+                    }
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .closeTask)) { _ in
@@ -99,7 +128,11 @@ struct WorkspaceView: View {
         .onReceive(NotificationCenter.default.publisher(for: .selectTabByIndex)) { notification in
             guard !appState.isWorkspaceSwitcherOpen,
                   let index = notification.userInfo?["index"] as? Int else { return }
-            state.activeTask?.selectTabByIndex(index)
+            if let task = state.activeTask, task.mode == .plan {
+                task.selectPlanTabByIndex(index)
+            } else {
+                state.activeTask?.selectTabByIndex(index)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .newTask)) { _ in
             state.showNewTaskSheet = true

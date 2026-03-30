@@ -30,8 +30,9 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var tabs: [TabInfo] = []
     @Published var selectedTabId: UUID?
     @Published var terminals: [UUID: TerminalPanel] = [:]
-    @Published var planChat: PlanChatState?
-    @Published var planTabId: UUID?  // Dedicated plan conversation tab
+    @Published var planChats: [UUID: PlanChatState] = [:]
+    @Published var planTabs: [PlanTabInfo] = []
+    @Published var selectedPlanTabId: UUID?
     let specState = SpecState()
     let buildStatus = BuildStatusState()
     private var specWatcher: SpecWatcher?
@@ -105,12 +106,8 @@ final class TaskState: ObservableObject, Identifiable {
     // MARK: - Plan/Build Mode
 
     func enterPlanMode() {
-        if planChat == nil {
-            planChat = PlanChatState(
-                worktreePath: worktreePath,
-                taskName: name,
-                branchName: branchName
-            )
+        if planTabs.isEmpty {
+            createPlanTab()
         }
         mode = .plan
     }
@@ -123,6 +120,98 @@ final class TaskState: ObservableObject, Identifiable {
             buildStatusWatcher = BuildStatusWatcher(worktreePath: worktreePath, buildStatus: buildStatus)
             buildStatusWatcher?.startWatching()
         }
+    }
+
+    // MARK: - Plan Tab Management
+
+    /// The active plan chat for the selected plan tab
+    var activePlanChat: PlanChatState? {
+        guard let id = selectedPlanTabId else { return nil }
+        return planChats[id]
+    }
+
+    @discardableResult
+    func createPlanTab() -> UUID {
+        let tabId = UUID()
+        let chatState = PlanChatState(
+            worktreePath: worktreePath,
+            taskName: name,
+            branchName: branchName
+        )
+        let tabNumber = planTabs.count + 1
+        let tab = PlanTabInfo(id: tabId, title: "Plan \(tabNumber)")
+        planTabs.append(tab)
+        planChats[tabId] = chatState
+        selectedPlanTabId = tabId
+
+        // Observe session status to update tab indicators
+        observePlanChatStatus(chatState, tabId: tabId)
+
+        return tabId
+    }
+
+    func closePlanTab(_ id: UUID) {
+        guard let index = planTabs.firstIndex(where: { $0.id == id }) else { return }
+
+        planChats[id]?.cancel()
+        planChats.removeValue(forKey: id)
+        planTabs.remove(at: index)
+
+        if selectedPlanTabId == id {
+            if !planTabs.isEmpty {
+                selectedPlanTabId = planTabs[min(index, planTabs.count - 1)].id
+            } else {
+                selectedPlanTabId = nil
+            }
+        }
+
+        // If last tab closed, create a new empty one
+        if planTabs.isEmpty {
+            createPlanTab()
+        }
+    }
+
+    func selectPlanTab(_ id: UUID) {
+        guard planTabs.contains(where: { $0.id == id }) else { return }
+        selectedPlanTabId = id
+        // Clear "done" status when user selects the tab
+        if let index = planTabs.firstIndex(where: { $0.id == id }),
+           planTabs[index].status == .done {
+            planTabs[index].status = .idle
+        }
+    }
+
+    func selectPlanTabByIndex(_ index: Int) {
+        guard !planTabs.isEmpty else { return }
+        if index == 9 {
+            selectedPlanTabId = planTabs.last?.id
+        } else {
+            let zeroIndex = index - 1
+            guard zeroIndex >= 0, zeroIndex < planTabs.count else { return }
+            selectedPlanTabId = planTabs[zeroIndex].id
+        }
+    }
+
+    private func observePlanChatStatus(_ chatState: PlanChatState, tabId: UUID) {
+        chatState.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self,
+                      let idx = self.planTabs.firstIndex(where: { $0.id == tabId }),
+                      let session = chatState.plannerSession else { return }
+                let newStatus: PlanTabStatus
+                switch session.status {
+                case .idle:         newStatus = .idle
+                case .connecting:   newStatus = .connecting
+                case .streaming:    newStatus = .streaming
+                case .done:         newStatus = .done
+                case .error:        newStatus = .idle
+                }
+                if self.planTabs[idx].status != newStatus {
+                    self.planTabs[idx].status = newStatus
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Tab Management
@@ -236,10 +325,6 @@ final class TaskState: ObservableObject, Identifiable {
         terminals.removeValue(forKey: id)
         tabs.remove(at: index)
 
-        if planTabId == id {
-            planTabId = nil
-        }
-
         if selectedTabId == id {
             if !tabs.isEmpty {
                 selectedTabId = tabs[min(index, tabs.count - 1)].id
@@ -300,8 +385,10 @@ final class TaskState: ObservableObject, Identifiable {
         selectedTabId = nil
         specWatcher?.stopWatching()
         buildStatusWatcher?.stopWatching()
-        planChat?.cancel()
-        planChat = nil
+        for (_, chat) in planChats { chat.cancel() }
+        planChats.removeAll()
+        planTabs.removeAll()
+        selectedPlanTabId = nil
     }
 
     // MARK: - Session Persistence
