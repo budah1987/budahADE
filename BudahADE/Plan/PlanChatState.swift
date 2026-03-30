@@ -18,6 +18,7 @@ final class PlanChatState: ObservableObject {
     let worktreePath: String
     let taskName: String
     let branchName: String
+    let role: AgentMode
 
     let chatManager = CLISubprocessManager()
     @Published var plannerSession: AgentSession? {
@@ -33,17 +34,19 @@ final class PlanChatState: ObservableObject {
         }
     }
     @Published var conversationState: PlanConversationState = .idle
-    @Published var selectedModel: AgentModel = .sonnet
+    @Published var selectedModel: AgentModel
     @Published var pendingSpec: String?
     @Published var editingMessageId: UUID?
     private var sessionCancellable: AnyCancellable?
 
     // MARK: - Init
 
-    init(worktreePath: String, taskName: String, branchName: String) {
+    init(worktreePath: String, taskName: String, branchName: String, role: AgentMode = .researcher) {
         self.worktreePath = worktreePath
         self.taskName = taskName
         self.branchName = branchName
+        self.role = role
+        self.selectedModel = role.defaultChatModel
     }
 
     // MARK: - Session Lifecycle
@@ -121,38 +124,10 @@ final class PlanChatState: ObservableObject {
     // MARK: - Planner Prompt
 
     private func plannerSystemPrompt() -> String {
-        return """
-        You are a planning collaborator for task "\(taskName)" on branch "\(branchName)".
-
-        IMPORTANT: Respond to the user immediately with text. Do NOT use tools on your first response unless the user explicitly asks you to research or look something up. Do NOT read memory files or check session history before responding.
-
-        ## Your approach
-        Start by understanding. Ask questions. Be curious about the problem before jumping to solutions.
-
-        - Listen first — understand what the user is trying to achieve and why
-        - Ask clarifying questions before researching or proposing solutions
-        - Think out loud — share your reasoning, surface tradeoffs
-        - Only research the codebase or spawn agents when the user's intent is clear
-        - Match the user's energy — brief questions get brief answers, deep exploration gets depth
-
-        ## When the problem is clear, analyze through multiple lenses
-        Use your teammate agents to explore the problem from several perspectives:
-        - @researcher: Codebase analysis, existing patterns, dependencies
-        - @architect: System design, code patterns, technical tradeoffs
-        - @ideator: Creative solutions, alternative approaches, business impact
-        - @qa: Edge cases, failure modes, testing strategy
-        - @designer: UI/UX considerations, component design, user experience
-
-        ## Workflow
-        1. Listen — understand intent and constraints
-        2. Research — use agents to explore the codebase and problem space
-        3. Synthesize — combine perspectives into a coherent plan
-        4. Spec — produce a structured spec with clear tasks and acceptance criteria
-
-        ## Guidelines
-        - Be concise and direct
-        - Reference specific files and line numbers when discussing code
-        - Don't over-engineer the conversation — simple questions deserve simple answers
-        """
+        return AgentPrompts.systemPrompt(
+            agent: role,
+            taskName: taskName,
+            branchName: branchName
+        )
     }
 }

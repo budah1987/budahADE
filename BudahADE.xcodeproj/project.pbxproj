@@ -89,6 +89,7 @@
 		C4C0789CCE1F66D2B9CE825C /* CLISubprocessManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8A90151E35F3275E7949A5 /* CLISubprocessManagerTests.swift */; };
 		C6E6CD27B61BBF2CD2DF6B50 /* AgentStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 767DE60DA0CF895A8BD7606E /* AgentStatusView.swift */; };
 		CDADF807D968D1569DE81E02 /* AgentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4701DD02EBF21C6E4814EE /* AgentSession.swift */; };
+		AM01BF01AM01BF01AM01BF01 /* AgentMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AM01RF01AM01RF01AM01RF01 /* AgentMode.swift */; };
 		CDE93063FC592FAD18D8C0D3 /* AgentSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FB2BB32C6E95B421F9188B /* AgentSessionTests.swift */; };
 		D05C0BA31AD477A67E19CB86 /* CanvasElementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC9007B2EB655C83C85950F /* CanvasElementView.swift */; };
 		D2EF43F713D69EBBA1BDB82B /* TileResizeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67E84F097063033949D58E23 /* TileResizeHandler.swift */; };
@@ -99,6 +100,7 @@
 		D93EF647D18F66ED982F9A3A /* TerminalSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 097E88C7634C6AEA371FCED8 /* TerminalSurfaceView.swift */; };
 		DB00B889725D9768A2C89D5D /* ScrollWheelMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C3EF5BB2ADCB65A6F16E122 /* ScrollWheelMonitor.swift */; };
 		DC16F86BE5A8369B5A568F76 /* MarkdownRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D2561B55CD2801DEE8E3326 /* MarkdownRendererTests.swift */; };
+		PR01BF01PR01BF01PR01BF01 /* PlanRoleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PR01RF01PR01RF01PR01RF01 /* PlanRoleTests.swift */; };
 		DCE5831F073A29D3341884FA /* FileTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104D96E4E1790C3C829BE427 /* FileTreeView.swift */; };
 		DD9847A108B13A131E94EBA3 /* CanvasNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC261905BA378E2DFD57D4F /* CanvasNode.swift */; };
 		E09D7A6E806674D69FB2C9E8 /* ScrollbackCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC27E581FCB3BCD2DDC2909 /* ScrollbackCapture.swift */; };
@@ -170,6 +172,7 @@
 		5B3EA44C1B07BAA3CA4FF10C /* SpecPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecPanelView.swift; sourceTree = "<group>"; };
 		5B705CFF356264227986EFC3 /* GitPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitPanelView.swift; sourceTree = "<group>"; };
 		5D2561B55CD2801DEE8E3326 /* MarkdownRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRendererTests.swift; sourceTree = "<group>"; };
+		PR01RF01PR01RF01PR01RF01 /* PlanRoleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanRoleTests.swift; sourceTree = "<group>"; };
 		5F15487E095AC64498BF5BC2 /* FilePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreviewView.swift; sourceTree = "<group>"; };
 		613162E19DB48FF4A5FD876D /* MarkdownSectionParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownSectionParserTests.swift; sourceTree = "<group>"; };
 		615B01DDEEA918B56797FD82 /* ConnectionSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSummaryTests.swift; sourceTree = "<group>"; };
@@ -229,6 +232,7 @@
 		E23D256BEFB8D9BE4995FB2F /* InlineNodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineNodesView.swift; sourceTree = "<group>"; };
 		E484D66678820F7CAC8411B7 /* GitSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitSidebarView.swift; sourceTree = "<group>"; };
 		E64217C9EFDA0169D85E6BD3 /* TileSelectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileSelectionManager.swift; sourceTree = "<group>"; };
+		AM01RF01AM01RF01AM01RF01 /* AgentMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentMode.swift; sourceTree = "<group>"; };
 		FB4701DD02EBF21C6E4814EE /* AgentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSession.swift; sourceTree = "<group>"; };
 		FC8076CAE8B058A6546DFC05 /* SmartGuides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartGuides.swift; sourceTree = "<group>"; };
 		FD395B8B091F42A4F27AF847 /* ChatTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTileView.swift; sourceTree = "<group>"; };
@@ -363,6 +367,7 @@
 				6C8A90151E35F3275E7949A5 /* CLISubprocessManagerTests.swift */,
 				615B01DDEEA918B56797FD82 /* ConnectionSummaryTests.swift */,
 				5D2561B55CD2801DEE8E3326 /* MarkdownRendererTests.swift */,
+				PR01RF01PR01RF01PR01RF01 /* PlanRoleTests.swift */,
 				613162E19DB48FF4A5FD876D /* MarkdownSectionParserTests.swift */,
 				A2B298CF533118ED5109DDB4 /* SessionPersistenceTests.swift */,
 				3531063D693A5E35F860EC9F /* SpecParserTests.swift */,
@@ -398,6 +403,7 @@
 			isa = PBXGroup;
 			children = (
 				2248CD251CA957A5BF8EC506 /* AgentRole.swift */,
+				AM01RF01AM01RF01AM01RF01 /* AgentMode.swift */,
 				FB4701DD02EBF21C6E4814EE /* AgentSession.swift */,
 				105399D43EF68E510AB152E8 /* ChatMessage.swift */,
 				39176766FB786C35333F2C4C /* CLISubprocessManager.swift */,
@@ -582,6 +588,7 @@
 				A78DD2A4F1C1A557B0C920C3 /* ChatMessageTests.swift in Sources */,
 				04BD58D1B40CBE60D9C07B39 /* ConnectionSummaryTests.swift in Sources */,
 				DC16F86BE5A8369B5A568F76 /* MarkdownRendererTests.swift in Sources */,
+				PR01BF01PR01BF01PR01BF01 /* PlanRoleTests.swift in Sources */,
 				A43CBAF9F2B8645909DB5BAE /* MarkdownSectionParserTests.swift in Sources */,
 				BFD0853E7FEB2689A97101F0 /* SessionPersistenceTests.swift in Sources */,
 				1140BEA9925BEBB8FE627A1D /* SpecParserTests.swift in Sources */,
@@ -598,6 +605,7 @@
 				FA090C7F8F09D8B03C20FE4F /* AddTileMenu.swift in Sources */,
 				2938C456FFF461F3E288470C /* AgentPrompts.swift in Sources */,
 				8D755546EB10A32DB66C6D7D /* AgentRole.swift in Sources */,
+				AM01BF01AM01BF01AM01BF01 /* AgentMode.swift in Sources */,
 				CDADF807D968D1569DE81E02 /* AgentSession.swift in Sources */,
 				C6E6CD27B61BBF2CD2DF6B50 /* AgentStatusView.swift in Sources */,
 				AD9AAC5CD5D8BDAAB0ACFB9A /* AgentsPanel.swift in Sources */,

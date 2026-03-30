@@ -15,11 +15,13 @@ struct PlanTabInfo: Identifiable, Equatable {
     let id: UUID
     var title: String
     var status: PlanTabStatus
+    let role: AgentMode
 
-    init(id: UUID = UUID(), title: String = "Plan", status: PlanTabStatus = .idle) {
+    init(id: UUID = UUID(), title: String = "Plan", status: PlanTabStatus = .idle, role: AgentMode = .researcher) {
         self.id = id
         self.title = title
         self.status = status
+        self.role = role
     }
 
     /// Map to TabAgentState for reuse with ConversationTab rendering
