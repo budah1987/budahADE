@@ -121,6 +121,9 @@
 		F87FBD406C4313EB94E58C13 /* CanvasNodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C656A43063C051F8EB3ED2D7 /* CanvasNodeTests.swift */; };
 		F91DAF8940F0D4B0F909E8A9 /* WorkspaceState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B054982DD13BCE9E13925DB /* WorkspaceState.swift */; };
 		FA090C7F8F09D8B03C20FE4F /* AddTileMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CDF50E67156ED3F76A0BE03 /* AddTileMenu.swift */; };
+		EE1234000001EE01 /* TaskArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1234000001EE02 /* TaskArchive.swift */; };
+		EE5678000002EE01 /* TaskArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5678000002EE02 /* TaskArchiveView.swift */; };
+		EE9ABC000003EE01 /* TaskArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE9ABC000003EE02 /* TaskArchiveTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -158,6 +161,9 @@
 		2319C4BCE08218AE8B0E1790 /* BudahADEApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudahADEApp.swift; sourceTree = "<group>"; };
 		29AE47D7CE6C4505EC7C95B4 /* BuildStatusWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildStatusWatcher.swift; sourceTree = "<group>"; };
 		29BDC02274A627217646433F /* TaskCompletionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCompletionSheet.swift; sourceTree = "<group>"; };
+		EE1234000001EE02 /* TaskArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskArchive.swift; sourceTree = "<group>"; };
+		EE5678000002EE02 /* TaskArchiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskArchiveView.swift; sourceTree = "<group>"; };
+		EE9ABC000003EE02 /* TaskArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskArchiveTests.swift; sourceTree = "<group>"; };
 		29D58E516EF4D0B568616D6A /* TileConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileConnectionTests.swift; sourceTree = "<group>"; };
 		2A59DA8E22324BFF54BB447C /* BudahADE.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudahADE.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DF0B28973E633407B8320E0 /* SpecStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecStripView.swift; sourceTree = "<group>"; };
@@ -373,6 +379,7 @@
 		4E9A905DE0C41224228719C4 /* BudahADETests */ = {
 			isa = PBXGroup;
 			children = (
+				EE9ABC000003EE02 /* TaskArchiveTests.swift */,
 				B6FB2BB32C6E95B421F9188B /* AgentSessionTests.swift */,
 				77A8E9F5B3C4D601 /* PlanConversationPersistenceTests.swift */,
 				CC1234567890AB02 /* CrossTabContextTests.swift */,
@@ -507,6 +514,8 @@
 				29AE47D7CE6C4505EC7C95B4 /* BuildStatusWatcher.swift */,
 				8A658A83DDCAA7B7F63B1827 /* GitWorktreeManager.swift */,
 				C08E0CF750B2777728F76B48 /* NewTaskSheet.swift */,
+				EE1234000001EE02 /* TaskArchive.swift */,
+				EE5678000002EE02 /* TaskArchiveView.swift */,
 				29BDC02274A627217646433F /* TaskCompletionSheet.swift */,
 				5759D771BB98273BB6BD7A50 /* TaskRailView.swift */,
 				9AFE20EF00412F2273406065 /* TaskState.swift */,
@@ -596,6 +605,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE9ABC000003EE01 /* TaskArchiveTests.swift in Sources */,
 				CDE93063FC592FAD18D8C0D3 /* AgentSessionTests.swift in Sources */,
 				88B9F0A6C4D5E702 /* PlanConversationPersistenceTests.swift in Sources */,
 				CC1234567890AB01 /* CrossTabContextTests.swift in Sources */,
@@ -696,6 +706,8 @@
 				4E1E26BA9C8DC68DB90FB24F /* StickyNoteView.swift in Sources */,
 				4ED11BF0954CC0664A2E983C /* SyntaxHighlighter.swift in Sources */,
 				5F8E35F5B4DA5E20613FC383 /* TaskCompletionSheet.swift in Sources */,
+				EE1234000001EE01 /* TaskArchive.swift in Sources */,
+				EE5678000002EE01 /* TaskArchiveView.swift in Sources */,
 				90C7EAE97BF0325E90DF8482 /* TaskRailView.swift in Sources */,
 				88921FEE69D164CD2AE748C3 /* TaskState.swift in Sources */,
 				23715A7AC1B62147BC77E750 /* TerminalPanel.swift in Sources */,
