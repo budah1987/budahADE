@@ -39,9 +39,16 @@ struct WorkspaceView: View {
                                 onNewTab: { task.createPlanTab() }
                             )
 
-                            if let planChat = task.activePlanChat {
-                                PlanChatView(state: planChat)
-                                    .id(task.selectedPlanTabId)
+                            if let planChat = task.activePlanChat,
+                               let selectedId = task.selectedPlanTabId {
+                                PlanChatView(
+                                    state: planChat,
+                                    siblingTabs: task.planTabs.filter { $0.id != selectedId },
+                                    onHandOff: { targetId in
+                                        task.handOff(from: selectedId, to: targetId)
+                                    }
+                                )
+                                .id(task.selectedPlanTabId)
                             }
                         }
                     } else {

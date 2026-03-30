@@ -7,6 +7,11 @@ import UniformTypeIdentifiers
 struct PlanChatView: View {
     @ObservedObject var state: PlanChatState
 
+    /// Sibling plan tabs (other than this one) — used for Hand off popover.
+    var siblingTabs: [PlanTabInfo] = []
+    /// Called when user picks Hand off → target tab.
+    var onHandOff: ((UUID) -> Void)? = nil
+
     @State private var inputText: String = ""
     @State private var pendingImage: NSImage?
     @State private var pendingImagePath: String?
@@ -19,6 +24,11 @@ struct PlanChatView: View {
     private var session: AgentSession? { state.plannerSession }
     private var isRunning: Bool {
         session?.status == .streaming || session?.status == .connecting
+    }
+
+    /// True when there's at least one assistant message — show action buttons
+    private var hasAssistantMessage: Bool {
+        session?.messages.contains { $0.role == .assistant } == true
     }
 
     private struct InputHeightKey: PreferenceKey {
@@ -64,6 +74,19 @@ struct PlanChatView: View {
                     }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // Action buttons — shown when there's at least one assistant message
+            if hasAssistantMessage {
+                PlanActionButtons(
+                    onApprove: handleApprove,
+                    onEdit: handleEdit,
+                    onHandOff: { targetTabId in
+                        onHandOff?(targetTabId)
+                    },
+                    siblingTabs: siblingTabs
+                )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
             // Input area
@@ -441,6 +464,17 @@ struct PlanChatView: View {
     private var canSend: Bool {
         !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || pendingImagePath != nil
+    }
+
+    private func handleApprove() {
+        guard let lastAssistant = session?.messages.last(where: { $0.role == .assistant }),
+              !lastAssistant.content.isEmpty else { return }
+        let version = SpecVersionManager.approve(content: lastAssistant.content, in: state.worktreePath)
+        state.sendMessage("✓ Spec approved and saved as version \(version).")
+    }
+
+    private func handleEdit() {
+        state.sendMessage("[Edit requested] What would you like to change?")
     }
 
     private func cycleModel() {

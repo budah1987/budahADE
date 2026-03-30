@@ -38,6 +38,7 @@ final class PlanChatState: ObservableObject {
     @Published var selectedModel: AgentModel
     @Published var pendingSpec: String?
     @Published var editingMessageId: UUID?
+    @Published var handedOffContext: [(role: AgentMode, content: String)] = []
     private var sessionCancellable: AnyCancellable?
     private var persistenceTask: Task<Void, Never>?
 
@@ -69,6 +70,14 @@ final class PlanChatState: ObservableObject {
 
         // Append sibling context to system prompt
         prompt += siblingContext
+
+        // Append any handed-off content from other tabs
+        if !handedOffContext.isEmpty {
+            prompt += "\n## Handed-off context\n"
+            for item in handedOffContext {
+                prompt += "\n### From \(item.role.displayName)\n\(item.content)\n"
+            }
+        }
 
         let session = chatManager.createSession(
             model: selectedModel,
@@ -117,6 +126,13 @@ final class PlanChatState: ObservableObject {
         }
         plannerSession = nil
         conversationState = .idle
+    }
+
+    // MARK: - Hand Off
+
+    /// Receives handed-off content from another tab for context injection.
+    func receiveHandOff(from role: AgentMode, content: String) {
+        handedOffContext.append((role: role, content: content))
     }
 
     // MARK: - Image Support

@@ -92,6 +92,10 @@
 		CDADF807D968D1569DE81E02 /* AgentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4701DD02EBF21C6E4814EE /* AgentSession.swift */; };
 		CDE93063FC592FAD18D8C0D3 /* AgentSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FB2BB32C6E95B421F9188B /* AgentSessionTests.swift */; };
 		88B9F0A6C4D5E702 /* PlanConversationPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A8E9F5B3C4D601 /* PlanConversationPersistenceTests.swift */; };
+		CC1234567890AB01 /* CrossTabContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1234567890AB02 /* CrossTabContextTests.swift */; };
+		AA0001000001AA01 /* SpecVersionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001000001AA02 /* SpecVersionManager.swift */; };
+		AA0001000002AA01 /* PlanActionButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001000002AA02 /* PlanActionButtons.swift */; };
+		AA0001000003AA01 /* SpecVersionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001000003AA02 /* SpecVersionManagerTests.swift */; };
 		D05C0BA31AD477A67E19CB86 /* CanvasElementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC9007B2EB655C83C85950F /* CanvasElementView.swift */; };
 		D2EF43F713D69EBBA1BDB82B /* TileResizeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67E84F097063033949D58E23 /* TileResizeHandler.swift */; };
 		D447DCD7346C53F34D961C91 /* BuildStatusWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29AE47D7CE6C4505EC7C95B4 /* BuildStatusWatcher.swift */; };
@@ -164,6 +168,9 @@
 		446F5B715D56B121ACAB6197 /* TextContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextContentView.swift; sourceTree = "<group>"; };
 		44797B9C62EDBFA7C53FC905 /* PlanTabInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanTabInfo.swift; sourceTree = "<group>"; };
 		88B9D6F4A1C3E501 /* PlanConversationPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanConversationPersistence.swift; sourceTree = "<group>"; };
+		AA0001000001AA02 /* SpecVersionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecVersionManager.swift; sourceTree = "<group>"; };
+		AA0001000002AA02 /* PlanActionButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanActionButtons.swift; sourceTree = "<group>"; };
+		AA0001000003AA02 /* SpecVersionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecVersionManagerTests.swift; sourceTree = "<group>"; };
 		4A11B98BC7EFC2C859D464CD /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		4BFD18F77F12A05253442BE7 /* BranchPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BranchPicker.swift; sourceTree = "<group>"; };
 		4CE1CDC57A91E5BE148DFF76 /* TileChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileChrome.swift; sourceTree = "<group>"; };
@@ -213,6 +220,7 @@
 		B6A5F5D954773878CEA5C72A /* MarkdownTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTileView.swift; sourceTree = "<group>"; };
 		B6FB2BB32C6E95B421F9188B /* AgentSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionTests.swift; sourceTree = "<group>"; };
 		77A8E9F5B3C4D601 /* PlanConversationPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanConversationPersistenceTests.swift; sourceTree = "<group>"; };
+		CC1234567890AB02 /* CrossTabContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossTabContextTests.swift; sourceTree = "<group>"; };
 		BA31CD9CFC2F1AF11FB20450 /* DiffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffView.swift; sourceTree = "<group>"; };
 		BA8669BBD4F4B2DF69CF04EF /* ChatMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageTests.swift; sourceTree = "<group>"; };
 		BC80EF0396CDF90170BCA53D /* TileDragHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDragHandler.swift; sourceTree = "<group>"; };
@@ -317,6 +325,8 @@
 				0B13B8012976BD523DA1A788 /* PlanChatView.swift */,
 				FF2963B910167F6F17F353CD /* PlanTabBar.swift */,
 				44797B9C62EDBFA7C53FC905 /* PlanTabInfo.swift */,
+				AA0001000002AA02 /* PlanActionButtons.swift */,
+				AA0001000001AA02 /* SpecVersionManager.swift */,
 				6C3EF5BB2ADCB65A6F16E122 /* ScrollWheelMonitor.swift */,
 				FC8076CAE8B058A6546DFC05 /* SmartGuides.swift */,
 				D8A1D43F4D8C488C552F26E4 /* TileConnection.swift */,
@@ -363,6 +373,8 @@
 			children = (
 				B6FB2BB32C6E95B421F9188B /* AgentSessionTests.swift */,
 				77A8E9F5B3C4D601 /* PlanConversationPersistenceTests.swift */,
+				CC1234567890AB02 /* CrossTabContextTests.swift */,
+				AA0001000003AA02 /* SpecVersionManagerTests.swift */,
 				C656A43063C051F8EB3ED2D7 /* CanvasNodeTests.swift */,
 				8D81BC97619FB88DB6761DE6 /* CanvasPersistenceTests.swift */,
 				BA8669BBD4F4B2DF69CF04EF /* ChatMessageTests.swift */,
@@ -583,6 +595,8 @@
 			files = (
 				CDE93063FC592FAD18D8C0D3 /* AgentSessionTests.swift in Sources */,
 				88B9F0A6C4D5E702 /* PlanConversationPersistenceTests.swift in Sources */,
+				CC1234567890AB01 /* CrossTabContextTests.swift in Sources */,
+				AA0001000003AA01 /* SpecVersionManagerTests.swift in Sources */,
 				C4C0789CCE1F66D2B9CE825C /* CLISubprocessManagerTests.swift in Sources */,
 				F87FBD406C4313EB94E58C13 /* CanvasNodeTests.swift in Sources */,
 				9451ECD75854EDB839C75613 /* CanvasPersistenceTests.swift in Sources */,
@@ -658,6 +672,8 @@
 				B9E8125A92533B1BE418C116 /* PlanTabBar.swift in Sources */,
 				8D614A6C2D45D57D424989FF /* PlanTabInfo.swift in Sources */,
 				99C0E7F5B2D4F602 /* PlanConversationPersistence.swift in Sources */,
+				AA0001000002AA01 /* PlanActionButtons.swift in Sources */,
+				AA0001000001AA01 /* SpecVersionManager.swift in Sources */,
 				A7D399BBD879DA2E9E981942 /* ProjectPickerView.swift in Sources */,
 				64FC5DA81A3FACFE44D1AA80 /* ProjectStore.swift in Sources */,
 				D8F81F365F4CE4AADB9F6AF2 /* RestoredTerminalView.swift in Sources */,

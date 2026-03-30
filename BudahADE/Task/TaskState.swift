@@ -181,6 +181,17 @@ final class TaskState: ObservableObject, Identifiable {
         }
     }
 
+    /// Routes the last assistant message from sourceTab to targetTab as handed-off context.
+    func handOff(from sourceTabId: UUID, to targetTabId: UUID) {
+        guard let sourceChat = planChats[sourceTabId],
+              let targetChat = planChats[targetTabId],
+              let sourceSession = sourceChat.plannerSession,
+              let lastAssistant = sourceSession.messages.last(where: { $0.role == .assistant }) else { return }
+        targetChat.receiveHandOff(from: sourceChat.role, content: lastAssistant.content)
+        // Switch to the target tab so the user sees the result
+        selectPlanTab(targetTabId)
+    }
+
     func selectPlanTabByIndex(_ index: Int) {
         guard !planTabs.isEmpty else { return }
         if index == 9 {
