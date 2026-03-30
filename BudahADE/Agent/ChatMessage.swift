@@ -113,11 +113,13 @@ enum StreamEvent: Equatable {
         let sessionId: String
         let tools: [String]?
         let model: String?
+        let slashCommands: [String]?
 
         enum CodingKeys: String, CodingKey {
             case sessionId = "session_id"
             case tools
             case model
+            case slashCommands = "slash_commands"
         }
     }
 
@@ -255,7 +257,8 @@ enum StreamEvent: Equatable {
                 let info = SystemInfo(
                     sessionId: decoded["session_id"]?.stringValue ?? "",
                     tools: decoded["tools"]?.arrayValue?.compactMap { $0.stringValue },
-                    model: decoded["model"]?.stringValue
+                    model: decoded["model"]?.stringValue,
+                    slashCommands: decoded["slash_commands"]?.arrayValue?.compactMap { $0.stringValue }
                 )
                 return .system(info)
 

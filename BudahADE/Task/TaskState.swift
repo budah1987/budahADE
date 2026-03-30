@@ -106,10 +106,8 @@ final class TaskState: ObservableObject, Identifiable {
     // MARK: - Plan/Build Mode
 
     func enterPlanMode() {
-        if planTabs.isEmpty {
-            createPlanTab()
-        }
         mode = .plan
+        // Don't auto-create tab — role selection modal handles it
     }
 
     func enterBuildMode() {

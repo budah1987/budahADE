@@ -94,12 +94,68 @@ final class PlanChatState: ObservableObject {
     }
 
     func sendMessage(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Handle /commands
+        if trimmed.hasPrefix("/") {
+            if let handled = handleLocalCommand(trimmed) {
+                // Command handled locally — don't send to agent
+                if !handled.isEmpty {
+                    // Add as system message for feedback
+                    plannerSession?.messages.append(ChatMessage(role: .system, content: handled))
+                }
+                return
+            }
+            // Not a local command — convert to skill invocation
+            let expanded = expandSlashCommand(trimmed)
+            let session = ensureSession()
+            if conversationState == .idle { conversationState = .chatting }
+            chatManager.send(sessionId: session.id, prompt: expanded, model: selectedModel)
+            persistConversation()
+            return
+        }
+
         let session = ensureSession()
         if conversationState == .idle {
             conversationState = .chatting
         }
         chatManager.send(sessionId: session.id, prompt: text, model: selectedModel)
         persistConversation()
+    }
+
+    /// Handle commands that should be processed locally, not sent to the agent.
+    /// Returns a feedback message, or nil if the command is not a local command.
+    private func handleLocalCommand(_ command: String) -> String? {
+        let parts = command.split(separator: " ", maxSplits: 1)
+        let cmd = parts.first.map(String.init) ?? command
+
+        switch cmd {
+        case "/clear":
+            newSession()
+            return "Conversation cleared."
+        case "/model":
+            // Cycle to next model
+            let models = AgentModel.allCases
+            if let idx = models.firstIndex(of: selectedModel) {
+                selectedModel = models[(idx + 1) % models.count]
+            }
+            return "Switched to \(selectedModel.displayName)."
+        default:
+            return nil // Not a local command
+        }
+    }
+
+    /// Convert a slash command into a natural language prompt that invokes the skill.
+    private func expandSlashCommand(_ command: String) -> String {
+        let parts = command.split(separator: " ", maxSplits: 1)
+        let skillName = String(parts[0].dropFirst()) // Remove leading /
+        let args = parts.count > 1 ? String(parts[1]) : ""
+
+        if args.isEmpty {
+            return "Use the \(skillName) skill."
+        } else {
+            return "Use the \(skillName) skill with: \(args)"
+        }
     }
 
     func persistConversation() {
@@ -132,9 +188,17 @@ final class PlanChatState: ObservableObject {
 
     // MARK: - Hand Off
 
-    /// Receives handed-off content from another tab for context injection.
+    /// Receives handed-off content from another tab.
+    /// If a session already exists, sends it as a message so the agent sees it immediately.
+    /// If no session yet, stores it for system prompt injection on session creation.
     func receiveHandOff(from role: AgentMode, content: String) {
         handedOffContext.append((role: role, content: content))
+
+        // If session already exists, inject as a user message so it's seen immediately
+        if plannerSession != nil {
+            let handOffMessage = "[Handed off from \(role.displayName)]\n\n\(content)"
+            sendMessage(handOffMessage)
+        }
     }
 
     // MARK: - Image Support

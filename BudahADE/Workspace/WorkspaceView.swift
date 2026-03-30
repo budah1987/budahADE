@@ -8,6 +8,7 @@ struct WorkspaceView: View {
     @State private var renameTarget: RenameTarget? = nil
     @State private var renameText: String = ""
     @FocusState private var renameFieldFocused: Bool
+    @State private var showRoleModal = false
 
     var body: some View {
         ZStack {
@@ -26,29 +27,43 @@ struct WorkspaceView: View {
                 VStack(spacing: 0) {
                     // Content
                     if let task = state.activeTask, task.mode == .plan {
-                        // Plan mode: tab bar + full-width chat
+                        // Plan mode: role modal or tab bar + chat
                         VStack(spacing: 0) {
-                            PlanTabBar(
-                                selectedTabID: Binding(
-                                    get: { task.selectedPlanTabId ?? UUID() },
-                                    set: { task.selectPlanTab($0) }
-                                ),
-                                tabs: task.planTabs,
-                                onSelectTab: { task.selectPlanTab($0) },
-                                onCloseTab: { task.closePlanTab($0) },
-                                onNewTab: { task.createPlanTab() }
-                            )
-
-                            if let planChat = task.activePlanChat,
-                               let selectedId = task.selectedPlanTabId {
-                                PlanChatView(
-                                    state: planChat,
-                                    siblingTabs: task.planTabs.filter { $0.id != selectedId },
-                                    onHandOff: { targetId in
-                                        task.handOff(from: selectedId, to: targetId)
-                                    }
+                            if task.planTabs.isEmpty {
+                                // No tabs — show role selection
+                                RoleSelectionModal { role in
+                                    task.createPlanTab(role: role)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else {
+                                PlanTabBar(
+                                    selectedTabID: Binding(
+                                        get: { task.selectedPlanTabId ?? UUID() },
+                                        set: { task.selectPlanTab($0) }
+                                    ),
+                                    tabs: task.planTabs,
+                                    onSelectTab: { task.selectPlanTab($0) },
+                                    onCloseTab: { task.closePlanTab($0) },
+                                    onNewTab: { showRoleModal = true }
                                 )
-                                .id(task.selectedPlanTabId)
+
+                                if let planChat = task.activePlanChat,
+                                   let selectedId = task.selectedPlanTabId {
+                                    PlanChatView(
+                                        state: planChat,
+                                        siblingTabs: task.planTabs.filter { $0.id != selectedId },
+                                        onHandOff: { targetId in
+                                            task.handOff(from: selectedId, to: targetId)
+                                        }
+                                    )
+                                    .id(task.selectedPlanTabId)
+                                }
+                            }
+                        }
+                        .sheet(isPresented: $showRoleModal) {
+                            RoleSelectionModal { role in
+                                task.createPlanTab(role: role)
+                                showRoleModal = false
                             }
                         }
                     } else {
@@ -108,7 +123,7 @@ struct WorkspaceView: View {
         .onReceive(NotificationCenter.default.publisher(for: .newTerminalTab)) { _ in
             if let task = state.activeTask {
                 if task.mode == .plan {
-                    task.createPlanTab()
+                    showRoleModal = true
                 } else {
                     task.createTab()
                 }
