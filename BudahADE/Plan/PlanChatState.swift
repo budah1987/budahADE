@@ -58,7 +58,18 @@ final class PlanChatState: ObservableObject {
         if let existing = plannerSession {
             return existing
         }
-        let prompt = plannerSystemPrompt()
+        var prompt = plannerSystemPrompt()
+
+        // Load sibling conversations for context injection
+        let siblings = PlanConversationPersistence.loadAllExcluding(
+            tabId: self.tabId,
+            from: worktreePath
+        )
+        let siblingContext = AgentPrompts.siblingContextBlock(from: siblings)
+
+        // Append sibling context to system prompt
+        prompt += siblingContext
+
         let session = chatManager.createSession(
             model: selectedModel,
             agentMode: nil,

@@ -209,6 +209,25 @@ enum AgentPrompts {
         """
     }
 
+    // MARK: - Sibling Context Injection
+
+    /// Build a context block from sibling conversations to inject into system prompt
+    static func siblingContextBlock(from siblings: [ConversationSnapshot]) -> String {
+        guard !siblings.isEmpty else { return "" }
+
+        var block = "\n## Context from other planning conversations\n"
+
+        for sibling in siblings {
+            block += "\n### \(sibling.role.displayName)\n"
+            for message in sibling.messages {
+                let prefix = message.role == .user ? "**User:**" : "**\(sibling.role.displayName):**"
+                block += "\(prefix) \(message.content)\n\n"
+            }
+        }
+
+        return block
+    }
+
     private static func slugify(_ text: String) -> String {
         text.lowercased()
             .components(separatedBy: .whitespacesAndNewlines)
