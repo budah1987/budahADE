@@ -49,7 +49,8 @@ final class AgentSessionTests: XCTestCase {
     func testAgentModelDisplayNames() {
         XCTAssertEqual(AgentModel.haiku.displayName, "Haiku")
         XCTAssertEqual(AgentModel.sonnet.displayName, "Sonnet")
-        XCTAssertEqual(AgentModel.opus.displayName, "Opus")
+        XCTAssertEqual(AgentModel.opus.displayName, "Opus 4.6")
+        XCTAssertFalse(AgentModel.sonnet1m.displayName.isEmpty)
     }
 
     func testAgentModelIdentifiable() {
@@ -60,9 +61,10 @@ final class AgentSessionTests: XCTestCase {
 
     func testAgentModelCaseIterable() {
         let models = AgentModel.allCases
-        XCTAssertEqual(models.count, 3)
+        XCTAssertEqual(models.count, 4)
         XCTAssertTrue(models.contains(.haiku))
         XCTAssertTrue(models.contains(.sonnet))
+        XCTAssertTrue(models.contains(.sonnet1m))
         XCTAssertTrue(models.contains(.opus))
     }
 

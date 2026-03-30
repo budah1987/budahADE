@@ -33,16 +33,15 @@ struct WorkspaceView: View {
                 VStack(spacing: 0) {
                     // Content
                     if let task = state.activeTask, task.mode == .plan {
-                        // Plan mode: show role modal when no tabs, otherwise tab bar + chat
-                        if task.planTabs.isEmpty {
-                            ZStack {
-                                Theme.appBackground
+                        // Plan mode: role modal or tab bar + chat
+                        VStack(spacing: 0) {
+                            if task.planTabs.isEmpty {
+                                // No tabs — show role selection
                                 RoleSelectionModal { role in
                                     task.createPlanTab(role: role)
                                 }
-                            }
-                        } else {
-                            VStack(spacing: 0) {
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else {
                                 PlanTabBar(
                                     selectedTabID: Binding(
                                         get: { task.selectedPlanTabId ?? UUID() },
@@ -54,20 +53,23 @@ struct WorkspaceView: View {
                                     onNewTab: { showRoleModal = true }
                                 )
 
-                                if let planChat = task.activePlanChat {
-                                    PlanChatView(state: planChat)
-                                        .id(task.selectedPlanTabId)
+                                if let planChat = task.activePlanChat,
+                                   let selectedId = task.selectedPlanTabId {
+                                    PlanChatView(
+                                        state: planChat,
+                                        siblingTabs: task.planTabs.filter { $0.id != selectedId },
+                                        onHandOff: { targetId in
+                                            task.handOff(from: selectedId, to: targetId)
+                                        }
+                                    )
+                                    .id(task.selectedPlanTabId)
                                 }
                             }
-                            .sheet(isPresented: $showRoleModal) {
-                                if let task = state.activeTask {
-                                    RoleSelectionModal { role in
-                                        task.createPlanTab(role: role)
-                                        showRoleModal = false
-                                    }
-                                    .padding(24)
-                                    .background(Theme.appBackground)
-                                }
+                        }
+                        .sheet(isPresented: $showRoleModal) {
+                            RoleSelectionModal { role in
+                                task.createPlanTab(role: role)
+                                showRoleModal = false
                             }
                         }
                     } else {

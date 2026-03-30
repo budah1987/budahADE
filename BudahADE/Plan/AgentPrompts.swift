@@ -115,35 +115,24 @@ enum AgentPrompts {
         case .designer:
             return """
             \(context)
-            You are a UI/UX Designer and front-end design expert. Focus on user experience, visual hierarchy, component structure, interaction patterns, and accessibility. When reviewing the codebase, look at SwiftUI views, layout patterns, and existing design tokens. Propose design improvements with clear rationale. Think in components — identify reusable patterns, consistent spacing, and coherent information architecture.
+            You are a UI/UX Designer. Focus on user experience, component structure, interaction patterns, visual hierarchy, and accessibility. When analyzing code, evaluate from the user's perspective — what's intuitive, what's confusing, what's missing. Present design decisions as options with trade-offs. Be opinionated — recommend the better option and explain why.
             \(specBlock)
             """
 
         case .specAuthor:
             return """
             \(context)
-            You are a Spec Author. Your job is to synthesize findings, ideas, and designs from the other plan tabs into a clear, structured, actionable spec document.
+            You are a Spec Author — your job is to synthesize findings from planning conversations into a clear, actionable specification document.
 
-            ## Your approach
-            Work section by section with the user. Don't write the whole spec at once — collaborate iteratively:
-            1. Ask which area to tackle first
-            2. Draft that section based on what's been discussed in other tabs
-            3. Refine with user feedback before moving on
-            4. Assemble the final spec only when all sections are ready
+            Your workflow:
+            1. Review the context from sibling conversations (research findings, design decisions, architectural proposals)
+            2. Present the spec ONE SECTION AT A TIME for user review
+            3. For each section, ask "Does this look right?" before moving to the next
+            4. Once all sections are approved, assemble the full document
+            5. Present the complete spec for final review
 
-            ## Spec format
-            Produce specs in this structure:
-            - **Overview** — problem statement and goals
-            - **Requirements** — what the solution must do (numbered, verifiable)
-            - **Design** — UI/UX decisions and component breakdown
-            - **Architecture** — data models, state management, file structure
-            - **Tasks** — implementation steps as checkboxes `- [ ]` with acceptance criteria
-
-            ## Guidelines
-            - Reference specific findings from researcher, ideator, designer, and developer tabs
-            - Keep requirements verifiable — each one should be testable
-            - Write tasks at the right granularity — one logical change per task
-            - Use Write tool to save the final spec to `.budahade/spec.md`
+            Spec format: Problem statement, goals, architecture, components, data flow, edge cases, implementation checklist.
+            Be concise. Every sentence should earn its place.
             \(specBlock)
             """
         }
@@ -242,6 +231,72 @@ enum AgentPrompts {
         Each `- [ ]` item is a task. When you complete a task, update the file: change `- [ ]` to `- [x]`.
         \(progressLine)
         """
+    }
+
+    // MARK: - Build Context Injection
+
+    /// Reads spec progress and agent output from the worktree's .budahade directory
+    /// and returns a formatted markdown block, or empty string if nothing exists.
+    static func buildContextBlock(worktreePath: String) -> String {
+        let fm = FileManager.default
+        var sections: [String] = []
+
+        // --- Spec progress ---
+        let specPath = (worktreePath as NSString)
+            .appendingPathComponent(".budahade/spec.md")
+        if let specContent = try? String(contentsOfFile: specPath, encoding: .utf8) {
+            let lines = specContent.components(separatedBy: "\n")
+            let completed = lines.filter { $0.contains("- [x]") || $0.contains("- [X]") }
+            let remaining = lines.filter { $0.contains("- [ ]") }
+            let total = completed.count + remaining.count
+            if total > 0 {
+                var specSection = "### Spec Progress\n"
+                specSection += "\(completed.count) of \(total) tasks completed\n\n"
+                for line in completed { specSection += "\(line)\n" }
+                for line in remaining { specSection += "\(line)\n" }
+                sections.append(specSection.trimmingCharacters(in: .newlines))
+            }
+        }
+
+        // --- Agent output ---
+        let agentOutputDir = (worktreePath as NSString)
+            .appendingPathComponent(".budahade/agent-output")
+        if let files = try? fm.contentsOfDirectory(atPath: agentOutputDir) {
+            let mdFiles = files.filter { $0.hasSuffix(".md") }.sorted()
+            var outputParts: [String] = []
+            for filename in mdFiles {
+                let filePath = (agentOutputDir as NSString).appendingPathComponent(filename)
+                if let content = try? String(contentsOfFile: filePath, encoding: .utf8),
+                   !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    outputParts.append(content.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+            }
+            if !outputParts.isEmpty {
+                sections.append("### Agent Output\n" + outputParts.joined(separator: "\n\n---\n\n"))
+            }
+        }
+
+        guard !sections.isEmpty else { return "" }
+        return "\n## Build Progress\n\n" + sections.joined(separator: "\n\n")
+    }
+
+    // MARK: - Sibling Context Injection
+
+    /// Build a context block from sibling conversations to inject into system prompt
+    static func siblingContextBlock(from siblings: [ConversationSnapshot]) -> String {
+        guard !siblings.isEmpty else { return "" }
+
+        var block = "\n## Context from other planning conversations\n"
+
+        for sibling in siblings {
+            block += "\n### \(sibling.role.displayName)\n"
+            for message in sibling.messages {
+                let prefix = message.role == .user ? "**User:**" : "**\(sibling.role.displayName):**"
+                block += "\(prefix) \(message.content)\n\n"
+            }
+        }
+
+        return block
     }
 
     private static func slugify(_ text: String) -> String {

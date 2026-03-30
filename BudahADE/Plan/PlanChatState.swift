@@ -15,6 +15,7 @@ enum PlanConversationState: Equatable {
 
 @MainActor
 final class PlanChatState: ObservableObject {
+    let tabId: UUID
     let worktreePath: String
     let taskName: String
     let branchName: String
@@ -37,11 +38,14 @@ final class PlanChatState: ObservableObject {
     @Published var selectedModel: AgentModel
     @Published var pendingSpec: String?
     @Published var editingMessageId: UUID?
+    @Published var handedOffContext: [(role: AgentMode, content: String)] = []
     private var sessionCancellable: AnyCancellable?
+    private var persistenceTask: Task<Void, Never>?
 
     // MARK: - Init
 
-    init(worktreePath: String, taskName: String, branchName: String, role: AgentMode = .researcher) {
+    init(tabId: UUID = UUID(), worktreePath: String, taskName: String, branchName: String, role: AgentMode = .researcher) {
+        self.tabId = tabId
         self.worktreePath = worktreePath
         self.taskName = taskName
         self.branchName = branchName
@@ -55,7 +59,28 @@ final class PlanChatState: ObservableObject {
         if let existing = plannerSession {
             return existing
         }
-        let prompt = plannerSystemPrompt()
+        var prompt = plannerSystemPrompt()
+
+        // Load sibling conversations for context injection
+        let siblings = PlanConversationPersistence.loadAllExcluding(
+            tabId: self.tabId,
+            from: worktreePath
+        )
+        let siblingContext = AgentPrompts.siblingContextBlock(from: siblings)
+        let buildContext = AgentPrompts.buildContextBlock(worktreePath: worktreePath)
+
+        // Append sibling context and build context to system prompt
+        prompt += siblingContext
+        prompt += buildContext
+
+        // Append any handed-off content from other tabs
+        if !handedOffContext.isEmpty {
+            prompt += "\n## Handed-off context\n"
+            for item in handedOffContext {
+                prompt += "\n### From \(item.role.displayName)\n\(item.content)\n"
+            }
+        }
+
         let session = chatManager.createSession(
             model: selectedModel,
             agentMode: nil,
@@ -69,11 +94,83 @@ final class PlanChatState: ObservableObject {
     }
 
     func sendMessage(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Handle /commands
+        if trimmed.hasPrefix("/") {
+            if let handled = handleLocalCommand(trimmed) {
+                // Command handled locally — don't send to agent
+                if !handled.isEmpty {
+                    // Add as system message for feedback
+                    plannerSession?.messages.append(ChatMessage(role: .system, content: handled))
+                }
+                return
+            }
+            // Not a local command — convert to skill invocation
+            let expanded = expandSlashCommand(trimmed)
+            let session = ensureSession()
+            if conversationState == .idle { conversationState = .chatting }
+            chatManager.send(sessionId: session.id, prompt: expanded, model: selectedModel)
+            persistConversation()
+            return
+        }
+
         let session = ensureSession()
         if conversationState == .idle {
             conversationState = .chatting
         }
         chatManager.send(sessionId: session.id, prompt: text, model: selectedModel)
+        persistConversation()
+    }
+
+    /// Handle commands that should be processed locally, not sent to the agent.
+    /// Returns a feedback message, or nil if the command is not a local command.
+    private func handleLocalCommand(_ command: String) -> String? {
+        let parts = command.split(separator: " ", maxSplits: 1)
+        let cmd = parts.first.map(String.init) ?? command
+
+        switch cmd {
+        case "/clear":
+            newSession()
+            return "Conversation cleared."
+        case "/model":
+            // Cycle to next model
+            let models = AgentModel.allCases
+            if let idx = models.firstIndex(of: selectedModel) {
+                selectedModel = models[(idx + 1) % models.count]
+            }
+            return "Switched to \(selectedModel.displayName)."
+        default:
+            return nil // Not a local command
+        }
+    }
+
+    /// Convert a slash command into a natural language prompt that invokes the skill.
+    private func expandSlashCommand(_ command: String) -> String {
+        let parts = command.split(separator: " ", maxSplits: 1)
+        let skillName = String(parts[0].dropFirst()) // Remove leading /
+        let args = parts.count > 1 ? String(parts[1]) : ""
+
+        if args.isEmpty {
+            return "Use the \(skillName) skill."
+        } else {
+            return "Use the \(skillName) skill with: \(args)"
+        }
+    }
+
+    func persistConversation() {
+        persistenceTask?.cancel()
+        persistenceTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            guard let session = plannerSession else { return }
+            let snapshot = ConversationSnapshot(
+                tabId: self.tabId,
+                role: self.role,
+                messages: session.messages
+            )
+            PlanConversationPersistence.save(snapshot, to: worktreePath)
+        }
     }
 
     func cancel() {
@@ -87,6 +184,21 @@ final class PlanChatState: ObservableObject {
         }
         plannerSession = nil
         conversationState = .idle
+    }
+
+    // MARK: - Hand Off
+
+    /// Receives handed-off content from another tab.
+    /// If a session already exists, sends it as a message so the agent sees it immediately.
+    /// If no session yet, stores it for system prompt injection on session creation.
+    func receiveHandOff(from role: AgentMode, content: String) {
+        handedOffContext.append((role: role, content: content))
+
+        // If session already exists, inject as a user message so it's seen immediately
+        if plannerSession != nil {
+            let handOffMessage = "[Handed off from \(role.displayName)]\n\n\(content)"
+            sendMessage(handOffMessage)
+        }
     }
 
     // MARK: - Image Support

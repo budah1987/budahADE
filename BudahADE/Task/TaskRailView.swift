@@ -66,6 +66,27 @@ struct TaskRailView: View {
 
             Spacer(minLength: 0)
 
+            // Task Archive button
+            Button {
+                workspace.showTaskArchive = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "archivebox")
+                        .font(.system(size: 10, weight: .medium))
+                    Text("Task Archive")
+                        .font(Theme.label(12))
+                }
+                .foregroundColor(Theme.textMuted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Theme.border).frame(height: 1)
+            }
+
             // New Task button
             Button {
                 workspace.showNewTaskSheet = true
@@ -84,13 +105,19 @@ struct TaskRailView: View {
             }
             .buttonStyle(.plain)
             .overlay(alignment: .top) {
-                Rectangle().fill(Theme.border).frame(height: 1)
+                Rectangle().fill(Theme.borderSubtle).frame(height: 1)
             }
         }
         .frame(width: 160)
         .sheet(item: $workspace.taskForCompletion) { task in
             TaskCompletionSheet(workspace: workspace, task: task)
                 .background(Theme.appBackground)
+        }
+        .sheet(isPresented: $workspace.showTaskArchive) {
+            TaskArchiveView(archive: workspace.taskArchive) { archived in
+                workspace.reopenTask(archived)
+            }
+            .background(Theme.appBackground)
         }
     }
 }

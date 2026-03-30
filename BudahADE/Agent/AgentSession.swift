@@ -179,8 +179,14 @@ final class AgentSession: ObservableObject, Identifiable {
         currentStreamingText += text
     }
 
+    /// Available slash commands from the CLI init event.
+    @Published var availableCommands: [String] = []
+
     func handleSystemInit(_ info: StreamEvent.SystemInfo) {
         claudeSessionId = info.sessionId
+        if let commands = info.slashCommands {
+            availableCommands = commands
+        }
     }
 
     func handleResult(_ result: StreamEvent.ResultInfo) {
@@ -358,7 +364,9 @@ final class AgentSession: ObservableObject, Identifiable {
         // Find option lines — numbered, lettered, or bulleted
         let numberedPattern = try! NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.+)$"#)
         let letteredPattern = try! NSRegularExpression(pattern: #"^([A-Za-z])[.)]\s+(.+)$"#)
-        let bulletPattern = try! NSRegularExpression(pattern: #"^[-•]\s+\*{0,2}(.+?)\*{0,2}$"#)
+        let bulletPattern = try! NSRegularExpression(pattern: #"^[-•]\s+\*{0,2}(.+?)\*{0,2}\s*(—.*)?$"#)
+        // Bullet + lettered: "• **A) Label** — desc" or "- **B) Label** — desc"
+        let bulletLetteredPattern = try! NSRegularExpression(pattern: #"^[-•]\s+\*{0,2}([A-Za-z])[.)]\s*(.+?)\*{0,2}\s*(—.*)?$"#)
 
         // Track which lines are inside code fences
         var inCodeBlock = false
@@ -373,6 +381,16 @@ final class AgentSession: ObservableObject, Identifiable {
             if let match = numberedPattern.firstMatch(in: line, range: range),
                let labelRange = Range(match.range(at: 1), in: line),
                let textRange = Range(match.range(at: 2), in: line) {
+                let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
+                options.append(DetectedOption(
+                    id: options.count,
+                    label: String(line[labelRange]),
+                    text: rawText
+                ))
+            } else if let match = bulletLetteredPattern.firstMatch(in: line, range: range),
+                      let labelRange = Range(match.range(at: 1), in: line),
+                      let textRange = Range(match.range(at: 2), in: line) {
+                // Bullet-prefixed lettered option: "• **A) Label** — desc"
                 let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
                 options.append(DetectedOption(
                     id: options.count,
@@ -403,6 +421,61 @@ final class AgentSession: ObservableObject, Identifiable {
         guard options.count >= 2 && options.count <= 6 else { return nil }
 
         return options
+    }
+
+    struct DetectedQuestion {
+        let contextText: String         // The question + surrounding context
+        let options: [DetectedOption]   // May be empty if no formatted options
+    }
+
+    /// Detects any question in the last assistant message, with or without options.
+    func detectQuestion(in text: String) -> DetectedQuestion? {
+        let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        let nonEmptyLines = lines.filter { !$0.isEmpty }
+        guard !nonEmptyLines.isEmpty else { return nil }
+
+        // Check for a question
+        let hasQuestion: Bool = {
+            // Last few non-empty lines end with ?
+            let tail = nonEmptyLines.suffix(3)
+            if tail.contains(where: { $0.hasSuffix("?") }) { return true }
+            // Or contains a question pattern
+            let questionPattern = try? NSRegularExpression(
+                pattern: "which.*prefer|would you like|should I|do you want|what approach|which option|what do you think|how would you|let me know|your thoughts",
+                options: .caseInsensitive
+            )
+            return tail.contains { line in
+                let range = NSRange(line.startIndex..<line.endIndex, in: line)
+                return questionPattern?.firstMatch(in: line, range: range) != nil
+            }
+        }()
+        guard hasQuestion else { return nil }
+
+        // Extract question context — the last paragraph or last few meaningful lines
+        let contextLines = extractQuestionContext(from: nonEmptyLines)
+        let contextText = contextLines.joined(separator: "\n")
+
+        // Try to detect formatted options (reuse existing logic)
+        let options = detectOptions(in: text) ?? []
+
+        return DetectedQuestion(contextText: contextText, options: options)
+    }
+
+    /// Extracts the question context — walks backward from the end to find the question paragraph.
+    private func extractQuestionContext(from lines: [String]) -> [String] {
+        // Walk backward from the end, collecting lines until we hit a blank-line gap
+        // or collect up to 6 lines
+        var result: [String] = []
+        let allLines = lines
+        var i = allLines.count - 1
+        while i >= 0 && result.count < 6 {
+            let line = allLines[i]
+            // Stop if we hit a heading or horizontal rule (context boundary)
+            if line.hasPrefix("##") || line.hasPrefix("---") { break }
+            result.insert(line, at: 0)
+            i -= 1
+        }
+        return result
     }
 
     // MARK: - Token Formatting

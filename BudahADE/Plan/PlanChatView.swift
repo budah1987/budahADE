@@ -7,6 +7,11 @@ import UniformTypeIdentifiers
 struct PlanChatView: View {
     @ObservedObject var state: PlanChatState
 
+    /// Sibling plan tabs (other than this one) — used for Hand off popover.
+    var siblingTabs: [PlanTabInfo] = []
+    /// Called when user picks Hand off → target tab.
+    var onHandOff: ((UUID) -> Void)? = nil
+
     @State private var inputText: String = ""
     @State private var pendingImage: NSImage?
     @State private var pendingImagePath: String?
@@ -14,11 +19,69 @@ struct PlanChatView: View {
     @State private var showModelMenu: Bool = false
     @State private var inputTextHeight: CGFloat = 36
     @State private var thinkingStartDate: Date?
+    @State private var slashPopoverIndex: Int = 0
+    @State private var keyMonitor: Any?
+    @StateObject private var slashState = SlashPopoverState()
     @FocusState private var inputFocused: Bool
+
+    @State private var slashCommandSelected = false
+
+    /// Whether the slash command popover should be visible
+    private var showSlashPopover: Bool {
+        inputText.hasPrefix("/") && !isRunning && !slashCommandSelected
+    }
+
+    /// The filter text after the "/"
+    private var slashFilter: String {
+        guard inputText.hasPrefix("/") else { return "" }
+        let afterSlash = String(inputText.dropFirst())
+        // Only filter on the first word (before any space = arguments)
+        return afterSlash.split(separator: " ").first.map(String.init) ?? afterSlash
+    }
+
+    /// Default commands to show before CLI init event provides the real list
+    private static let defaultRemoteCommands = [
+        "update-config", "debug", "simplify", "batch", "loop", "schedule",
+        "claude-api", "qmd-sessions", "site-extract", "prepare-to-build",
+        "handoff", "find-skills", "figma-design-system", "design-apply",
+        "design-extract", "kill-mcp", "notion-update", "figma-connect",
+        "interface-design:extract", "interface-design:status",
+        "interface-design:audit", "interface-design:init",
+        "interface-design:interface-design",
+        "figma-friend:figma-designer", "figma-friend:clone-ui",
+        "compact", "context", "cost", "heapdump", "init",
+        "pr-comments", "release-notes", "review", "security-review",
+        "extra-usage", "insights",
+    ]
+
+    /// Ghost text completion — shows the full command with typed portion + faint remainder
+    private var ghostCompletion: String? {
+        guard showSlashPopover, !allCommands.isEmpty else { return nil }
+        let idx = min(slashPopoverIndex, allCommands.count - 1)
+        let command = allCommands[idx]
+        // Show the full "/command" as ghost text
+        return "/\(command)"
+    }
+
+    /// All available commands (local + from CLI or defaults)
+    private var allCommands: [String] {
+        let local = ["clear", "model"]
+        let remote = session?.availableCommands.isEmpty == false
+            ? session!.availableCommands
+            : Self.defaultRemoteCommands
+        let all = local + remote
+        if slashFilter.isEmpty { return all }
+        return all.filter { $0.localizedCaseInsensitiveContains(slashFilter) }
+    }
 
     private var session: AgentSession? { state.plannerSession }
     private var isRunning: Bool {
         session?.status == .streaming || session?.status == .connecting
+    }
+
+    /// True when there's at least one assistant message — show action buttons
+    private var hasAssistantMessage: Bool {
+        session?.messages.contains { $0.role == .assistant } == true
     }
 
     private struct InputHeightKey: PreferenceKey {
@@ -30,6 +93,19 @@ struct PlanChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Role indicator
+            HStack(spacing: 6) {
+                Image(systemName: state.role.iconName)
+                    .foregroundStyle(state.role.dotColor)
+                Text(state.role.displayName)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
             // Messages
             messageList
                 .overlay(alignment: .bottom) {
@@ -42,15 +118,16 @@ struct PlanChatView: View {
                     .allowsHitTesting(false)
                 }
 
-            // Option buttons sheet — slides up from input
+            // Question sheet — slides up when Claude asks a question
             if let session,
                !session.optionsDismissed,
                let lastMsg = session.messages.last,
                lastMsg.role == .assistant,
                !lastMsg.content.isEmpty,
-               let options = session.detectOptions(in: lastMsg.content) {
+               let question = session.detectQuestion(in: lastMsg.content) {
                 OptionButtonsSheet(
-                    options: options,
+                    contextText: question.contextText,
+                    options: question.options,
                     onSelect: { option in
                         session.optionsDismissed = true
                         state.sendMessage("\(option.label). \(option.text)")
@@ -64,6 +141,19 @@ struct PlanChatView: View {
                     }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // Action buttons — shown when there's at least one assistant message
+            if hasAssistantMessage {
+                PlanActionButtons(
+                    onApprove: handleApprove,
+                    onEdit: handleEdit,
+                    onHandOff: { targetTabId in
+                        onHandOff?(targetTabId)
+                    },
+                    siblingTabs: siblingTabs
+                )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
             // Input area
@@ -159,6 +249,9 @@ struct PlanChatView: View {
             .onChange(of: session?.currentStreamingText) { _, _ in
                 scrollToBottom(proxy: proxy)
             }
+            .onChange(of: session?.activityFeed.count) { _, _ in
+                scrollToBottom(proxy: proxy)
+            }
             .onChange(of: session?.status) { _, newValue in
                 if newValue == .connecting {
                     thinkingStartDate = Date()
@@ -166,6 +259,10 @@ struct PlanChatView: View {
                     session?.isThinking = false
                 } else if newValue == .idle || newValue == .done || newValue == nil {
                     thinkingStartDate = nil
+                    // Scroll when response completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        scrollToBottom(proxy: proxy)
+                    }
                 } else if case .error = newValue {
                     thinkingStartDate = nil
                 }
@@ -243,6 +340,24 @@ struct PlanChatView: View {
 
     private var inputArea: some View {
         VStack(spacing: 0) {
+            // Slash command popover — floats above input
+            if showSlashPopover && !allCommands.isEmpty {
+                SlashCommandPopover(
+                    commands: allCommands,
+                    filter: "",
+                    onSelect: { command in
+                        inputText = "/\(command) "
+                    },
+                    onDismiss: {
+                        inputText = ""
+                    },
+                    selectedIndex: $slashPopoverIndex
+                )
+                .padding(.horizontal, 14)
+                .padding(.bottom, 4)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             // Pending image preview
             if let img = pendingImage {
                 HStack {
@@ -315,6 +430,14 @@ struct PlanChatView: View {
                             .padding(.top, 2)
                             .allowsHitTesting(false)
                     }
+                    // Ghost text — shows autocomplete suggestion
+                    if let ghost = ghostCompletion {
+                        Text(ghost)
+                            .font(.system(size: 14))
+                            .foregroundColor(Theme.textSecondary.opacity(0.5))
+                            .padding(.top, 2)
+                            .allowsHitTesting(false)
+                    }
                     TextEditor(text: $inputText)
                         .font(.system(size: 14))
                         .foregroundColor(.white)
@@ -341,7 +464,22 @@ struct PlanChatView: View {
                         }
                         .onKeyPress(.return, phases: .down) { press in
                             guard !press.modifiers.contains(.shift) else { return .ignored }
+                            // If slash popover is showing, select the command and dismiss
+                            if showSlashPopover && !allCommands.isEmpty {
+                                let idx = min(slashPopoverIndex, allCommands.count - 1)
+                                inputText = "/\(allCommands[idx]) "
+                                slashCommandSelected = true
+                                return .handled
+                            }
                             sendMessage()
+                            return .handled
+                        }
+                        .onKeyPress(.tab, phases: .down) { _ in
+                            // Tab auto-completes the selected command and dismisses
+                            guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
+                            let idx = min(slashPopoverIndex, allCommands.count - 1)
+                            inputText = "/\(allCommands[idx]) "
+                            slashCommandSelected = true
                             return .handled
                         }
                         .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
@@ -434,6 +572,49 @@ struct PlanChatView: View {
                 pendingImagePath = path
             }
         }
+        .onAppear { installKeyMonitor() }
+        .onDisappear { removeKeyMonitor() }
+        .onChange(of: inputText) { oldValue, newValue in
+            // Reset selection flag if user edits the text (not just from our auto-fill)
+            if newValue.count < oldValue.count || !newValue.hasPrefix("/") {
+                slashCommandSelected = false
+            }
+            let visible = newValue.hasPrefix("/") && !isRunning && !slashCommandSelected
+            slashState.isVisible = visible
+            slashState.commands = visible ? allCommands : []
+            if oldValue.count != newValue.count {
+                slashState.selectedIndex = 0
+                slashPopoverIndex = 0
+            }
+        }
+        .onChange(of: slashState.selectedIndex) { _, newValue in
+            slashPopoverIndex = newValue
+        }
+    }
+
+    private func installKeyMonitor() {
+        let ss = slashState
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard ss.isVisible else { return event }
+
+            switch Int(event.keyCode) {
+            case 126: // up arrow
+                DispatchQueue.main.async { ss.moveUp() }
+                return nil
+            case 125: // down arrow
+                DispatchQueue.main.async { ss.moveDown() }
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
     }
 
     // MARK: - Actions
@@ -441,6 +622,17 @@ struct PlanChatView: View {
     private var canSend: Bool {
         !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || pendingImagePath != nil
+    }
+
+    private func handleApprove() {
+        guard let lastAssistant = session?.messages.last(where: { $0.role == .assistant }),
+              !lastAssistant.content.isEmpty else { return }
+        let version = SpecVersionManager.approve(content: lastAssistant.content, in: state.worktreePath)
+        state.sendMessage("✓ Spec approved and saved as version \(version).")
+    }
+
+    private func handleEdit() {
+        state.sendMessage("[Edit requested] What would you like to change?")
     }
 
     private func cycleModel() {
@@ -661,6 +853,7 @@ private struct PlanMessageBubble: View {
 // MARK: - Option Buttons Sheet
 
 private struct OptionButtonsSheet: View {
+    let contextText: String
     let options: [AgentSession.DetectedOption]
     let onSelect: (AgentSession.DetectedOption) -> Void
     let onDismiss: () -> Void
@@ -671,10 +864,18 @@ private struct OptionButtonsSheet: View {
     @FocusState private var customFieldFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            // Header with close button
-            HStack {
-                Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            // Header with context + close button
+            HStack(alignment: .top) {
+                // Question context
+                Text(cleanContext(contextText))
+                    .font(Theme.body(13))
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 8)
+
                 Button {
                     withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
                 } label: {
@@ -687,20 +888,24 @@ private struct OptionButtonsSheet: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.trailing, 4)
+            .padding(.bottom, 4)
 
-            // Option rows
-            ForEach(options) { option in
-                OptionSheetRow(option: option, onSelect: onSelect)
+            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+
+            // Option rows (if any)
+            if !options.isEmpty {
+                ForEach(options) { option in
+                    OptionSheetRow(option: option, onSelect: onSelect)
+                }
             }
 
-            // "Something else" free-text input
+            // Free-text input — always shown
             HStack(spacing: 8) {
                 Text("↵")
                     .font(Theme.mono(12))
                     .foregroundColor(Theme.textMuted)
                     .frame(width: 18, alignment: .trailing)
-                TextField("Something else...", text: $customText)
+                TextField(options.isEmpty ? "Type your answer..." : "Something else...", text: $customText)
                     .font(Theme.body(13))
                     .foregroundColor(Theme.textPrimary)
                     .textFieldStyle(.plain)
@@ -718,7 +923,7 @@ private struct OptionButtonsSheet: View {
             .padding(.top, 2)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(Theme.surface2.opacity(0.6))
         .focusable()
         .focused($sheetFocused)
@@ -752,6 +957,21 @@ private struct OptionButtonsSheet: View {
             withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
             return .handled
         }
+    }
+
+    /// Strip markdown bold/italic markers and bullet prefixes for clean display
+    private func cleanContext(_ text: String) -> String {
+        text.replacingOccurrences(of: "**", with: "")
+            .replacingOccurrences(of: "__", with: "")
+            .components(separatedBy: "\n")
+            .map { line in
+                var l = line
+                // Strip bullet prefixes
+                if l.hasPrefix("• ") { l = String(l.dropFirst(2)) }
+                if l.hasPrefix("- ") { l = String(l.dropFirst(2)) }
+                return l
+            }
+            .joined(separator: "\n")
     }
 }
 
@@ -886,5 +1106,28 @@ private struct PlanModelSelectorMenu: View {
         )
         .frame(width: 180)
         .shadow(color: .black.opacity(0.4), radius: 12)
+    }
+}
+
+// MARK: - Slash Popover State (class for NSEvent monitor capture)
+
+final class SlashPopoverState: ObservableObject {
+    @Published var isVisible = false
+    @Published var commands: [String] = []
+    @Published var selectedIndex: Int = 0
+
+    func moveUp() {
+        guard !commands.isEmpty else { return }
+        selectedIndex = (selectedIndex - 1 + commands.count) % commands.count
+    }
+
+    func moveDown() {
+        guard !commands.isEmpty else { return }
+        selectedIndex = (selectedIndex + 1) % commands.count
+    }
+
+    var selectedCommand: String? {
+        guard !commands.isEmpty, selectedIndex < commands.count else { return nil }
+        return commands[selectedIndex]
     }
 }

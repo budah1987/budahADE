@@ -107,7 +107,7 @@ final class TaskState: ObservableObject, Identifiable {
 
     func enterPlanMode() {
         mode = .plan
-        // Role selection modal handles tab creation — don't auto-create here
+        // Don't auto-create tab — role selection modal handles it
     }
 
     func enterBuildMode() {
@@ -129,15 +129,16 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     @discardableResult
-    func createPlanTab(role: AgentMode) -> UUID {
+    func createPlanTab(role: AgentMode = .researcher) -> UUID {
         let tabId = UUID()
         let chatState = PlanChatState(
+            tabId: tabId,
             worktreePath: worktreePath,
             taskName: name,
             branchName: branchName,
             role: role
         )
-        let tab = PlanTabInfo(id: tabId, title: role.displayName, role: role)
+        let tab = PlanTabInfo(id: tabId, title: role.displayName, status: .idle, role: role)
         planTabs.append(tab)
         planChats[tabId] = chatState
         selectedPlanTabId = tabId
@@ -174,6 +175,17 @@ final class TaskState: ObservableObject, Identifiable {
            planTabs[index].status == .done {
             planTabs[index].status = .idle
         }
+    }
+
+    /// Routes the last assistant message from sourceTab to targetTab as handed-off context.
+    func handOff(from sourceTabId: UUID, to targetTabId: UUID) {
+        guard let sourceChat = planChats[sourceTabId],
+              let targetChat = planChats[targetTabId],
+              let sourceSession = sourceChat.plannerSession,
+              let lastAssistant = sourceSession.messages.last(where: { $0.role == .assistant }) else { return }
+        targetChat.receiveHandOff(from: sourceChat.role, content: lastAssistant.content)
+        // Switch to the target tab so the user sees the result
+        selectPlanTab(targetTabId)
     }
 
     func selectPlanTabByIndex(_ index: Int) {

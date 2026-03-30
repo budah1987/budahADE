@@ -6,6 +6,7 @@ struct RoleSelectionModal: View {
     let onSelect: (AgentMode) -> Void
 
     @State private var hoveredRole: AgentMode? = nil
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -47,6 +48,8 @@ struct RoleSelectionModal: View {
                 )
                 .shadow(color: .black.opacity(0.45), radius: 40, y: 16)
         )
+        .focusable()
+        .focused($isFocused)
         .onKeyPress { press in
             for role in AgentMode.planRoles {
                 if let idx = role.roleShortcutIndex,
@@ -56,6 +59,11 @@ struct RoleSelectionModal: View {
                 }
             }
             return .ignored
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isFocused = true
+            }
         }
     }
 }

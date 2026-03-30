@@ -21,6 +21,8 @@ final class WorkspaceState: ObservableObject, Identifiable {
     @Published var activeTaskId: UUID?
     @Published var showNewTaskSheet: Bool = false
     @Published var taskForCompletion: TaskState?
+    @Published var taskArchive = TaskArchive()
+    @Published var showTaskArchive: Bool = false
 
     var projectName: String {
         (projectPath as NSString).lastPathComponent
@@ -38,6 +40,9 @@ final class WorkspaceState: ObservableObject, Identifiable {
     init(projectPath: String, restoring: Bool = false) {
         self.projectPath = projectPath
         ensureClaudeMd()
+        if let loaded = TaskArchive.load(from: projectPath) {
+            taskArchive = loaded
+        }
         if !restoring {
             // No auto-task creation — show "What are you working on?" prompt
             showNewTaskSheet = true
@@ -187,6 +192,41 @@ final class WorkspaceState: ObservableObject, Identifiable {
     func completeTask(_ id: UUID) {
         guard let task = tasks.first(where: { $0.id == id }) else { return }
         task.status = .completed
+    }
+
+    func reopenTask(_ archived: ArchivedTask) {
+        // Remove from archive
+        taskArchive.tasks.removeAll { $0.id == archived.id }
+        TaskArchive.save(taskArchive, to: projectPath)
+
+        // Restore as an active task (worktree must still exist on disk)
+        let snapshot = TaskSnapshot(
+            name: archived.name,
+            branchName: archived.branchName,
+            baseBranch: "main",
+            mode: "build"
+        )
+        restoreTask(snapshot)
+    }
+
+    func archiveTask(_ task: TaskState) {
+        let specVersionCount = SpecVersionManager.listVersions(in: task.worktreePath).count
+        let conversationCount = PlanConversationPersistence.loadAll(from: task.worktreePath).count
+
+        let archived = ArchivedTask(
+            id: task.id,
+            name: task.name,
+            branchName: task.branchName,
+            worktreePath: task.worktreePath,
+            completedAt: Date(),
+            specVersionCount: specVersionCount,
+            conversationCount: conversationCount
+        )
+
+        taskArchive.add(archived)
+        TaskArchive.save(taskArchive, to: projectPath)
+
+        deleteTask(task.id)
     }
 
     // MARK: - Private
