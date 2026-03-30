@@ -93,6 +93,7 @@
 		CDE93063FC592FAD18D8C0D3 /* AgentSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FB2BB32C6E95B421F9188B /* AgentSessionTests.swift */; };
 		88B9F0A6C4D5E702 /* PlanConversationPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A8E9F5B3C4D601 /* PlanConversationPersistenceTests.swift */; };
 		CC1234567890AB01 /* CrossTabContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1234567890AB02 /* CrossTabContextTests.swift */; };
+		DD1234567890AB01 /* PlanBuildBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1234567890AB02 /* PlanBuildBridgeTests.swift */; };
 		AA0001000001AA01 /* SpecVersionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001000001AA02 /* SpecVersionManager.swift */; };
 		AA0001000002AA01 /* PlanActionButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001000002AA02 /* PlanActionButtons.swift */; };
 		AA0001000003AA01 /* SpecVersionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001000003AA02 /* SpecVersionManagerTests.swift */; };
@@ -221,6 +222,7 @@
 		B6FB2BB32C6E95B421F9188B /* AgentSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionTests.swift; sourceTree = "<group>"; };
 		77A8E9F5B3C4D601 /* PlanConversationPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanConversationPersistenceTests.swift; sourceTree = "<group>"; };
 		CC1234567890AB02 /* CrossTabContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossTabContextTests.swift; sourceTree = "<group>"; };
+		DD1234567890AB02 /* PlanBuildBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanBuildBridgeTests.swift; sourceTree = "<group>"; };
 		BA31CD9CFC2F1AF11FB20450 /* DiffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffView.swift; sourceTree = "<group>"; };
 		BA8669BBD4F4B2DF69CF04EF /* ChatMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageTests.swift; sourceTree = "<group>"; };
 		BC80EF0396CDF90170BCA53D /* TileDragHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDragHandler.swift; sourceTree = "<group>"; };
@@ -374,6 +376,7 @@
 				B6FB2BB32C6E95B421F9188B /* AgentSessionTests.swift */,
 				77A8E9F5B3C4D601 /* PlanConversationPersistenceTests.swift */,
 				CC1234567890AB02 /* CrossTabContextTests.swift */,
+				DD1234567890AB02 /* PlanBuildBridgeTests.swift */,
 				AA0001000003AA02 /* SpecVersionManagerTests.swift */,
 				C656A43063C051F8EB3ED2D7 /* CanvasNodeTests.swift */,
 				8D81BC97619FB88DB6761DE6 /* CanvasPersistenceTests.swift */,
@@ -596,6 +599,7 @@
 				CDE93063FC592FAD18D8C0D3 /* AgentSessionTests.swift in Sources */,
 				88B9F0A6C4D5E702 /* PlanConversationPersistenceTests.swift in Sources */,
 				CC1234567890AB01 /* CrossTabContextTests.swift in Sources */,
+				DD1234567890AB01 /* PlanBuildBridgeTests.swift in Sources */,
 				AA0001000003AA01 /* SpecVersionManagerTests.swift in Sources */,
 				C4C0789CCE1F66D2B9CE825C /* CLISubprocessManagerTests.swift in Sources */,
 				F87FBD406C4313EB94E58C13 /* CanvasNodeTests.swift in Sources */,

@@ -209,6 +209,53 @@ enum AgentPrompts {
         """
     }
 
+    // MARK: - Build Context Injection
+
+    /// Reads spec progress and agent output from the worktree's .budahade directory
+    /// and returns a formatted markdown block, or empty string if nothing exists.
+    static func buildContextBlock(worktreePath: String) -> String {
+        let fm = FileManager.default
+        var sections: [String] = []
+
+        // --- Spec progress ---
+        let specPath = (worktreePath as NSString)
+            .appendingPathComponent(".budahade/spec.md")
+        if let specContent = try? String(contentsOfFile: specPath, encoding: .utf8) {
+            let lines = specContent.components(separatedBy: "\n")
+            let completed = lines.filter { $0.contains("- [x]") || $0.contains("- [X]") }
+            let remaining = lines.filter { $0.contains("- [ ]") }
+            let total = completed.count + remaining.count
+            if total > 0 {
+                var specSection = "### Spec Progress\n"
+                specSection += "\(completed.count) of \(total) tasks completed\n\n"
+                for line in completed { specSection += "\(line)\n" }
+                for line in remaining { specSection += "\(line)\n" }
+                sections.append(specSection.trimmingCharacters(in: .newlines))
+            }
+        }
+
+        // --- Agent output ---
+        let agentOutputDir = (worktreePath as NSString)
+            .appendingPathComponent(".budahade/agent-output")
+        if let files = try? fm.contentsOfDirectory(atPath: agentOutputDir) {
+            let mdFiles = files.filter { $0.hasSuffix(".md") }.sorted()
+            var outputParts: [String] = []
+            for filename in mdFiles {
+                let filePath = (agentOutputDir as NSString).appendingPathComponent(filename)
+                if let content = try? String(contentsOfFile: filePath, encoding: .utf8),
+                   !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    outputParts.append(content.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+            }
+            if !outputParts.isEmpty {
+                sections.append("### Agent Output\n" + outputParts.joined(separator: "\n\n---\n\n"))
+            }
+        }
+
+        guard !sections.isEmpty else { return "" }
+        return "\n## Build Progress\n\n" + sections.joined(separator: "\n\n")
+    }
+
     // MARK: - Sibling Context Injection
 
     /// Build a context block from sibling conversations to inject into system prompt

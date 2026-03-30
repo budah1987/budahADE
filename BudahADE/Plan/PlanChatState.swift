@@ -67,9 +67,11 @@ final class PlanChatState: ObservableObject {
             from: worktreePath
         )
         let siblingContext = AgentPrompts.siblingContextBlock(from: siblings)
+        let buildContext = AgentPrompts.buildContextBlock(worktreePath: worktreePath)
 
-        // Append sibling context to system prompt
+        // Append sibling context and build context to system prompt
         prompt += siblingContext
+        prompt += buildContext
 
         // Append any handed-off content from other tabs
         if !handedOffContext.isEmpty {
