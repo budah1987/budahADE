@@ -322,7 +322,7 @@ struct WorkspaceView: View {
                         .foregroundStyle(Theme.textSecondary)
                     Spacer()
                     Text("esc to cancel")
-                        .font(Theme.mono(10))
+                        .font(Theme.caption(10))
                         .foregroundStyle(Theme.textMuted)
                 }
                 .padding(.horizontal, 14)

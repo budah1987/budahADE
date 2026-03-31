@@ -113,7 +113,7 @@ struct SpecPanelView: View {
 
             if section.totalCount > 0 {
                 Text("\(section.completedCount)/\(section.totalCount)")
-                    .font(Theme.mono(9))
+                    .font(Theme.caption(9))
                     .foregroundColor(
                         section.progress >= 1.0 ? Theme.success : Theme.textMuted
                     )
@@ -181,7 +181,7 @@ struct SpecPanelView: View {
                     .foregroundColor(Theme.textMuted)
                 Spacer()
                 Text("\(specState.allSpecs.count) specs")
-                    .font(Theme.mono(9))
+                    .font(Theme.caption(9))
                     .foregroundColor(Theme.textMuted)
             }
             .padding(.horizontal, 10)
@@ -209,7 +209,7 @@ struct SpecPanelView: View {
                     .lineLimit(1)
                 Spacer()
                 Text("\(specState.completedCount) of \(specState.totalCount)")
-                    .font(Theme.mono(11))
+                    .font(Theme.body(11))
                     .foregroundColor(Theme.textSecondary)
             }
 
@@ -308,7 +308,7 @@ struct SpecPanelView: View {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } label: {
                 Text(specFileName(spec.filePath))
-                    .font(Theme.mono(9))
+                    .font(Theme.caption(9))
                     .foregroundColor(Theme.textMuted)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)

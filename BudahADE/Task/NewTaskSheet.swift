@@ -69,7 +69,7 @@ struct NewTaskSheet: View {
 
                     TextField("feat/my-feature", text: $branchName)
                         .textFieldStyle(.plain)
-                        .font(Theme.mono(14))
+                        .font(Theme.body(14))
                         .foregroundColor(Theme.textPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
@@ -98,7 +98,7 @@ struct NewTaskSheet: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(baseBranch)
-                                .font(Theme.mono(11))
+                                .font(Theme.body(11))
                                 .foregroundColor(Theme.textSecondary)
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.system(size: 8))

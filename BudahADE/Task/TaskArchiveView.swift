@@ -80,7 +80,7 @@ private struct TaskArchiveRow: View {
                         Image(systemName: "arrow.triangle.branch")
                             .font(.system(size: 9))
                         Text(task.branchName)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(Theme.caption(10))
                     }
                     .foregroundColor(Theme.textMuted)
 

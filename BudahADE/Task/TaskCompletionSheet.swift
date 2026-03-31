@@ -25,7 +25,7 @@ struct TaskCompletionSheet: View {
                     .font(Theme.headline(17))
                     .foregroundColor(Theme.textPrimary)
                 Text(task.branchName)
-                    .font(Theme.mono(11))
+                    .font(Theme.body(11))
                     .foregroundColor(Theme.textMuted)
             }
             .padding(.top, 24)
