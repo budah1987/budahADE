@@ -268,8 +268,17 @@ struct WorkspaceView: View {
 
                 // Inline spec strip (only when spec exists)
                 if task.specState.hasSpec {
-                    SpecStripView(specState: task.specState, buildStatus: task.buildStatus, variant: .inline)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    SpecStripView(
+                        specState: task.specState,
+                        buildStatus: task.buildStatus,
+                        variant: .inline,
+                        hasBuilder: task.builderPanel != nil,
+                        isBuilderDrawerOpen: Binding(
+                            get: { task.isBuilderDrawerOpen },
+                            set: { task.isBuilderDrawerOpen = $0 }
+                        )
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
 
                     Rectangle()
                         .fill(Theme.borderSubtle)
@@ -277,30 +286,46 @@ struct WorkspaceView: View {
                 }
             }
 
-            ZStack {
-                ForEach(state.tasks) { task in
-                    ForEach(task.tabs) { tab in
-                        if let panel = task.terminals[tab.id] {
-                            TerminalPanelView(panel: panel)
-                                .opacity(task.id == state.activeTaskId && tab.id == task.selectedTabId ? 1 : 0)
-                                .allowsHitTesting(task.id == state.activeTaskId && tab.id == task.selectedTabId)
+            ZStack(alignment: .top) {
+                // Terminal panels
+                ZStack {
+                    ForEach(state.tasks) { task in
+                        ForEach(task.tabs) { tab in
+                            if let panel = task.terminals[tab.id] {
+                                TerminalPanelView(panel: panel)
+                                    .opacity(task.id == state.activeTaskId && tab.id == task.selectedTabId ? 1 : 0)
+                                    .allowsHitTesting(task.id == state.activeTaskId && tab.id == task.selectedTabId)
+                            }
                         }
+                    }
+
+                    if state.tasks.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("No tasks yet")
+                                .font(Theme.label(14))
+                                .foregroundColor(Theme.textMuted)
+                            Text("Press ⌘N to create a task")
+                                .font(Theme.caption(12))
+                                .foregroundColor(Theme.textMuted.opacity(0.6))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
 
-                if state.tasks.isEmpty {
-                    VStack(spacing: 8) {
-                        Text("No tasks yet")
-                            .font(Theme.label(14))
-                            .foregroundColor(Theme.textMuted)
-                        Text("Press ⌘N to create a task")
-                            .font(Theme.caption(12))
-                            .foregroundColor(Theme.textMuted.opacity(0.6))
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Builder drawer overlay — slides down from top
+                if let task = state.activeTask,
+                   task.isBuilderDrawerOpen,
+                   let builderPanel = task.builderPanel {
+                    BuilderDrawerView(
+                        panel: builderPanel,
+                        buildStatus: task.buildStatus,
+                        onClose: { task.isBuilderDrawerOpen = false }
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .background(Theme.contentBg)
+            .animation(.easeInOut(duration: 0.25), value: state.activeTask?.isBuilderDrawerOpen)
         }
     }
 
