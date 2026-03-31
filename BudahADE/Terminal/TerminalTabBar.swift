@@ -146,6 +146,7 @@ struct ConversationTab: View {
             )
         }
         .buttonStyle(.plain)
+        .overlay(MiddleClickOverlay(action: onClose))
         .onAppear { startBreathing() }
         .onChange(of: agentState) { _, _ in startBreathing() }
     }
@@ -309,6 +310,34 @@ struct NewAgentTabButton: View {
         .buttonStyle(.plain)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.1)) { isHovered = hovering }
+        }
+    }
+}
+
+// MARK: - Middle Click Overlay
+
+struct MiddleClickOverlay: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> MiddleClickView {
+        let view = MiddleClickView()
+        view.action = action
+        return view
+    }
+
+    func updateNSView(_ nsView: MiddleClickView, context: Context) {
+        nsView.action = action
+    }
+
+    class MiddleClickView: NSView {
+        var action: (() -> Void)?
+
+        override func otherMouseDown(with event: NSEvent) {
+            if event.buttonNumber == 2 {
+                action?()
+            } else {
+                super.otherMouseDown(with: event)
+            }
         }
     }
 }
