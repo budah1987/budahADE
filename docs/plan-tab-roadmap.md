@@ -139,8 +139,93 @@ GitRepository polls every 1.5s (5 git subprocess calls each). Replace with file 
 ### 5.3 Conversation search
 Search across plan tab histories.
 
-### 5.4 Test coverage
-DiffModalView, CommitHistoryView, and the spec-builder integration have no tests.
+### 5.4 Test Plan
+
+#### Existing Coverage
+- `SpecParserTests` — title, sections, progress, findSpecFiles (root patterns), nil/missing
+- `SpecVersionManagerTests` — versioned spec creation, active spec read
+- `PlanBuildBridgeTests` — build context block generation from spec + agent output
+
+#### Unit Tests (new)
+
+**SpecParser — `.budahade/spec.md` discovery**
+- [ ] `findSpecFiles` returns `.budahade/spec.md` when it exists
+- [ ] `findSpecFiles` returns both root `*-spec.md` AND `.budahade/spec.md` without duplicates
+- [ ] `findSpecFiles` ignores `.budahade/spec.md` when it doesn't exist
+
+**BuildStatusState — elapsed time**
+- [ ] `elapsed` returns nil when `taskStartedAt` is nil
+- [ ] `elapsed` returns nil when status is not `.working`
+- [ ] `elapsed` returns formatted string ("Xs", "Xm Ys") when working with a start time
+- [ ] `taskStartedAt` resets when task title changes (via BuildStatusWatcher)
+- [ ] `taskStartedAt` initializes on first `.working` status even without title change
+
+**SpecBlockGraphView — block state logic**
+- [ ] Completed task returns `.completed`
+- [ ] First unchecked task with `buildStatus.working` returns `.active`
+- [ ] First unchecked task with `buildStatus.blocked` returns `.blocked`
+- [ ] Non-active unchecked task returns `.pending`
+- [ ] `currentTaskIndex` from build-status.json overrides first-unchecked fallback
+
+**SpecVersionManager — approve-to-discovery round trip**
+- [ ] `approve()` writes to `.budahade/spec.md`, then `findSpecFiles()` discovers it
+- [ ] `approve()` twice increments version, both versions listed, active spec is latest
+
+#### Integration Tests (new)
+
+**Approve & Build flow**
+- [ ] `handleApprove()` calls `SpecVersionManager.approve()` and returns correct item count
+- [ ] Item count matches number of `- [ ]` and `- [x]` lines in content
+- [ ] `onApproveToBuild` callback fires with correct count
+
+**Builder launch**
+- [ ] `enterBuildMode()` creates `builderPanel` when spec exists and panel is nil
+- [ ] `enterBuildMode()` does NOT create `builderPanel` when no spec exists
+- [ ] `enterBuildMode()` creates a regular CLI tab when `tabs` is empty
+- [ ] `stopBuilder()` nils out `builderPanel` and closes drawer
+- [ ] `closeAllTerminals()` calls `stopBuilder()`
+
+**SpecWatcher integration**
+- [ ] SpecWatcher picks up `.budahade/spec.md` written by `SpecVersionManager.approve()`
+- [ ] SpecState updates within one polling cycle (2s) after spec file write
+
+#### Manual Smoke Tests
+
+**Full spec-to-builder workflow**
+- [ ] Create task → Plan mode → open Spec Author tab
+- [ ] Have Spec Author generate a spec with `- [ ]` items
+- [ ] Click "Approve & Build" → confirm inline message shows "→ spec.md written — N items"
+- [ ] 3-step overlay appears and auto-dismisses (~2s)
+- [ ] App switches to Build mode automatically
+- [ ] Builder drawer is open, builder terminal is running Claude with builder prompt
+- [ ] Spec strip shows builder toggle button with status dot
+- [ ] Close drawer → CLI tabs are visible and untouched
+- [ ] Reopen drawer → builder output is still there
+
+**Block graph**
+- [ ] Block graph appears in SpecPanelView between header and checklist
+- [ ] One block per spec item, 8×14px, 2px gaps
+- [ ] Completed items show green, pending show dim
+- [ ] Active item pulses (opacity animation)
+- [ ] Blocked item shows red (manually write `"status": "blocked"` to build-status.json)
+- [ ] Hover tooltip shows section ID + task title
+- [ ] Percentage label updates as items complete
+- [ ] Collapse toggle hides checklist but keeps block strip visible
+
+**Builder drawer UX**
+- [ ] Drawer overlays CLI terminals, does not push them down
+- [ ] Drawer header shows status dot, "Builder", current task, elapsed time
+- [ ] Close button (chevron-up) closes drawer
+- [ ] Spec strip toggle button reopens drawer
+- [ ] Toggle button dot color matches build status (accent/red/green/gray)
+- [ ] Elapsed time ticks up while builder is working
+
+**Edge cases**
+- [ ] Approve with no assistant messages → no-op (no crash)
+- [ ] Switch Plan → Build → Plan → Build → builder panel persists, not duplicated
+- [ ] Spec with 0 checkbox items → block graph hidden, no crash
+- [ ] Build-status.json missing → graceful idle state, no errors
+- [ ] Kill builder mid-task → status dot goes gray, drawer still accessible
 
 ---
 
