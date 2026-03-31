@@ -68,17 +68,43 @@
 
 ## Phase 2 — In-App Browser
 
+> Full spec: `docs/specs/2026-03-23-browser-panel.md`
+
 ### Current State
-`BrowserTileView.swift` is a full WKWebView with URL bar, back/forward/reload — but only available as a canvas tile (unused in current chat-based Plan mode).
+`BrowserTileView.swift` is a full WKWebView with URL bar, back/forward/reload — but only available as a canvas tile (unused in current chat-based Plan mode). `WebViewStore` manages WKWebView lifecycle with KVO-based state tracking.
 
-### 2.1 Browser as a Build mode tab type
-Allow creating browser tabs alongside terminal tabs. Useful for localhost preview, docs, PR reviews.
+### 2.A — Browser Panel MVP
+_Goal: User can see localhost preview alongside terminal._
 
-### 2.2 URL interception from chat/terminal
-When Claude returns URLs or terminal prints `localhost:XXXX`, offer to open in-app.
+- `BrowserState` + `BrowserPanelView` — reuse `WebViewStore` pattern, add port indicator
+- Content toggle in `WorkspaceView` — `Cmd+Shift+B` opacity-switches terminal ↔ browser
+- `DevServerDetector` — scan worktree for package.json/vite.config/next.config, return dev command + port strategy
+- `DevServerManager` — per-task process lifecycle, port assignment (`3000 + taskIndex`), process group cleanup
+- Wire into `TaskState` — auto-start dev server on task open, stop on close, port badge on task card
+- Process safety — AppDelegate termination cleanup + orphan port sweep on launch
 
-### 2.3 Page content sharing
-"Show this page to Claude" — extract text or screenshot, inject into conversation.
+### 2.B — Intelligence Layer
+_Goal: Browser auto-navigates and reloads on code changes._
+
+- `URLDetector` — parse dev server stdout for `localhost:\d+` patterns, auto-navigate on first detection
+- Detected URLs dropdown — when multiple URLs found, show picker in browser chrome
+- `SmartReloader` — FSEvents file watcher + build-complete signal from stdout → `WKWebView.reload()`
+
+### 2.C — Agent Control
+_Goal: Agents can control the browser via HTTP REST API._
+
+- `BrowserHTTPServer` on `NWListener` — single port (default `9222`), header-routed by `X-Task-Id`
+- Endpoints: `/navigate`, `/screenshot`, `/click`, `/type`, `/dom`, `/evaluate`, `/console`, `/network`, `/url`, `/reload`, `/capabilities`
+- Console + network capture via `WKScriptMessageHandler` — ring buffer in `BrowserState`
+- Server lifecycle tied to task open/close
+
+### 2.D — Interaction
+_Goal: User points at element, AI gets full context._
+
+- `ElementPicker` — JS overlay via `WKUserScript`, highlight on hover, capture on click (`Cmd+Shift+I`)
+- Context bundle: CSS selector path + outer HTML + cropped screenshot + computed styles + parent context
+- Chat injection — structured block with screenshot attached into active agent input
+- Pop-out window — `NSPanel` with dock-back button
 
 ---
 
