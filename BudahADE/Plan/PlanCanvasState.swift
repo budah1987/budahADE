@@ -791,13 +791,21 @@ final class PlanCanvasState: ObservableObject {
 
         // Create a temp file with the section content
         let dir = (worktreePath as NSString).appendingPathComponent(".budahade/sections")
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        } catch {
+            print("[PlanCanvasState] ⚠️ Failed to create sections directory: \(error)")
+        }
         let filename = "\(sectionId).md"
         let filePath = (dir as NSString).appendingPathComponent(filename)
 
         // Write section content with header
         let content = "## \(section.title)\n\n\(section.content)"
-        try? content.write(toFile: filePath, atomically: true, encoding: .utf8)
+        do {
+            try content.write(toFile: filePath, atomically: true, encoding: .utf8)
+        } catch {
+            print("[PlanCanvasState] ⚠️ Failed to write section file \(filename): \(error)")
+        }
 
         // Find the spec tile position to place the new tile nearby
         let specPos = findElement(specTileId)?.position ?? .zero
@@ -842,13 +850,21 @@ final class PlanCanvasState: ObservableObject {
         lines.replaceSubrange(range.lowerBound..<upperBound, with: editedLines)
 
         specContent = lines.joined(separator: "\n")
-        try? specContent.write(toFile: specPath, atomically: true, encoding: .utf8)
+        do {
+            try specContent.write(toFile: specPath, atomically: true, encoding: .utf8)
+        } catch {
+            print("[PlanCanvasState] ⚠️ Failed to write merged spec to \((specPath as NSString).lastPathComponent): \(error)")
+        }
 
         // Remove the detached tile
         removeElement(tileId)
 
         // Clean up the temp file
-        try? FileManager.default.removeItem(atPath: docPath)
+        do {
+            try FileManager.default.removeItem(atPath: docPath)
+        } catch {
+            print("[PlanCanvasState] ⚠️ Failed to remove temp section file: \(error)")
+        }
     }
 
     // MARK: - Persistence

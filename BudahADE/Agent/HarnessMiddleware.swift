@@ -333,7 +333,11 @@ enum FailureMemory {
     /// Records a failure/lesson learned to persistent storage
     static func record(lesson: String, worktreePath: String) {
         let dir = (worktreePath as NSString).appendingPathComponent(".budahade")
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        } catch {
+            print("[FailureMemory] ⚠️ Failed to create .budahade directory: \(error)")
+        }
         let path = (dir as NSString).appendingPathComponent("failures.md")
 
         let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -348,7 +352,11 @@ enum FailureMemory {
                 handle.closeFile()
             }
         } else {
-            try? ("# Lessons Learned\n\n" + entry).write(toFile: path, atomically: true, encoding: .utf8)
+            do {
+                try ("# Lessons Learned\n\n" + entry).write(toFile: path, atomically: true, encoding: .utf8)
+            } catch {
+                print("[FailureMemory] ⚠️ Failed to create failure log: \(error)")
+            }
         }
     }
 
@@ -411,7 +419,11 @@ enum CostTracker {
         worktreePath: String
     ) {
         let dir = (worktreePath as NSString).appendingPathComponent(".budahade")
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        } catch {
+            print("[CostTracker] ⚠️ Failed to create .budahade directory: \(error)")
+        }
         let path = (dir as NSString).appendingPathComponent("cost-log.json")
 
         let entry = CostEntry(
@@ -437,7 +449,11 @@ enum CostTracker {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(entries) {
-            try? data.write(to: URL(fileURLWithPath: path))
+            do {
+                try data.write(to: URL(fileURLWithPath: path))
+            } catch {
+                print("[CostTracker] ⚠️ Failed to save cost log: \(error)")
+            }
         }
     }
 
@@ -624,7 +640,11 @@ enum TraceAnalysis {
         worktreePath: String
     ) {
         let dir = (worktreePath as NSString).appendingPathComponent(".budahade")
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        } catch {
+            print("[TraceLog] ⚠️ Failed to create .budahade directory: \(error)")
+        }
         let path = (dir as NSString).appendingPathComponent("traces.json")
 
         let loopFiles = session.loopDetector.fileEditCounts
@@ -682,7 +702,11 @@ enum TraceAnalysis {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(entries) {
-            try? data.write(to: URL(fileURLWithPath: path))
+            do {
+                try data.write(to: URL(fileURLWithPath: path))
+            } catch {
+                print("[TraceLog] ⚠️ Failed to save traces: \(error)")
+            }
         }
     }
 
