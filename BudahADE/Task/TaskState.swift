@@ -40,6 +40,9 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var selectedPlanTabId: UUID?
     let specState = SpecState()
     let buildStatus = BuildStatusState()
+    /// Dev server for this task (lazy — created on first browser tab)
+    @Published var devServerManager: DevServerManager?
+    var assignedPort: Int?
     /// Dedicated builder terminal — lives outside the tab bar, shown in spec strip drawer
     @Published var builderPanel: TerminalPanel?
     @Published var isBuilderDrawerOpen: Bool = false
@@ -411,13 +414,21 @@ final class TaskState: ObservableObject, Identifiable {
 
     @discardableResult
     func createBrowserTab(url: URL? = nil) -> UUID {
-        let panel = BrowserPanel(url: url)
+        // Lazy dev server start: detect project and start server on first browser tab
+        let resolvedURL: URL?
+        if let url {
+            resolvedURL = url
+        } else {
+            resolvedURL = startDevServerIfNeeded()
+        }
+
+        let panel = BrowserPanel(url: resolvedURL)
         let id = panel.id
         let tab = TabInfo(
             id: id,
             title: panel.state.title ?? "Browser",
             isRunning: false,
-            tabType: .browser(url: url)
+            tabType: .browser(url: resolvedURL)
         )
         tabs.append(tab)
         browserPanels[id] = panel
@@ -532,6 +543,37 @@ final class TaskState: ObservableObject, Identifiable {
         }
     }
 
+    // MARK: - Dev Server
+
+    /// Detect project type and start dev server if applicable. Returns localhost URL or nil.
+    private func startDevServerIfNeeded() -> URL? {
+        // Don't start a second server if one is already running
+        if let manager = devServerManager, manager.isRunning {
+            return manager.detectedURL ?? URL(string: "http://localhost:\(manager.port)")
+        }
+
+        guard let config = DevServerDetector.detect(in: worktreePath) else { return nil }
+
+        // TODO: Use WorkspaceState.projectIndex for port windowing
+        guard let port = PortAllocator.shared.allocate(projectIndex: 0) else { return nil }
+
+        assignedPort = port
+        let manager = DevServerManager(config: config, port: port, worktreePath: worktreePath)
+        devServerManager = manager
+        manager.start()
+
+        return URL(string: "http://localhost:\(port)")
+    }
+
+    func stopDevServer() {
+        devServerManager?.stop()
+        if let port = assignedPort {
+            PortAllocator.shared.release(port: port)
+        }
+        assignedPort = nil
+        devServerManager = nil
+    }
+
     func selectTabByIndex(_ index: Int) {
         guard !tabs.isEmpty else { return }
         let targetId: UUID?
@@ -565,10 +607,13 @@ final class TaskState: ObservableObject, Identifiable {
 
     func closeAllTerminals() {
         stopBuilder()
+        stopDevServer()
         for panel in terminals.values {
             panel.close()
         }
         terminals.removeAll()
+        browserPanels.removeAll()
+        splitPane = nil
         tabs.removeAll()
         selectedTabId = nil
         specWatcher?.stopWatching()
