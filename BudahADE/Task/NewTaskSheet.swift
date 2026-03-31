@@ -326,7 +326,7 @@ struct NewTaskSheet: View {
 
 // MARK: - Based On Dropdown
 
-private struct BasedOnDropdownView: View {
+struct BasedOnDropdownView: View {
     let projectPath: String
     @Binding var baseBranch: String
     @Binding var isPresented: Bool

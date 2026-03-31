@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GitSidebarView: View {
     @ObservedObject var taskState: TaskState
+    let projectPath: String
     @StateObject private var repo: GitRepository
     @State private var panelWidth: CGFloat = 320
     @State private var isDragging: Bool = false
@@ -20,8 +21,9 @@ struct GitSidebarView: View {
 
     enum ActionState { case idle, loading, success }
 
-    init(task: TaskState) {
+    init(task: TaskState, projectPath: String) {
         self.taskState = task
+        self.projectPath = projectPath
         _repo = StateObject(wrappedValue: GitRepository(path: task.worktreePath))
     }
 
@@ -32,7 +34,7 @@ struct GitSidebarView: View {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(spacing: 8) {
-                        BranchHeaderView(repo: repo)
+                        BranchHeaderView(repo: repo, projectPath: projectPath)
                             .padding(.horizontal, 8)
                             .padding(.top, 8)
 

@@ -96,7 +96,7 @@ struct WorkspaceView: View {
                                     .fill(Theme.border)
                                     .frame(width: 1)
 
-                                GitSidebarView(task: task)
+                                GitSidebarView(task: task, projectPath: state.projectPath)
                                     .id(state.activeTaskId)
                                     .transition(.move(edge: .trailing).combined(with: .opacity))
                             }
