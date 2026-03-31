@@ -111,6 +111,15 @@ final class GitRepository: ObservableObject {
         refresh()
     }
 
+    func createBranch(_ name: String) -> Bool {
+        let result = runGit(["checkout", "-b", name])
+        if result != nil {
+            refresh()
+            return true
+        }
+        return false
+    }
+
     func diff(file: String, staged: Bool) -> String {
         var args = ["diff"]
         if staged { args.append("--cached") }
