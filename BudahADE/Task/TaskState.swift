@@ -29,6 +29,8 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var mode: TaskMode = .build
     @Published var tabs: [TabInfo] = []
     @Published var selectedTabId: UUID?
+    /// Split pane: when set, the content area shows two panes
+    @Published var splitPane: SplitPaneState?
     @Published var terminals: [UUID: TerminalPanel] = [:]
     @Published var browserPanels: [UUID: BrowserPanel] = [:]
     @Published var planChats: [UUID: PlanChatState] = [:]
@@ -461,6 +463,11 @@ final class TaskState: ObservableObject, Identifiable {
             browserPanels.removeValue(forKey: id)
         }
 
+        // Close split if the closed tab was in a pane
+        if let split = splitPane, (split.secondaryTabId == id || selectedTabId == id) {
+            splitPane = nil
+        }
+
         tabs.remove(at: index)
 
         if selectedTabId == id {
@@ -483,6 +490,28 @@ final class TaskState: ObservableObject, Identifiable {
         if tabs[index].isTerminal {
             terminals[id]?.focus()
         }
+    }
+
+    // MARK: - Split Pane
+
+    func splitTab(_ tabId: UUID, to zone: DropZone) {
+        guard tabs.contains(where: { $0.id == tabId }) else { return }
+        if zone.isFirst {
+            // Dragged tab goes to left/top pane, current selected stays in right/bottom
+            splitPane = SplitPaneState(secondaryTabId: selectedTabId ?? tabId, orientation: zone.orientation)
+            selectedTabId = tabId
+        } else {
+            // Dragged tab goes to right/bottom pane
+            splitPane = SplitPaneState(secondaryTabId: tabId, orientation: zone.orientation)
+        }
+    }
+
+    func closeSplit() {
+        if let split = splitPane {
+            // If the secondary tab was selected conceptually, select it in the main area
+            selectedTabId = selectedTabId ?? split.secondaryTabId
+        }
+        splitPane = nil
     }
 
     func selectTabByIndex(_ index: Int) {

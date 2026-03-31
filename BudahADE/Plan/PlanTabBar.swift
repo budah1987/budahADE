@@ -14,6 +14,7 @@ struct PlanTabBar: View {
             HStack(spacing: 4) {
                 ForEach(tabs) { tab in
                     ConversationTab(
+                        id: tab.id,
                         title: tab.title,
                         isSelected: tab.id == selectedTabID,
                         agentState: tab.agentState,

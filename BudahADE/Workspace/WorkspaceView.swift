@@ -19,6 +19,7 @@ struct WorkspaceView: View {
     /// Plan → Build transition overlay
     @State private var buildTransition: BuildTransitionState? = nil
 
+
     var body: some View {
         ZStack {
             Theme.appBackground.ignoresSafeArea()
@@ -298,34 +299,47 @@ struct WorkspaceView: View {
             }
 
             ZStack(alignment: .top) {
-                // Tab content panels (terminal + browser)
-                ZStack {
-                    ForEach(state.tasks) { task in
-                        let isActiveTask = task.id == state.activeTaskId
-                        ForEach(task.tabs) { tab in
-                            let isVisible = isActiveTask && tab.id == task.selectedTabId
-                            Group {
-                                if tab.isTerminal, let panel = task.terminals[tab.id] {
-                                    TerminalPanelView(panel: panel)
-                                } else if tab.isBrowser, let panel = task.browserPanels[tab.id] {
-                                    BrowserPanelView(state: panel.state)
-                                }
+                // Tab content panels (terminal + browser) — single or split
+                if let task = state.activeTask, let split = task.splitPane {
+                    PaneLayout(orientation: split.orientation) {
+                        tabContentView(for: task, tabId: task.selectedTabId)
+                    } second: {
+                        tabContentView(for: task, tabId: split.secondaryTabId)
+                    }
+                } else {
+                    ZStack {
+                        ForEach(state.tasks) { task in
+                            let isActiveTask = task.id == state.activeTaskId
+                            ForEach(task.tabs) { tab in
+                                let isVisible = isActiveTask && tab.id == task.selectedTabId
+                                tabContentPanel(task: task, tab: tab)
+                                    .opacity(isVisible ? 1 : 0)
+                                    .allowsHitTesting(isVisible)
                             }
-                            .opacity(isVisible ? 1 : 0)
-                            .allowsHitTesting(isVisible)
+                        }
+
+                        if state.tasks.isEmpty {
+                            VStack(spacing: 8) {
+                                Text("No tasks yet")
+                                    .font(Theme.label(14))
+                                    .foregroundColor(Theme.textMuted)
+                                Text("Press ⌘N to create a task")
+                                    .font(Theme.caption(12))
+                                    .foregroundColor(Theme.textMuted.opacity(0.6))
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
+                }
 
-                    if state.tasks.isEmpty {
-                        VStack(spacing: 8) {
-                            Text("No tasks yet")
-                                .font(Theme.label(14))
-                                .foregroundColor(Theme.textMuted)
-                            Text("Press ⌘N to create a task")
-                                .font(Theme.caption(12))
-                                .foregroundColor(Theme.textMuted.opacity(0.6))
+                // Drop zone overlay for tab splitting (always present, invisible until drag targets)
+                if let task = state.activeTask, task.splitPane == nil {
+                    SplitDropOverlay { zone, tabIdString in
+                        if let tabId = UUID(uuidString: tabIdString) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                task.splitTab(tabId, to: zone)
+                            }
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
 
@@ -343,6 +357,28 @@ struct WorkspaceView: View {
             }
             .background(Theme.contentBg)
             .animation(.easeInOut(duration: 0.25), value: state.activeTask?.isBuilderDrawerOpen)
+        }
+    }
+
+    // MARK: - Tab Content Helpers
+
+    /// Render a single tab's content panel (terminal or browser).
+    @ViewBuilder
+    private func tabContentPanel(task: TaskState, tab: TabInfo) -> some View {
+        if tab.isTerminal, let panel = task.terminals[tab.id] {
+            TerminalPanelView(panel: panel)
+        } else if tab.isBrowser, let panel = task.browserPanels[tab.id] {
+            BrowserPanelView(state: panel.state)
+        }
+    }
+
+    /// Render the content for a specific tab ID (used by split pane).
+    @ViewBuilder
+    private func tabContentView(for task: TaskState, tabId: UUID?) -> some View {
+        if let tabId, let tab = task.tabs.first(where: { $0.id == tabId }) {
+            tabContentPanel(task: task, tab: tab)
+        } else {
+            Color.clear
         }
     }
 

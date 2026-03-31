@@ -72,6 +72,7 @@ struct TerminalTabBar: View {
             HStack(spacing: 4) {
                 ForEach(tabs) { tab in
                     ConversationTab(
+                        id: tab.id,
                         title: tab.title,
                         isSelected: tab.id == selectedTabID,
                         isSpotlit: renameTarget?.tabId == tab.id,
@@ -104,6 +105,7 @@ struct TerminalTabBar: View {
 // MARK: - Conversation Tab
 
 struct ConversationTab: View {
+    let id: UUID
     let title: String
     let isSelected: Bool
     var isSpotlit: Bool = false
@@ -174,6 +176,7 @@ struct ConversationTab: View {
             )
         }
         .buttonStyle(.plain)
+        .draggable(id.uuidString)
         .overlay(MiddleClickOverlay(action: onClose))
         .onAppear { startBreathing() }
         .onChange(of: agentState) { _, _ in startBreathing() }
