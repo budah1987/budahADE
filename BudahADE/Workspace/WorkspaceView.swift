@@ -163,12 +163,22 @@ struct WorkspaceView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in
             if let task = state.activeTask, task.mode == .build {
-                // Focus existing browser tab, or create one
                 if let existing = task.tabs.first(where: { $0.isBrowser }) {
                     task.selectTab(existing.id)
                 } else {
                     task.createBrowserTab()
                 }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusNextPane)) { _ in
+            state.activeTask?.moveFocus(.next)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusPrevPane)) { _ in
+            state.activeTask?.moveFocus(.previous)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .closeSplit)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                state.activeTask?.closeSplit()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .closeTerminalTab)) { _ in
@@ -303,8 +313,12 @@ struct WorkspaceView: View {
                 if let task = state.activeTask, let split = task.splitPane {
                     PaneLayout(orientation: split.orientation) {
                         tabContentView(for: task, tabId: task.selectedTabId)
+                            .overlay(paneFocusBorder(focused: task.focusedPane == .primary))
+                            .onTapGesture { task.focusedPane = .primary }
                     } second: {
                         tabContentView(for: task, tabId: split.secondaryTabId)
+                            .overlay(paneFocusBorder(focused: task.focusedPane == .secondary))
+                            .onTapGesture { task.focusedPane = .secondary }
                     }
                 } else {
                     ZStack {
@@ -380,6 +394,12 @@ struct WorkspaceView: View {
         } else {
             Color.clear
         }
+    }
+
+    private func paneFocusBorder(focused: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 2)
+            .strokeBorder(focused ? Theme.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
+            .allowsHitTesting(false)
     }
 
     // MARK: - Rename Palette

@@ -31,6 +31,8 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var selectedTabId: UUID?
     /// Split pane: when set, the content area shows two panes
     @Published var splitPane: SplitPaneState?
+    /// Which pane is focused (for keyboard nav and visual indicator)
+    @Published var focusedPane: PanePosition = .primary
     @Published var terminals: [UUID: TerminalPanel] = [:]
     @Published var browserPanels: [UUID: BrowserPanel] = [:]
     @Published var planChats: [UUID: PlanChatState] = [:]
@@ -512,6 +514,22 @@ final class TaskState: ObservableObject, Identifiable {
             selectedTabId = selectedTabId ?? split.secondaryTabId
         }
         splitPane = nil
+        focusedPane = .primary
+    }
+
+    func moveFocus(_ direction: PaneFocusDirection) {
+        guard splitPane != nil else { return }
+        switch direction {
+        case .next:
+            focusedPane = focusedPane == .primary ? .secondary : .primary
+        case .previous:
+            focusedPane = focusedPane == .secondary ? .primary : .secondary
+        }
+        // Focus the terminal in the newly focused pane if applicable
+        let tabId = focusedPane == .primary ? selectedTabId : splitPane?.secondaryTabId
+        if let tabId, let idx = tabs.firstIndex(where: { $0.id == tabId }), tabs[idx].isTerminal {
+            terminals[tabId]?.focus()
+        }
     }
 
     func selectTabByIndex(_ index: Int) {

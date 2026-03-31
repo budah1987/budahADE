@@ -16,6 +16,13 @@ enum PanePosition: Equatable {
     case secondary
 }
 
+// MARK: - Pane Focus Direction
+
+enum PaneFocusDirection {
+    case next
+    case previous
+}
+
 // MARK: - Drop Zone
 
 /// Where a dragged tab can be dropped to create a split.
