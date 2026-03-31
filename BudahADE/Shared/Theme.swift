@@ -69,39 +69,43 @@ enum Theme {
     static let panelGap: CGFloat = 0
     static let edgePadding: CGFloat = 0
 
-    // MARK: - Typography
+    // MARK: - Typography (Geist for UI, Menlo for terminal content)
+
+    private static let geistName = "Geist"
 
     static func display(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .black)
+        .custom("\(geistName)-Black", size: size)
     }
 
     static func headline(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .bold)
+        .custom("\(geistName)-Bold", size: size)
     }
 
     static func label(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .medium)
+        .custom("\(geistName)-Medium", size: size)
     }
 
     static func body(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .regular)
+        .custom("\(geistName)-Regular", size: size)
     }
 
     static func caption(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .regular)
+        .custom("\(geistName)-Regular", size: size)
     }
 
-    static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .monospaced)
+    /// Terminal content only — diffs, code blocks, file preview
+    static func code(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Menlo", size: size).weight(weight)
     }
 
-    static func monoFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: size, weight: weight)
+    /// NSFont for AppKit contexts — canvas text measurement, attributed strings
+    static func geistFont(size: CGFloat, name: String = "Geist-Regular") -> NSFont {
+        NSFont(name: name, size: size) ?? NSFont.systemFont(ofSize: size)
     }
 
-    /// Legacy compat
-    static func uiFont(size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight)
+    /// NSFont for terminal content in AppKit contexts
+    static func codeFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        NSFont(name: "Menlo", size: size) ?? NSFont.monospacedSystemFont(ofSize: size, weight: weight)
     }
 }
 
