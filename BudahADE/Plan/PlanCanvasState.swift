@@ -21,6 +21,7 @@ final class PlanCanvasState: ObservableObject {
     // Interaction
     @Published var selectedId: UUID?
     @Published var draggingId: UUID?
+    @Published var activeDragOffset: CGSize = .zero
     @Published var resizingId: UUID?
     @Published var hoveredFrameId: UUID?
     @Published var frameInsertIndex: Int?
