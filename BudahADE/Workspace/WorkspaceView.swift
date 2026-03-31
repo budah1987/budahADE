@@ -160,6 +160,16 @@ struct WorkspaceView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in
+            if let task = state.activeTask, task.mode == .build {
+                // Focus existing browser tab, or create one
+                if let existing = task.tabs.first(where: { $0.isBrowser }) {
+                    task.selectTab(existing.id)
+                } else {
+                    task.createBrowserTab()
+                }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .closeTerminalTab)) { _ in
             if let task = state.activeTask {
                 if task.mode == .plan {
@@ -263,7 +273,8 @@ struct WorkspaceView: View {
                     renameTarget: renameTarget,
                     onSelectTab: { task.selectTab($0) },
                     onCloseTab: { requestCloseTab(.build($0)) },
-                    onNewTab: { task.createTab() }
+                    onNewTab: { task.createTab() },
+                    onNewBrowserTab: { task.createBrowserTab() }
                 )
 
                 // Inline spec strip (only when spec exists)
@@ -287,15 +298,21 @@ struct WorkspaceView: View {
             }
 
             ZStack(alignment: .top) {
-                // Terminal panels
+                // Tab content panels (terminal + browser)
                 ZStack {
                     ForEach(state.tasks) { task in
+                        let isActiveTask = task.id == state.activeTaskId
                         ForEach(task.tabs) { tab in
-                            if let panel = task.terminals[tab.id] {
-                                TerminalPanelView(panel: panel)
-                                    .opacity(task.id == state.activeTaskId && tab.id == task.selectedTabId ? 1 : 0)
-                                    .allowsHitTesting(task.id == state.activeTaskId && tab.id == task.selectedTabId)
+                            let isVisible = isActiveTask && tab.id == task.selectedTabId
+                            Group {
+                                if tab.isTerminal, let panel = task.terminals[tab.id] {
+                                    TerminalPanelView(panel: panel)
+                                } else if tab.isBrowser, let panel = task.browserPanels[tab.id] {
+                                    BrowserPanelView(state: panel.state)
+                                }
                             }
+                            .opacity(isVisible ? 1 : 0)
+                            .allowsHitTesting(isVisible)
                         }
                     }
 

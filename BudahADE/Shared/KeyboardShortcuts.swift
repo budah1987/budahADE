@@ -25,6 +25,9 @@ enum KeyboardShortcuts {
     // Workspace
     static let workspaceSwitcher = KeyShortcut(.o, modifiers: [.command, .shift])
 
+    // Browser
+    static let toggleBrowser = KeyShortcut(.b, modifiers: [.command, .shift])
+
     // Tasks
     static let newTask = KeyShortcut(.n, modifiers: .command)
     static let closeTask = KeyShortcut(.w, modifiers: [.command, .shift])

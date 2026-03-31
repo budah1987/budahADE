@@ -30,6 +30,7 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var tabs: [TabInfo] = []
     @Published var selectedTabId: UUID?
     @Published var terminals: [UUID: TerminalPanel] = [:]
+    @Published var browserPanels: [UUID: BrowserPanel] = [:]
     @Published var planChats: [UUID: PlanChatState] = [:]
     @Published var planTabs: [PlanTabInfo] = []
     @Published var selectedPlanTabId: UUID?
@@ -404,14 +405,62 @@ final class TaskState: ObservableObject, Identifiable {
         }
     }
 
+    @discardableResult
+    func createBrowserTab(url: URL? = nil) -> UUID {
+        let panel = BrowserPanel(url: url)
+        let id = panel.id
+        let tab = TabInfo(
+            id: id,
+            title: panel.state.title ?? "Browser",
+            isRunning: false,
+            tabType: .browser(url: url)
+        )
+        tabs.append(tab)
+        browserPanels[id] = panel
+        selectedTabId = id
+
+        // Sync browser page title → tab title
+        observeBrowserTitle(id: id, state: panel.state)
+
+        return id
+    }
+
+    private func observeBrowserTitle(id: UUID, state: BrowserState) {
+        Task { @MainActor [weak self] in
+            while self?.browserPanels[id] != nil {
+                let title = state.title
+                withObservationTracking {
+                    _ = state.title
+                } onChange: {
+                    Task { @MainActor [weak self] in
+                        guard let self,
+                              let idx = self.tabs.firstIndex(where: { $0.id == id }),
+                              let newTitle = state.title, !newTitle.isEmpty else { return }
+                        self.tabs[idx].title = newTitle
+                    }
+                }
+                // Yield to avoid tight loop — onChange fires asynchronously
+                try? await Task.sleep(for: .milliseconds(100))
+                _ = title  // suppress unused warning
+            }
+        }
+    }
+
     func closeTab(_ id: UUID) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
-        // Kill tmux session when user explicitly closes a tab
-        if let tmuxName = tabs[index].tmuxSession {
-            TmuxSessionManager.killSession(tmuxName)
+        let tab = tabs[index]
+
+        if tab.isTerminal {
+            // Kill tmux session when user explicitly closes a tab
+            if let tmuxName = tab.tmuxSession {
+                TmuxSessionManager.killSession(tmuxName)
+            }
+            terminals[id]?.close()
+            terminals.removeValue(forKey: id)
+        } else if tab.isBrowser {
+            browserPanels.removeValue(forKey: id)
         }
-        terminals[id]?.close()
-        terminals.removeValue(forKey: id)
+
         tabs.remove(at: index)
 
         if selectedTabId == id {
@@ -431,7 +480,9 @@ final class TaskState: ObservableObject, Identifiable {
             tabs[index].agentStatus = .inactive
         }
         // Make terminal first responder so keyboard events (paste, Shift+Enter) go to the right tab
-        terminals[id]?.focus()
+        if tabs[index].isTerminal {
+            terminals[id]?.focus()
+        }
     }
 
     func selectTabByIndex(_ index: Int) {

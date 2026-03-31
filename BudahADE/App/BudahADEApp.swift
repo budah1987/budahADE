@@ -85,6 +85,11 @@ struct BudahADEApp: App {
                 }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
 
+                Button("Toggle Browser") {
+                    NotificationCenter.default.post(name: .toggleBrowser, object: nil)
+                }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
+
                 Button("Focus Input") {
                     NotificationCenter.default.post(name: .focusInput, object: nil)
                 }
@@ -307,5 +312,6 @@ extension Notification.Name {
     static let canvasZoomToFit = Notification.Name("budahADE.canvasZoomToFit")
     static let closeTask = Notification.Name("budahADE.closeTask")
     static let toggleRightPanel = Notification.Name("budahADE.toggleRightPanel")
+    static let toggleBrowser = Notification.Name("budahADE.toggleBrowser")
     static let focusInput = Notification.Name("budahADE.focusInput")
 }

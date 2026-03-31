@@ -23,12 +23,20 @@ enum TabAgentState: Equatable {
     }
 }
 
+// MARK: - Tab Type
+
+enum TabType: Equatable {
+    case terminal
+    case browser(url: URL?)
+}
+
 // MARK: - Tab Model
 
 struct TabInfo: Identifiable, Equatable {
     let id: UUID
     var title: String
     var isRunning: Bool
+    var tabType: TabType = .terminal
     var agentStatus: AgentStatus = .inactive
     var claudeSessionId: String?   // For --resume fallback (when tmux unavailable)
     var agentMode: AgentMode?      // Which agent role launched this tab
@@ -36,10 +44,14 @@ struct TabInfo: Identifiable, Equatable {
     var restoredTitle: String?     // Saved title — preserved until Claude sets a real one
     var hadActivity: Bool = false  // True once agent has run — used for close confirmation
 
+    var isTerminal: Bool { if case .terminal = tabType { return true } else { return false } }
+    var isBrowser: Bool { if case .browser = tabType { return true } else { return false } }
+
     static func == (lhs: TabInfo, rhs: TabInfo) -> Bool {
         lhs.id == rhs.id &&
         lhs.title == rhs.title &&
         lhs.isRunning == rhs.isRunning &&
+        lhs.tabType == rhs.tabType &&
         lhs.agentStatus == rhs.agentStatus
     }
 }
@@ -53,6 +65,7 @@ struct TerminalTabBar: View {
     let onSelectTab: (UUID) -> Void
     let onCloseTab: (UUID) -> Void
     let onNewTab: () -> Void
+    var onNewBrowserTab: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -62,6 +75,7 @@ struct TerminalTabBar: View {
                         title: tab.title,
                         isSelected: tab.id == selectedTabID,
                         isSpotlit: renameTarget?.tabId == tab.id,
+                        tabType: tab.tabType,
                         agentState: TabAgentState(from: tab.agentStatus),
                         onSelect: { onSelectTab(tab.id) },
                         onClose: { onCloseTab(tab.id) }
@@ -70,8 +84,11 @@ struct TerminalTabBar: View {
 
                 Spacer(minLength: 0)
 
-                NewAgentTabButton(action: onNewTab)
-                    .padding(.trailing, 8)
+                NewTabMenu(
+                    onNewTerminal: onNewTab,
+                    onNewBrowser: onNewBrowserTab ?? {}
+                )
+                .padding(.trailing, 8)
             }
             .padding(.horizontal, 6)
             .padding(.top, 6)
@@ -90,11 +107,16 @@ struct ConversationTab: View {
     let title: String
     let isSelected: Bool
     var isSpotlit: Bool = false
+    var tabType: TabType = .terminal
     let agentState: TabAgentState
     let onSelect: () -> Void
     let onClose: () -> Void
 
     @State private var glowBreathing: Bool = false
+
+    private var isBrowser: Bool {
+        if case .browser = tabType { return true } else { return false }
+    }
 
     var body: some View {
         Button(action: onSelect) {
@@ -105,6 +127,12 @@ struct ConversationTab: View {
                         .foregroundStyle(Theme.textMuted)
                 }
                 .buttonStyle(.plain)
+
+                if isBrowser {
+                    Image(systemName: "globe")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(isSelected ? Theme.accent : Theme.textMuted)
+                }
 
                 Text(title)
                     .font(Theme.label(11))
@@ -283,7 +311,48 @@ struct GlowBar: View {
     }
 }
 
-// MARK: - New Tab Button
+// MARK: - New Tab Menu
+
+struct NewTabMenu: View {
+    let onNewTerminal: () -> Void
+    let onNewBrowser: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Menu {
+            Button(action: onNewTerminal) {
+                Label("Terminal", systemImage: "terminal")
+            }
+            Button(action: onNewBrowser) {
+                Label("Browser", systemImage: "globe")
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(isHovered ? Theme.textSecondary : Theme.textMuted)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(isHovered ? Theme.tabGlassBackground : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(
+                            isHovered ? Theme.tabGlassBorder : Color.clear,
+                            lineWidth: 1
+                        )
+                )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.1)) { isHovered = hovering }
+        }
+    }
+}
+
+// MARK: - New Tab Button (simple, for PlanTabBar)
 
 struct NewAgentTabButton: View {
     let action: () -> Void
