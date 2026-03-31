@@ -29,7 +29,7 @@ struct ActivityFeedView: View {
                 TimelineView(.animation(minimumInterval: 0.08)) { timeline in
                     let idx = Int(timeline.date.timeIntervalSinceReferenceDate / 0.08) % Self.brailleFrames.count
                     Text(Self.brailleFrames[idx])
-                        .font(.system(size: 14, design: .monospaced))
+                        .font(Theme.body(14))
                         .foregroundColor(Theme.textSecondary)
                 }
 
@@ -37,7 +37,7 @@ struct ActivityFeedView: View {
                     TimelineView(.animation(minimumInterval: 0.1)) { timeline in
                         let elapsed = timeline.date.timeIntervalSince(startDate)
                         Text(String(format: "%.1fs", elapsed))
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(Theme.caption(12))
                             .foregroundColor(Theme.textMuted)
                     }
                 }
@@ -69,7 +69,7 @@ struct ActivityFeedView: View {
             statusIcon(entry.status, kind: entry.kind)
 
             Text(entry.label)
-                .font(Theme.mono(12))
+                .font(Theme.body(12))
                 .foregroundColor(foregroundColor(for: entry))
                 .lineLimit(1)
 
@@ -77,7 +77,7 @@ struct ActivityFeedView: View {
 
             if let detail = entry.detail {
                 Text(detail)
-                    .font(Theme.mono(10))
+                    .font(Theme.caption(10))
                     .foregroundColor(Theme.textMuted)
                     .lineLimit(1)
             }

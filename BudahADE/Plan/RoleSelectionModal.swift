@@ -84,7 +84,7 @@ private struct RoleRow: View {
                         .fill(Theme.surface2)
                         .frame(width: 22, height: 22)
                     Text(role.roleShortcutIndex.map { "\($0)" } ?? "")
-                        .font(Theme.mono(11))
+                        .font(Theme.label(11))
                         .foregroundStyle(Theme.textMuted)
                 }
 

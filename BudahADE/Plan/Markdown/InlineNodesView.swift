@@ -23,7 +23,7 @@ struct InlineNodesView: View {
 
         case .code(let code):
             return SwiftUI.Text(code)
-                .font(Theme.mono(13))
+                .font(Theme.code(13))
                 .foregroundColor(Theme.textPrimary)
 
         case .emphasis(let children):
