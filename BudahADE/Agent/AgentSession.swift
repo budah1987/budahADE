@@ -111,10 +111,16 @@ final class AgentSession: ObservableObject, Identifiable {
 
     /// Loop detection: tracks repeated edits to the same file
     let loopDetector = LoopDetector()
+    /// Tool escalation: surfaces denied tool requests for UI approval
+    let toolEscalation = ToolEscalationManager()
     /// Whether this session has already completed a verification pass
     var hasVerified: Bool = false
+    /// Whether this session has been marked complete (for adaptive turn limits)
+    @Published var isVerifiedComplete: Bool = false
     /// Pending loop warning to inject on next turn
     @Published var pendingLoopWarning: String?
+    /// Last result event for cost/trace recording
+    var lastResult: StreamEvent.ResultInfo?
 
     struct StagedContent {
         let content: String
@@ -208,6 +214,7 @@ final class AgentSession: ObservableObject, Identifiable {
 
     func handleResult(_ result: StreamEvent.ResultInfo) {
         status = .done
+        lastResult = result
         if claudeSessionId == nil, let sessionId = result.sessionId {
             claudeSessionId = sessionId
         }
@@ -216,6 +223,11 @@ final class AgentSession: ObservableObject, Identifiable {
             activityFeed[i].status = .completed
         }
         isThinking = false
+
+        // Adaptive turn limit: if verification pass completed, mark session as done
+        if hasVerified {
+            isVerifiedComplete = true
+        }
     }
 
     // MARK: - Activity Feed Handlers
@@ -244,6 +256,24 @@ final class AgentSession: ObservableObject, Identifiable {
         guard let index = activityFeed.firstIndex(where: { $0.id == event.toolUseId }) else { return }
         activityFeed[index].status = event.isError ? .failed : .completed
         activityFeed[index].detail = summarizeToolResult(event, kind: activityFeed[index].kind)
+
+        // Check for tool escalation (agent tried to use a tool it doesn't have)
+        if event.isError {
+            let toolName: String
+            switch activityFeed[index].kind {
+            case .toolRead: toolName = "Read"
+            case .toolGrep: toolName = "Grep"
+            case .toolGlob: toolName = "Glob"
+            case .toolBash: toolName = "Bash"
+            case .toolEdit: toolName = "Edit"
+            case .toolWrite: toolName = "Write"
+            case .toolWebSearch: toolName = "WebSearch"
+            case .toolWebFetch: toolName = "WebFetch"
+            case .toolOther(let name): toolName = name
+            default: toolName = "Unknown"
+            }
+            toolEscalation.checkForEscalation(toolName: toolName, result: event)
+        }
     }
 
     func handleThinking(_ text: String) {

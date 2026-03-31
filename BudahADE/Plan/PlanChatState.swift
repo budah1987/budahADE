@@ -99,21 +99,46 @@ final class PlanChatState: ObservableObject {
             disableMcp: true
         )
 
-        // Wire auto-verification: when the agent finishes, send a spec-aware verification prompt
+        // Wire session completion: cost tracking, trace recording, verification, adaptive limits
         let taskNameCopy = taskName
         let roleCopy = role
         let worktreePathCopy = worktreePath
         chatManager.onSessionComplete = { [weak self] sessionId in
             guard let self = self,
                   let session = self.plannerSession,
-                  session.id == sessionId,
-                  !session.hasVerified else { return }
+                  session.id == sessionId else { return }
 
-            if let verifyPrompt = SelfVerification.verificationPrompt(
-                taskName: taskNameCopy, role: roleCopy, worktreePath: worktreePathCopy
-            ) {
-                session.hasVerified = true
-                self.chatManager.send(sessionId: sessionId, prompt: verifyPrompt)
+            // Record cost and trace data
+            if let result = session.lastResult {
+                CostTracker.record(
+                    taskName: taskNameCopy,
+                    role: roleCopy,
+                    model: session.model,
+                    result: result,
+                    worktreePath: worktreePathCopy
+                )
+                TraceAnalysis.recordTrace(
+                    taskName: taskNameCopy,
+                    session: session,
+                    result: result,
+                    worktreePath: worktreePathCopy
+                )
+            }
+
+            // Adaptive turn limit: if already verified, don't send more prompts
+            guard !session.isVerifiedComplete else { return }
+
+            // First completion → send spec-diff verification if spec exists, else standard verification
+            if !session.hasVerified {
+                if let diffPrompt = SpecDiffVerification.diffPrompt(worktreePath: worktreePathCopy) {
+                    session.hasVerified = true
+                    self.chatManager.send(sessionId: sessionId, prompt: diffPrompt)
+                } else if let verifyPrompt = SelfVerification.verificationPrompt(
+                    taskName: taskNameCopy, role: roleCopy, worktreePath: worktreePathCopy
+                ) {
+                    session.hasVerified = true
+                    self.chatManager.send(sessionId: sessionId, prompt: verifyPrompt)
+                }
             }
         }
 

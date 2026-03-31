@@ -385,6 +385,346 @@ enum FailureMemory {
     }
 }
 
+// MARK: - Cost Tracking
+
+/// Persists per-task cost data to `.budahade/cost-log.json` for analysis.
+enum CostTracker {
+
+    struct CostEntry: Codable {
+        let timestamp: String
+        let taskName: String
+        let role: String
+        let model: String
+        let inputTokens: Int
+        let outputTokens: Int
+        let costUSD: Double
+        let durationMs: Int?
+        let numTurns: Int?
+    }
+
+    /// Records a completed session's cost to the persistent log
+    static func record(
+        taskName: String,
+        role: AgentMode?,
+        model: AgentModel,
+        result: StreamEvent.ResultInfo,
+        worktreePath: String
+    ) {
+        let dir = (worktreePath as NSString).appendingPathComponent(".budahade")
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let path = (dir as NSString).appendingPathComponent("cost-log.json")
+
+        let entry = CostEntry(
+            timestamp: ISO8601DateFormatter().string(from: Date()),
+            taskName: taskName,
+            role: role?.rawValue ?? "unknown",
+            model: model.rawValue,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            costUSD: result.costUSD,
+            durationMs: result.durationMs,
+            numTurns: result.numTurns
+        )
+
+        // Load existing entries, append, and write back
+        var entries: [CostEntry] = []
+        if let data = FileManager.default.contents(atPath: path),
+           let existing = try? JSONDecoder().decode([CostEntry].self, from: data) {
+            entries = existing
+        }
+        entries.append(entry)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? encoder.encode(entries) {
+            try? data.write(to: URL(fileURLWithPath: path))
+        }
+    }
+
+    /// Returns a summary of total cost for the current task
+    static func summary(worktreePath: String) -> (totalCost: Double, totalTokens: Int, entryCount: Int) {
+        let path = (worktreePath as NSString).appendingPathComponent(".budahade/cost-log.json")
+        guard let data = FileManager.default.contents(atPath: path),
+              let entries = try? JSONDecoder().decode([CostEntry].self, from: data) else {
+            return (0, 0, 0)
+        }
+        let totalCost = entries.reduce(0) { $0 + $1.costUSD }
+        let totalTokens = entries.reduce(0) { $0 + $1.inputTokens + $1.outputTokens }
+        return (totalCost, totalTokens, entries.count)
+    }
+}
+
+// MARK: - Tool Escalation
+
+/// Detects when an agent tries to use a tool it doesn't have access to,
+/// and surfaces it as a pending escalation request for the UI to display.
+@MainActor
+final class ToolEscalationManager: ObservableObject {
+
+    struct EscalationRequest: Identifiable, Equatable {
+        let id: UUID
+        let toolName: String
+        let reason: String
+        let timestamp: Date
+        var granted: Bool = false
+    }
+
+    @Published var pendingRequests: [EscalationRequest] = []
+
+    /// Known tool error patterns that indicate a permission issue
+    private static let deniedPatterns = [
+        "not allowed",
+        "not in allowedTools",
+        "tool is not available",
+        "permission denied",
+    ]
+
+    /// Check a tool result for signs of a denied tool request
+    func checkForEscalation(toolName: String, result: ToolResultEvent) {
+        guard result.isError else { return }
+        let lowered = result.content.lowercased()
+        let isDenied = Self.deniedPatterns.contains { lowered.contains($0) }
+        guard isDenied else { return }
+
+        // Don't duplicate requests for the same tool
+        guard !pendingRequests.contains(where: { $0.toolName == toolName && !$0.granted }) else { return }
+
+        let request = EscalationRequest(
+            id: UUID(),
+            toolName: toolName,
+            reason: String(result.content.prefix(200)),
+            timestamp: Date()
+        )
+        pendingRequests.append(request)
+    }
+
+    /// Grant a tool escalation — returns the updated allowed tools list
+    func grant(requestId: UUID, currentTools: [String]?) -> [String]? {
+        guard let idx = pendingRequests.firstIndex(where: { $0.id == requestId }) else {
+            return currentTools
+        }
+        pendingRequests[idx].granted = true
+        let toolName = pendingRequests[idx].toolName
+
+        // Add the tool to the allowed list
+        if var tools = currentTools {
+            if !tools.contains(toolName) {
+                tools.append(toolName)
+            }
+            return tools
+        }
+        return nil // Already unrestricted
+    }
+
+    func dismiss(requestId: UUID) {
+        pendingRequests.removeAll { $0.id == requestId }
+    }
+}
+
+// MARK: - Spec Diff Verification
+
+/// Generates a structural verification by comparing modified files against spec requirements.
+enum SpecDiffVerification {
+
+    /// Builds a verification prompt that diffs git changes against unchecked spec items.
+    static func diffPrompt(worktreePath: String) -> String? {
+        let specItems = uncheckedSpecItems(worktreePath: worktreePath)
+        guard !specItems.isEmpty else { return nil }
+
+        let modifiedFiles = gitModifiedFiles(worktreePath: worktreePath)
+        guard !modifiedFiles.isEmpty else { return nil }
+
+        var prompt = """
+        STRUCTURAL VERIFICATION — Compare your changes against the spec:
+
+        Files you modified:
+        """
+        for file in modifiedFiles.prefix(20) {
+            prompt += "\n- `\(file)`"
+        }
+
+        prompt += "\n\nUnchecked spec requirements:\n"
+        for item in specItems {
+            prompt += "- \(item)\n"
+        }
+
+        prompt += """
+
+        For each spec requirement:
+        1. Which modified file(s) address it?
+        2. Is the requirement fully satisfied, or only partially?
+        3. Are there requirements that NO modified file addresses? If so, they may be missing.
+        4. Are there modified files that don't map to any requirement? Explain why they were changed.
+        Fix any gaps you find.
+        """
+
+        return prompt
+    }
+
+    private static func uncheckedSpecItems(worktreePath: String) -> [String] {
+        let specPath = (worktreePath as NSString).appendingPathComponent(".budahade/spec.md")
+        guard let content = try? String(contentsOfFile: specPath, encoding: .utf8) else { return [] }
+        return content.components(separatedBy: "\n")
+            .filter { $0.contains("- [ ]") }
+            .map { $0.trimmingCharacters(in: .whitespaces)
+                     .replacingOccurrences(of: "- [ ] ", with: "") }
+            .prefix(15)
+            .map { String($0) }
+    }
+
+    private static func gitModifiedFiles(worktreePath: String) -> [String] {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "cd '\(worktreePath)' && git diff --name-only HEAD 2>/dev/null; git diff --name-only --cached HEAD 2>/dev/null"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? ""
+            let files = output.components(separatedBy: "\n")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            // Deduplicate
+            return Array(Set(files)).sorted()
+        } catch {
+            return []
+        }
+    }
+}
+
+// MARK: - Trace Analysis
+
+/// Cross-session trace analysis: persists conversation traces and generates
+/// analysis prompts to find systemic failure patterns across multiple task completions.
+enum TraceAnalysis {
+
+    struct TraceEntry: Codable {
+        let timestamp: String
+        let taskName: String
+        let role: String
+        let model: String
+        let turnCount: Int
+        let inputTokens: Int
+        let outputTokens: Int
+        let costUSD: Double
+        let loopDetections: [String]    // Files that triggered loop warnings
+        let toolErrors: [String]        // Tool names that errored
+        let verified: Bool              // Whether verification pass ran
+        let outcome: String             // "completed", "error", "timeout"
+    }
+
+    /// Records a completed session trace for later analysis
+    @MainActor static func recordTrace(
+        taskName: String,
+        session: AgentSession,
+        result: StreamEvent.ResultInfo,
+        worktreePath: String
+    ) {
+        let dir = (worktreePath as NSString).appendingPathComponent(".budahade")
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let path = (dir as NSString).appendingPathComponent("traces.json")
+
+        let loopFiles = session.loopDetector.fileEditCounts
+            .filter { $0.value >= session.loopDetector.warningThreshold }
+            .map { $0.key }
+
+        let toolErrors = session.activityFeed
+            .filter { $0.status == .failed }
+            .map { entry -> String in
+                switch entry.kind {
+                case .toolBash(let cmd): return "Bash: \(String(cmd.prefix(50)))"
+                case .toolEdit(let path): return "Edit: \(path)"
+                case .toolWrite(let path): return "Write: \(path)"
+                case .toolOther(let name): return name
+                default: return entry.label
+                }
+            }
+
+        let outcome: String
+        if result.stopReason == "max_turns" {
+            outcome = "timeout"
+        } else if session.status == .error("") {
+            outcome = "error"
+        } else {
+            outcome = "completed"
+        }
+
+        let entry = TraceEntry(
+            timestamp: ISO8601DateFormatter().string(from: Date()),
+            taskName: taskName,
+            role: session.agentMode?.rawValue ?? "unknown",
+            model: session.model.rawValue,
+            turnCount: result.numTurns ?? session.messages.filter { $0.role == .user }.count,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            costUSD: result.costUSD,
+            loopDetections: loopFiles,
+            toolErrors: toolErrors,
+            verified: session.hasVerified,
+            outcome: outcome
+        )
+
+        var entries: [TraceEntry] = []
+        if let data = FileManager.default.contents(atPath: path),
+           let existing = try? JSONDecoder().decode([TraceEntry].self, from: data) {
+            entries = existing
+        }
+        entries.append(entry)
+
+        // Keep last 50 traces to avoid unbounded growth
+        if entries.count > 50 {
+            entries = Array(entries.suffix(50))
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? encoder.encode(entries) {
+            try? data.write(to: URL(fileURLWithPath: path))
+        }
+    }
+
+    /// Generates an analysis prompt from accumulated traces for pattern detection
+    static func analysisPrompt(worktreePath: String) -> String? {
+        let path = (worktreePath as NSString).appendingPathComponent(".budahade/traces.json")
+        guard let data = FileManager.default.contents(atPath: path),
+              let entries = try? JSONDecoder().decode([TraceEntry].self, from: data),
+              entries.count >= 3 else {
+            return nil  // Need at least 3 traces for meaningful analysis
+        }
+
+        var prompt = """
+        Analyze these \(entries.count) agent session traces and identify systemic patterns:
+
+        """
+
+        for (i, entry) in entries.enumerated() {
+            prompt += """
+            ### Trace \(i + 1): \(entry.taskName) (\(entry.role), \(entry.model))
+            - Outcome: \(entry.outcome) | Turns: \(entry.turnCount) | Cost: $\(String(format: "%.4f", entry.costUSD))
+            - Tokens: \(entry.inputTokens) in / \(entry.outputTokens) out
+            - Verified: \(entry.verified) | Loop detections: \(entry.loopDetections.joined(separator: ", ").isEmpty ? "none" : entry.loopDetections.joined(separator: ", "))
+            - Tool errors: \(entry.toolErrors.joined(separator: ", ").isEmpty ? "none" : entry.toolErrors.joined(separator: ", "))
+
+            """
+        }
+
+        prompt += """
+        Identify:
+        1. Which roles/models have the highest failure rates?
+        2. Are there common tool errors that suggest missing capabilities?
+        3. Which tasks trigger loop detections? What do they have in common?
+        4. Are sessions that run verification more likely to succeed?
+        5. What's the cost efficiency (cost per successful completion)?
+        6. Concrete recommendations to improve the harness (system prompts, tool access, turn limits).
+        """
+
+        return prompt
+    }
+}
+
 // MARK: - Sibling Summary (Haiku-powered)
 
 /// Generates concise Haiku summaries of sibling conversations instead of raw truncation.

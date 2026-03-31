@@ -70,6 +70,12 @@ final class CLISubprocessManager: ObservableObject {
             return
         }
 
+        // Adaptive turn limit: stop early if verification is complete
+        if session.isVerifiedComplete {
+            print("[CLISubprocessManager] Session \(sessionId) verified complete — skipping send")
+            return
+        }
+
         // Prepend loop warning if one was triggered during the previous turn
         var effectivePrompt = prompt
         if let loopWarning = session.pendingLoopWarning {
