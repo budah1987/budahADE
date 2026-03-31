@@ -1218,7 +1218,114 @@ private struct DetailedOptionCard: View {
     let isFocused: Bool
     let onSelect: () -> Void
     let onHover: (Bool) -> Void
-    var body: some View { EmptyView() }
+
+    @State private var isHovered = false
+
+    private var isHighlighted: Bool { isFocused || isHovered }
+
+    var body: some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.15)) { onSelect() }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                // Header: badge + title + arrow
+                HStack(spacing: 10) {
+                    Text(option.label)
+                        .font(Theme.mono(11, weight: .semibold))
+                        .foregroundColor(Theme.accent)
+                        .frame(width: 22, height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(isHighlighted
+                                      ? Color(hex: 0xc4785c).opacity(0.15)
+                                      : Color.white.opacity(0.06))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .strokeBorder(isHighlighted
+                                              ? Color(hex: 0xc4785c).opacity(0.3)
+                                              : Color.white.opacity(0.1),
+                                              lineWidth: 1)
+                        )
+
+                    Text(option.text)
+                        .font(Theme.label(13))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+
+                    Spacer()
+
+                    Text("→")
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.accent)
+                        .opacity(isHighlighted ? 1 : 0)
+                }
+                .padding(.bottom, 6)
+
+                // Description + Pros/Cons
+                if !option.description.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array(parsedDescription.enumerated()), id: \.offset) { _, item in
+                            switch item {
+                            case .plain(let text):
+                                Text(text)
+                                    .font(Theme.body(12))
+                                    .foregroundColor(Theme.textSecondary)
+                                    .lineLimit(3)
+                            case .pros(let text):
+                                (Text("Pros: ").font(Theme.label(11)).foregroundColor(Theme.success)
+                                 + Text(text).font(Theme.body(11)).foregroundColor(Color(hex: 0x777777)))
+                            case .cons(let text):
+                                (Text("Cons: ").font(Theme.label(11)).foregroundColor(Theme.error)
+                                 + Text(text).font(Theme.body(11)).foregroundColor(Color(hex: 0x777777)))
+                            }
+                        }
+                    }
+                    .padding(.leading, 32) // past badge width
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHighlighted ? Color.white.opacity(isFocused ? 0.04 : 0.03) : Color.clear)
+            )
+            .overlay(alignment: .leading) {
+                // Left accent border
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(isFocused ? Theme.accent : (isHovered ? Theme.accent.opacity(0.3) : Color.clear))
+                    .frame(width: 2)
+            }
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+            onHover(hovering)
+        }
+    }
+
+    // MARK: - Description Parsing
+
+    private enum DescriptionLine {
+        case plain(String)
+        case pros(String)
+        case cons(String)
+    }
+
+    private var parsedDescription: [DescriptionLine] {
+        option.description.components(separatedBy: "\n").compactMap { line in
+            let l = line.trimmingCharacters(in: .whitespaces)
+            guard !l.isEmpty else { return nil }
+            if l.lowercased().hasPrefix("pros:") {
+                return .pros(String(l.dropFirst(5)).trimmingCharacters(in: .whitespaces))
+            } else if l.lowercased().hasPrefix("cons:") {
+                return .cons(String(l.dropFirst(5)).trimmingCharacters(in: .whitespaces))
+            } else {
+                return .plain(l)
+            }
+        }
+    }
 }
 
 // MARK: - Inline Bold Text
