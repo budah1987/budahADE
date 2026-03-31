@@ -256,8 +256,48 @@ Search across plan tab histories.
 - [ ] TabInfo with `.browser` type round-trips through encode/decode
 - [ ] TabInfo with `.terminal` type is unaffected by browser additions
 - [ ] Creating a browser tab assigns a unique UUID distinct from terminal tabs
+- [ ] `isTerminal` / `isBrowser` convenience properties return correct values
+- [ ] TabInfo `Equatable` includes `tabType` in comparison
 
-**URL detection — pattern matching**
+**DevServerDetector — project detection**
+- [ ] Detects vite project (vite.config.ts → `npx vite --port N`)
+- [ ] Detects next.js project (next.config.js → `npx next dev --port N`)
+- [ ] Detects generic npm project (package.json with "dev" script → `npm run dev` with PORT env)
+- [ ] Detects Django project (manage.py → `python manage.py runserver N`)
+- [ ] Detects Go project with net/http (go.mod → `go run .` with stdout parsing)
+- [ ] Detects Rust project with axum/actix (Cargo.toml → `cargo run` with stdout parsing)
+- [ ] Returns nil for non-web project (empty directory, no config files)
+- [ ] `shellCommand(port:)` correctly injects port for each injection type
+
+**PortAllocator — port windowing**
+- [ ] First project allocates ports in 3000-3010 range
+- [ ] Second project allocates ports in 3012-3022 range (+2 gap)
+- [ ] `allocate()` skips ports that are already in use (bind check)
+- [ ] `release(port:)` frees port for reuse
+- [ ] `releaseAll(projectIndex:)` frees all ports for a project
+- [ ] Returns nil when window is exhausted (11 ports used)
+
+**DevServerManager — process lifecycle**
+- [ ] `start()` spawns process with correct shell command
+- [ ] `isRunning` is true after start, false after stop
+- [ ] `stop()` sends SIGTERM to process group
+- [ ] URL detection regex matches `http://localhost:3001` in stdout
+- [ ] URL detection regex matches `http://127.0.0.1:8080` in stdout
+- [ ] `detectedURL` set immediately for non-stdout port injection types
+
+**SplitPaneState — split logic**
+- [ ] `splitTab` with `.right` zone puts dragged tab in secondary pane
+- [ ] `splitTab` with `.left` zone puts dragged tab in primary pane, current in secondary
+- [ ] `closeSplit()` merges panes, resets focusedPane to `.primary`
+- [ ] Closing secondary tab's tab also closes the split
+- [ ] `moveFocus(.next)` toggles between `.primary` and `.secondary`
+
+**SessionPersistence — browser tabs**
+- [ ] `TabSnapshot` with `isBrowser: true` and `browserURL` round-trips through JSON
+- [ ] `TabSnapshot` with `isBrowser: nil` is backwards-compatible (treated as terminal)
+- [ ] Restored browser tab navigates to saved URL
+
+**URL detection — pattern matching** (Phase 2.B — not yet implemented)
 - [ ] Detects `http://localhost:3000` in plain text
 - [ ] Detects `https://example.com/path` in plain text
 - [ ] Detects `localhost:XXXX` without scheme prefix
@@ -265,7 +305,7 @@ Search across plan tab histories.
 - [ ] Returns multiple URLs when text contains more than one
 - [ ] Ignores duplicate URLs in same message
 
-**Page content extraction**
+**Page content extraction** (Phase 2.D — not yet implemented)
 - [ ] `extractPageText()` returns `document.body.innerText` via JS evaluation
 - [ ] `extractPageText()` returns nil/empty for about:blank
 - [ ] Extracted text is truncated to a sane limit (e.g. 20k chars)
@@ -277,15 +317,37 @@ Search across plan tab histories.
 - [ ] `createBrowserTab(url:)` selects the new tab
 - [ ] Browser tab appears in TerminalTabBar alongside terminal tabs
 - [ ] Closing browser tab removes it and selects adjacent tab
-- [ ] `closeAllTerminals()` also closes browser tabs
+- [ ] `closeAllTerminals()` also closes browser tabs and stops dev server
 
-**URL interception → browser tab**
+**Dev server integration**
+- [ ] `createBrowserTab()` on web project detects config and starts dev server
+- [ ] `createBrowserTab()` on non-web project opens blank browser (no crash)
+- [ ] Second `createBrowserTab()` reuses existing dev server (no duplicate)
+- [ ] `stopDevServer()` kills process group and releases port
+- [ ] Browser navigates to `http://localhost:{port}` after server starts
+
+**Split pane integration**
+- [ ] Dragging tab to right drop zone creates horizontal split
+- [ ] Dragging tab to bottom drop zone creates vertical split
+- [ ] Split uses `PaneLayout` with drag-to-resize divider
+- [ ] Closing either pane's tab closes the split
+- [ ] `Cmd+Opt+Right/Left` moves focus between panes
+- [ ] `Cmd+Opt+Return` closes the split
+- [ ] Focused pane has accent border indicator
+
+**Session persistence — browser**
+- [ ] Browser tabs saved in `tabs.json` with `isBrowser: true` and `browserURL`
+- [ ] Restored browser tabs reload their saved URL
+- [ ] Terminal tabs still restore correctly (backwards compatible)
+- [ ] Mixed terminal + browser tabs restore in correct order
+
+**URL interception → browser tab** (Phase 2.B — not yet implemented)
 - [ ] Detected URL in chat message shows "Open in-app" button
 - [ ] Clicking "Open in-app" calls `createBrowserTab(url:)` with correct URL
 - [ ] Detected `localhost:XXXX` in terminal scrollback shows affordance
 - [ ] Opening URL that matches existing browser tab selects it instead of duplicating
 
-**Page content → chat injection**
+**Page content → chat injection** (Phase 2.D — not yet implemented)
 - [ ] "Show to Claude" extracts page text and sends as user message
 - [ ] Injected message includes page URL as attribution
 - [ ] "Show to Claude" with empty page content shows no-op / warning
@@ -302,17 +364,34 @@ Search across plan tab histories.
 - [ ] Middle-click closes browser tab
 - [ ] Switching between browser and terminal tabs preserves state in both
 
-**URL interception**
-- [ ] Claude returns a URL in chat → "Open in-app" affordance appears inline
-- [ ] Terminal prints `localhost:8080` → affordance appears (toast or inline)
-- [ ] Clicking affordance opens browser tab at that URL
-- [ ] If browser tab already open at that URL, selects it instead
+**Tab drag-to-split**
+- [ ] Drag terminal tab to right edge → horizontal split with accent highlight on drop zone
+- [ ] Drag browser tab to bottom edge → vertical split
+- [ ] Drop zone highlight appears with subtle animation during drag hover
+- [ ] Divider is draggable to resize panes (0.15–0.85 ratio)
+- [ ] Cmd+Opt+Right/Left toggles focus between panes
+- [ ] Focused pane has accent border, unfocused has no border
+- [ ] Cmd+Opt+Return closes split, panes merge
+- [ ] Dragging a tab when already split → no-op (overlay hidden)
 
-**Page content sharing**
-- [ ] Browser tab toolbar has "Show to Claude" button
-- [ ] Click it → page text injected into active chat as user message
-- [ ] Large pages are truncated with "[truncated]" indicator
-- [ ] Works on localhost dev server pages
+**Dev server auto-start**
+- [ ] Open browser tab in Vite project → dev server starts, page loads localhost
+- [ ] Port badge (:3001) appears on task card in rail while server runs
+- [ ] Close task → dev server stops, port badge disappears
+- [ ] Open browser tab in non-web project → blank browser, no server, no crash
+- [ ] Multiple tasks → each gets own port (3000, 3001, etc.)
+
+**Pop-out window**
+- [ ] Click pop-out button in browser chrome → NSPanel opens on same/secondary monitor
+- [ ] Pop-out window shows same page (shared WKWebView state)
+- [ ] Navigate in pop-out → URL updates in both pop-out and tab if docked back
+- [ ] Close pop-out window → browser tab still works in main window
+- [ ] Pop-out window floats above other windows (utility panel behavior)
+
+**Keyboard shortcuts**
+- [ ] Cmd+Shift+B creates browser tab if none exists
+- [ ] Cmd+Shift+B focuses existing browser tab if one exists
+- [ ] Cmd+Shift+B no-op in Plan mode
 
 **Edge cases**
 - [ ] Browser tab with no URL → shows blank state, no crash
@@ -320,6 +399,9 @@ Search across plan tab histories.
 - [ ] Rapid tab switching between browser and terminal → no flicker or layout break
 - [ ] Session restore with browser tabs → URLs reload on reopen
 - [ ] Browser tab during Build mode → does not interfere with builder drawer
+- [ ] App termination with running dev servers → all servers killed (no orphans)
+- [ ] Port conflict (port in use) → allocator skips to next available port
+- [ ] Close all terminals → browser panels and dev server also cleaned up
 
 ---
 
