@@ -16,6 +16,9 @@ struct WorkspaceView: View {
     /// Role selection modal (shown as sheet when adding new plan tab)
     @State private var showRoleModal: Bool = false
 
+    /// Plan → Build transition overlay
+    @State private var buildTransition: BuildTransitionState? = nil
+
     var body: some View {
         ZStack {
             Theme.appBackground.ignoresSafeArea()
@@ -60,6 +63,9 @@ struct WorkspaceView: View {
                                         siblingTabs: task.planTabs.filter { $0.id != selectedId },
                                         onHandOff: { targetId in
                                             task.handOff(from: selectedId, to: targetId)
+                                        },
+                                        onApproveToBuild: { itemCount in
+                                            startBuildTransition(task: task, itemCount: itemCount)
                                         }
                                     )
                                     .id(task.selectedPlanTabId)
@@ -110,6 +116,11 @@ struct WorkspaceView: View {
             // ── RENAME PALETTE ──
             if renameTarget != nil {
                 renamePalette
+            }
+
+            // ── BUILD TRANSITION OVERLAY ──
+            if let transition = buildTransition {
+                BuildTransitionOverlay(state: transition)
             }
         }
         .coordinateSpace(name: "workspace")
@@ -206,6 +217,34 @@ struct WorkspaceView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     renameFieldFocused = true
                 }
+            }
+        }
+    }
+
+    // MARK: - Build Transition
+
+    private func startBuildTransition(task: TaskState, itemCount: Int) {
+        let transition = BuildTransitionState()
+        buildTransition = transition
+
+        // Step 1: Writing spec.md… (already done by handleApprove)
+        transition.step = .writingSpec
+
+        // Step 2: Launching builder agent…
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            transition.step = .launchingBuilder
+        }
+
+        // Step 3: Switching to Build mode…
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            transition.step = .switchingMode
+            task.enterBuildMode()
+        }
+
+        // Dismiss overlay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                buildTransition = nil
             }
         }
     }
@@ -428,6 +467,85 @@ struct RenameSpotlightKey: PreferenceKey {
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         let next = nextValue()
         if next != .zero { value = next }
+    }
+}
+
+// MARK: - Rename Target
+
+// MARK: - Build Transition State
+
+@MainActor
+final class BuildTransitionState: ObservableObject {
+    enum Step: Int, CaseIterable {
+        case writingSpec
+        case launchingBuilder
+        case switchingMode
+
+        var label: String {
+            switch self {
+            case .writingSpec:      return "Writing spec.md\u{2026}"
+            case .launchingBuilder: return "Launching builder agent\u{2026}"
+            case .switchingMode:    return "Switching to Build mode\u{2026}"
+            }
+        }
+    }
+
+    @Published var step: Step = .writingSpec
+}
+
+// MARK: - Build Transition Overlay
+
+struct BuildTransitionOverlay: View {
+    @ObservedObject var state: BuildTransitionState
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(BuildTransitionState.Step.allCases, id: \.rawValue) { step in
+                    HStack(spacing: 8) {
+                        if step.rawValue < state.step.rawValue {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Theme.success)
+                                .frame(width: 14)
+                        } else if step == state.step {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .frame(width: 14)
+                        } else {
+                            Circle()
+                                .fill(Theme.textMuted.opacity(0.3))
+                                .frame(width: 6, height: 6)
+                                .frame(width: 14)
+                        }
+
+                        Text(step.label)
+                            .font(.system(size: 13, weight: step == state.step ? .medium : .regular))
+                            .foregroundColor(
+                                step.rawValue <= state.step.rawValue
+                                    ? Theme.textPrimary
+                                    : Theme.textMuted
+                            )
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Theme.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Theme.borderSubtle, lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
+            )
+        }
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.2), value: state.step)
     }
 }
 

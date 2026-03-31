@@ -112,6 +112,13 @@ struct SpecStripView: View {
                             ? Color(hex: 0xE06C75)
                             : Theme.textMuted)
                         .lineLimit(1)
+
+                    if buildStatus.status == .working, let elapsed = buildStatus.elapsed {
+                        Text(elapsed)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(Theme.textMuted.opacity(0.6))
+                    }
+
                     Spacer()
                 }
                 .padding(.horizontal, 12)
