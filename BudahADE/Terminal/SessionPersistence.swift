@@ -8,6 +8,8 @@ struct TabSnapshot: Codable {
     let isActive: Bool
     let scrollbackPath: String?  // relative path to scrollback text file
     let tmuxSession: String?     // tmux session name for reattach
+    let isBrowser: Bool?         // true for browser tabs (nil = terminal for backwards compat)
+    let browserURL: String?      // last URL for browser tabs
 }
 
 struct SessionSnapshot: Codable {

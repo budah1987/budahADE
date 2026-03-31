@@ -85,10 +85,32 @@ struct BudahADEApp: App {
                 }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
 
+                Button("Toggle Browser") {
+                    NotificationCenter.default.post(name: .toggleBrowser, object: nil)
+                }
+                .keyboardShortcut("b", modifiers: [.command, .shift])
+
                 Button("Focus Input") {
                     NotificationCenter.default.post(name: .focusInput, object: nil)
                 }
                 .keyboardShortcut("l", modifiers: .command)
+
+                Divider()
+
+                Button("Focus Next Pane") {
+                    NotificationCenter.default.post(name: .focusNextPane, object: nil)
+                }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+
+                Button("Focus Previous Pane") {
+                    NotificationCenter.default.post(name: .focusPrevPane, object: nil)
+                }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+
+                Button("Close Split") {
+                    NotificationCenter.default.post(name: .closeSplit, object: nil)
+                }
+                .keyboardShortcut(.return, modifiers: [.command, .option])
             }
 
             // Cmd+1..9 — switch agent tabs within active task
@@ -296,6 +318,9 @@ extension Notification.Name {
     static let toggleLeftPanel = Notification.Name("budahADE.toggleLeftPanel")
     static let splitRight = Notification.Name("budahADE.splitRight")
     static let splitDown = Notification.Name("budahADE.splitDown")
+    static let focusNextPane = Notification.Name("budahADE.focusNextPane")
+    static let focusPrevPane = Notification.Name("budahADE.focusPrevPane")
+    static let closeSplit = Notification.Name("budahADE.closeSplit")
     static let selectTabByIndex = Notification.Name("budahADE.selectTabByIndex")
     static let toggleWorkspaceSwitcher = Notification.Name("budahADE.toggleWorkspaceSwitcher")
     static let newTask = Notification.Name("budahADE.newTask")
@@ -307,5 +332,6 @@ extension Notification.Name {
     static let canvasZoomToFit = Notification.Name("budahADE.canvasZoomToFit")
     static let closeTask = Notification.Name("budahADE.closeTask")
     static let toggleRightPanel = Notification.Name("budahADE.toggleRightPanel")
+    static let toggleBrowser = Notification.Name("budahADE.toggleBrowser")
     static let focusInput = Notification.Name("budahADE.focusInput")
 }

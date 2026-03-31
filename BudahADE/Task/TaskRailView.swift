@@ -153,7 +153,7 @@ private struct TaskCardView: View {
                         .animation(.easeOut(duration: 0.12), value: isActive)
                 }
 
-                // Row 2: Branch name
+                // Row 2: Branch name + port badge
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.branch")
                         .font(.system(size: 8, weight: .medium))
@@ -163,6 +163,16 @@ private struct TaskCardView: View {
                         .font(Theme.caption(9))
                         .foregroundColor(Theme.textMuted)
                         .lineLimit(1)
+
+                    if let port = task.assignedPort, task.devServerManager?.isRunning == true {
+                        Text(":\(port)")
+                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                            .foregroundColor(Theme.accent)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Theme.accent.opacity(0.12))
+                            .cornerRadius(3)
+                    }
                 }
                 .padding(.leading, 12)
 

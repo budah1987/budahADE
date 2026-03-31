@@ -23,12 +23,20 @@ enum TabAgentState: Equatable {
     }
 }
 
+// MARK: - Tab Type
+
+enum TabType: Equatable {
+    case terminal
+    case browser(url: URL?)
+}
+
 // MARK: - Tab Model
 
 struct TabInfo: Identifiable, Equatable {
     let id: UUID
     var title: String
     var isRunning: Bool
+    var tabType: TabType = .terminal
     var agentStatus: AgentStatus = .inactive
     var claudeSessionId: String?   // For --resume fallback (when tmux unavailable)
     var agentMode: AgentMode?      // Which agent role launched this tab
@@ -36,10 +44,14 @@ struct TabInfo: Identifiable, Equatable {
     var restoredTitle: String?     // Saved title — preserved until Claude sets a real one
     var hadActivity: Bool = false  // True once agent has run — used for close confirmation
 
+    var isTerminal: Bool { if case .terminal = tabType { return true } else { return false } }
+    var isBrowser: Bool { if case .browser = tabType { return true } else { return false } }
+
     static func == (lhs: TabInfo, rhs: TabInfo) -> Bool {
         lhs.id == rhs.id &&
         lhs.title == rhs.title &&
         lhs.isRunning == rhs.isRunning &&
+        lhs.tabType == rhs.tabType &&
         lhs.agentStatus == rhs.agentStatus
     }
 }
@@ -53,15 +65,18 @@ struct TerminalTabBar: View {
     let onSelectTab: (UUID) -> Void
     let onCloseTab: (UUID) -> Void
     let onNewTab: () -> Void
+    var onNewBrowserTab: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
                 ForEach(tabs) { tab in
                     ConversationTab(
+                        id: tab.id,
                         title: tab.title,
                         isSelected: tab.id == selectedTabID,
                         isSpotlit: renameTarget?.tabId == tab.id,
+                        tabType: tab.tabType,
                         agentState: TabAgentState(from: tab.agentStatus),
                         onSelect: { onSelectTab(tab.id) },
                         onClose: { onCloseTab(tab.id) }
@@ -70,8 +85,11 @@ struct TerminalTabBar: View {
 
                 Spacer(minLength: 0)
 
-                NewAgentTabButton(action: onNewTab)
-                    .padding(.trailing, 8)
+                NewTabMenu(
+                    onNewTerminal: onNewTab,
+                    onNewBrowser: onNewBrowserTab ?? {}
+                )
+                .padding(.trailing, 8)
             }
             .padding(.horizontal, 6)
             .padding(.top, 6)
@@ -87,65 +105,75 @@ struct TerminalTabBar: View {
 // MARK: - Conversation Tab
 
 struct ConversationTab: View {
+    let id: UUID
     let title: String
     let isSelected: Bool
     var isSpotlit: Bool = false
+    var tabType: TabType = .terminal
     let agentState: TabAgentState
     let onSelect: () -> Void
     let onClose: () -> Void
 
     @State private var glowBreathing: Bool = false
 
+    private var isBrowser: Bool {
+        if case .browser = tabType { return true } else { return false }
+    }
+
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 6) {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(Theme.textMuted)
-                }
-                .buttonStyle(.plain)
-
-                Text(title)
-                    .font(Theme.label(11))
-                    .foregroundStyle(isSelected ? Theme.textPrimary : Theme.textSecondary)
-                    .lineLimit(1)
-
-                if agentState != .idle {
-                    Text(agentState == .working ? "working" : "done")
-                        .font(Theme.caption(9))
-                        .foregroundStyle(
-                            agentState == .working
-                                ? Color(hex: 0x818cf8)
-                                : Theme.success
-                        )
-                }
+        HStack(spacing: 6) {
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(Theme.textMuted)
             }
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            .background(tabBackground)
-            .overlay(alignment: .bottom) {
-                // GlowBar outside clipped background so shadows can bleed
-                GlowBar(state: agentState)
-                    .frame(height: 3)
-                    .shadow(color: glowInnerShadow, radius: 10, y: 0)
-                    .shadow(color: glowOuterShadow, radius: 20, y: 2)
-                    .opacity(agentState == .idle ? 0 : 1)
+            .buttonStyle(.plain)
+
+            if isBrowser {
+                Image(systemName: "globe")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(isSelected ? Theme.accent : Theme.textMuted)
             }
-            .fixedSize()
-            .background(
-                GeometryReader { geo in
-                    Color.clear
-                        .preference(
-                            key: RenameSpotlightKey.self,
-                            value: isSpotlit
-                                ? geo.frame(in: .named("workspace"))
-                                : .zero
-                        )
-                }
-            )
+
+            Text(title)
+                .font(Theme.label(11))
+                .foregroundStyle(isSelected ? Theme.textPrimary : Theme.textSecondary)
+                .lineLimit(1)
+
+            if agentState != .idle {
+                Text(agentState == .working ? "working" : "done")
+                    .font(Theme.caption(9))
+                    .foregroundStyle(
+                        agentState == .working
+                            ? Color(hex: 0x818cf8)
+                            : Theme.success
+                    )
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+        .background(tabBackground)
+        .overlay(alignment: .bottom) {
+            // GlowBar outside clipped background so shadows can bleed
+            GlowBar(state: agentState)
+                .frame(height: 3)
+                .shadow(color: glowInnerShadow, radius: 10, y: 0)
+                .shadow(color: glowOuterShadow, radius: 20, y: 2)
+                .opacity(agentState == .idle ? 0 : 1)
+        }
+        .fixedSize()
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(
+                        key: RenameSpotlightKey.self,
+                        value: isSpotlit
+                            ? geo.frame(in: .named("workspace"))
+                            : .zero
+                    )
+            }
+        )
+        .background(TabDragClickHandler(dragId: id.uuidString, onClick: onSelect, onMiddleClick: onClose))
         .overlay(MiddleClickOverlay(action: onClose))
         .onAppear { startBreathing() }
         .onChange(of: agentState) { _, _ in startBreathing() }
@@ -283,7 +311,48 @@ struct GlowBar: View {
     }
 }
 
-// MARK: - New Tab Button
+// MARK: - New Tab Menu
+
+struct NewTabMenu: View {
+    let onNewTerminal: () -> Void
+    let onNewBrowser: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Menu {
+            Button(action: onNewTerminal) {
+                Label("Terminal", systemImage: "terminal")
+            }
+            Button(action: onNewBrowser) {
+                Label("Browser", systemImage: "globe")
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(isHovered ? Theme.textSecondary : Theme.textMuted)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(isHovered ? Theme.tabGlassBackground : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(
+                            isHovered ? Theme.tabGlassBorder : Color.clear,
+                            lineWidth: 1
+                        )
+                )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.1)) { isHovered = hovering }
+        }
+    }
+}
+
+// MARK: - New Tab Button (simple, for PlanTabBar)
 
 struct NewAgentTabButton: View {
     let action: () -> Void
@@ -338,6 +407,80 @@ struct MiddleClickOverlay: NSViewRepresentable {
             } else {
                 super.otherMouseDown(with: event)
             }
+        }
+    }
+}
+
+// MARK: - Tab Drag+Click Handler
+//
+// SwiftUI's .draggable modifier on macOS blocks ALL click events (Button and onTapGesture alike)
+// because the NSDraggingSource machinery captures mouseDown before SwiftUI gestures can fire.
+// This NSViewRepresentable handles both click and drag at the AppKit level, bypassing the conflict.
+
+struct TabDragClickHandler: NSViewRepresentable {
+    let dragId: String
+    let onClick: () -> Void
+    let onMiddleClick: () -> Void
+
+    func makeNSView(context: Context) -> TabDragView {
+        let view = TabDragView()
+        view.dragId = dragId
+        view.onClick = onClick
+        return view
+    }
+
+    func updateNSView(_ nsView: TabDragView, context: Context) {
+        nsView.dragId = dragId
+        nsView.onClick = onClick
+    }
+
+    class TabDragView: NSView, NSDraggingSource {
+        var dragId: String = ""
+        var onClick: (() -> Void)?
+
+        private var mouseDownEvent: NSEvent?
+        private var dragStarted = false
+
+        private static let dragThreshold: CGFloat = 5
+
+        override var acceptsFirstResponder: Bool { false }
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func mouseDown(with event: NSEvent) {
+            mouseDownEvent = event
+            dragStarted = false
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let origin = mouseDownEvent, !dragStarted else { return }
+            let dx = event.locationInWindow.x - origin.locationInWindow.x
+            let dy = event.locationInWindow.y - origin.locationInWindow.y
+            guard sqrt(dx * dx + dy * dy) >= Self.dragThreshold else { return }
+
+            dragStarted = true
+            let item = NSDraggingItem(pasteboardWriter: dragId as NSString)
+            let img = NSImage(size: NSSize(width: 1, height: 1))
+            item.setDraggingFrame(NSRect(origin: .zero, size: NSSize(width: 1, height: 1)), contents: img)
+            beginDraggingSession(with: [item], event: origin, source: self)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            defer {
+                mouseDownEvent = nil
+                dragStarted = false
+            }
+            guard !dragStarted else { return }
+            // Confirm release is still within the view bounds
+            let loc = convert(event.locationInWindow, from: nil)
+            guard bounds.contains(loc) else { return }
+            DispatchQueue.main.async { [weak self] in self?.onClick?() }
+        }
+
+        // MARK: NSDraggingSource
+        func draggingSession(_ session: NSDraggingSession,
+                             sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+            return .move
         }
     }
 }

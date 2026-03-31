@@ -29,12 +29,23 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var mode: TaskMode = .build
     @Published var tabs: [TabInfo] = []
     @Published var selectedTabId: UUID?
+    /// Split pane: when set, the content area shows two panes
+    @Published var splitPane: SplitPaneState?
+    /// Which pane is focused (for keyboard nav and visual indicator)
+    @Published var focusedPane: PanePosition = .primary
     @Published var terminals: [UUID: TerminalPanel] = [:]
+    @Published var browserPanels: [UUID: BrowserPanel] = [:]
     @Published var planChats: [UUID: PlanChatState] = [:]
     @Published var planTabs: [PlanTabInfo] = []
     @Published var selectedPlanTabId: UUID?
     let specState = SpecState()
     let buildStatus = BuildStatusState()
+    /// Dev server for this task (lazy — created on first browser tab)
+    @Published var devServerManager: DevServerManager?
+    var assignedPort: Int?
+    /// Dedicated builder terminal — lives outside the tab bar, shown in spec strip drawer
+    @Published var builderPanel: TerminalPanel?
+    @Published var isBuilderDrawerOpen: Bool = false
     private var specWatcher: SpecWatcher?
     private var buildStatusWatcher: BuildStatusWatcher?
     let createdAt: Date = Date()
@@ -112,12 +123,91 @@ final class TaskState: ObservableObject, Identifiable {
 
     func enterBuildMode() {
         mode = .build
-        focusActiveTerminal()
+
+        // Synchronous spec discovery — ensures we detect spec files that were
+        // just written (e.g. via NewTaskSheet import) before the watcher polls.
+        if !specState.hasSpec {
+            let specFiles = SpecParser.findSpecFiles(in: worktreePath)
+            if !specFiles.isEmpty {
+                let results = specFiles.compactMap { SpecParser.parse(fileAt: $0) }
+                specState.updateAll(from: results)
+            }
+        }
+
+        // Launch builder in dedicated panel (not in tab bar)
+        if builderPanel == nil && specState.hasSpec {
+            launchBuilder()
+        }
+
+        // Create a regular CLI tab if none exist
+        if tabs.isEmpty {
+            createTab()
+        } else {
+            focusActiveTerminal()
+        }
+
         // Start build status watcher if we have a spec
         if specState.hasSpec && buildStatusWatcher == nil {
             buildStatusWatcher = BuildStatusWatcher(worktreePath: worktreePath, buildStatus: buildStatus)
             buildStatusWatcher?.startWatching()
         }
+    }
+
+    // MARK: - Builder Panel
+
+    /// Launch the builder agent in a dedicated terminal panel (outside the tab bar).
+    func launchBuilder() {
+        let panel = TerminalPanel(workingDirectory: worktreePath)
+        builderPanel = panel
+
+        let specPath = specState.activeSpec?.filePath
+        let progress: (completed: Int, total: Int)? = specState.activeSpec.map {
+            (completed: $0.completedCount, total: $0.totalCount)
+        }
+
+        let claudeCommand: String
+        if let specPath, let progress {
+            claudeCommand = AgentPrompts.builderLaunchCommand(
+                taskName: name,
+                branchName: branchName,
+                worktreePath: worktreePath,
+                specFilePath: specPath,
+                specProgress: progress
+            )
+        } else {
+            claudeCommand = AgentPrompts.launchCommand(
+                agent: .claude,
+                taskName: name,
+                branchName: branchName,
+                worktreePath: worktreePath
+            )
+        }
+
+        if TmuxSessionManager.isAvailable {
+            let sessionName = "builder-\(id.uuidString.prefix(8))"
+            let tmuxCmd = TmuxSessionManager.newSessionCommand(
+                name: sessionName, workingDirectory: worktreePath
+            )
+            panel.sendCommandWhenReady(tmuxCmd)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                panel.sendCommandWhenReady(claudeCommand)
+            }
+            panel.tmuxSession = sessionName
+        } else {
+            panel.sendCommandWhenReady(claudeCommand)
+        }
+
+        isBuilderDrawerOpen = true
+    }
+
+    /// Stop the builder and clean up its panel.
+    func stopBuilder() {
+        if let tmux = builderPanel?.tmuxSession {
+            TmuxSessionManager.killSession(tmux)
+        }
+        builderPanel?.close()
+        builderPanel = nil
+        isBuilderDrawerOpen = false
     }
 
     // MARK: - Plan Tab Management
@@ -322,14 +412,75 @@ final class TaskState: ObservableObject, Identifiable {
         }
     }
 
+    @discardableResult
+    func createBrowserTab(url: URL? = nil) -> UUID {
+        // Lazy dev server start: detect project and start server on first browser tab
+        let resolvedURL: URL?
+        if let url {
+            resolvedURL = url
+        } else {
+            resolvedURL = startDevServerIfNeeded()
+        }
+
+        let panel = BrowserPanel(url: resolvedURL)
+        let id = panel.id
+        let tab = TabInfo(
+            id: id,
+            title: panel.state.title ?? "Browser",
+            isRunning: false,
+            tabType: .browser(url: resolvedURL)
+        )
+        tabs.append(tab)
+        browserPanels[id] = panel
+        selectedTabId = id
+
+        // Sync browser page title → tab title
+        observeBrowserTitle(id: id, state: panel.state)
+
+        return id
+    }
+
+    private func observeBrowserTitle(id: UUID, state: BrowserState) {
+        Task { @MainActor [weak self] in
+            while self?.browserPanels[id] != nil {
+                let title = state.title
+                withObservationTracking {
+                    _ = state.title
+                } onChange: {
+                    Task { @MainActor [weak self] in
+                        guard let self,
+                              let idx = self.tabs.firstIndex(where: { $0.id == id }),
+                              let newTitle = state.title, !newTitle.isEmpty else { return }
+                        self.tabs[idx].title = newTitle
+                    }
+                }
+                // Yield to avoid tight loop — onChange fires asynchronously
+                try? await Task.sleep(for: .milliseconds(100))
+                _ = title  // suppress unused warning
+            }
+        }
+    }
+
     func closeTab(_ id: UUID) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
-        // Kill tmux session when user explicitly closes a tab
-        if let tmuxName = tabs[index].tmuxSession {
-            TmuxSessionManager.killSession(tmuxName)
+        let tab = tabs[index]
+
+        if tab.isTerminal {
+            // Kill tmux session when user explicitly closes a tab
+            if let tmuxName = tab.tmuxSession {
+                TmuxSessionManager.killSession(tmuxName)
+            }
+            terminals[id]?.close()
+            terminals.removeValue(forKey: id)
+        } else if tab.isBrowser {
+            browserPanels.removeValue(forKey: id)
         }
-        terminals[id]?.close()
-        terminals.removeValue(forKey: id)
+
+        // Close split if the closed tab was in a pane
+        if let split = splitPane, (split.secondaryTabId == id || selectedTabId == id) {
+            splitPane = nil
+        }
+
         tabs.remove(at: index)
 
         if selectedTabId == id {
@@ -349,7 +500,78 @@ final class TaskState: ObservableObject, Identifiable {
             tabs[index].agentStatus = .inactive
         }
         // Make terminal first responder so keyboard events (paste, Shift+Enter) go to the right tab
-        terminals[id]?.focus()
+        if tabs[index].isTerminal {
+            terminals[id]?.focus()
+        }
+    }
+
+    // MARK: - Split Pane
+
+    func splitTab(_ tabId: UUID, to zone: DropZone) {
+        guard tabs.contains(where: { $0.id == tabId }) else { return }
+        if zone.isFirst {
+            // Dragged tab goes to left/top pane, current selected stays in right/bottom
+            splitPane = SplitPaneState(secondaryTabId: selectedTabId ?? tabId, orientation: zone.orientation)
+            selectedTabId = tabId
+        } else {
+            // Dragged tab goes to right/bottom pane
+            splitPane = SplitPaneState(secondaryTabId: tabId, orientation: zone.orientation)
+        }
+    }
+
+    func closeSplit() {
+        if let split = splitPane {
+            // If the secondary tab was selected conceptually, select it in the main area
+            selectedTabId = selectedTabId ?? split.secondaryTabId
+        }
+        splitPane = nil
+        focusedPane = .primary
+    }
+
+    func moveFocus(_ direction: PaneFocusDirection) {
+        guard splitPane != nil else { return }
+        switch direction {
+        case .next:
+            focusedPane = focusedPane == .primary ? .secondary : .primary
+        case .previous:
+            focusedPane = focusedPane == .secondary ? .primary : .secondary
+        }
+        // Focus the terminal in the newly focused pane if applicable
+        let tabId = focusedPane == .primary ? selectedTabId : splitPane?.secondaryTabId
+        if let tabId, let idx = tabs.firstIndex(where: { $0.id == tabId }), tabs[idx].isTerminal {
+            terminals[tabId]?.focus()
+        }
+    }
+
+    // MARK: - Dev Server
+
+    /// Detect project type and start dev server if applicable. Returns localhost URL or nil.
+    private func startDevServerIfNeeded() -> URL? {
+        // Don't start a second server if one is already running
+        if let manager = devServerManager, manager.isRunning {
+            return manager.detectedURL ?? URL(string: "http://localhost:\(manager.port)")
+        }
+
+        guard let config = DevServerDetector.detect(in: worktreePath) else { return nil }
+
+        // TODO: Use WorkspaceState.projectIndex for port windowing
+        guard let port = PortAllocator.shared.allocate(projectIndex: 0) else { return nil }
+
+        assignedPort = port
+        let manager = DevServerManager(config: config, port: port, worktreePath: worktreePath)
+        devServerManager = manager
+        manager.start()
+
+        return URL(string: "http://localhost:\(port)")
+    }
+
+    func stopDevServer() {
+        devServerManager?.stop()
+        if let port = assignedPort {
+            PortAllocator.shared.release(port: port)
+        }
+        assignedPort = nil
+        devServerManager = nil
     }
 
     func selectTabByIndex(_ index: Int) {
@@ -384,10 +606,14 @@ final class TaskState: ObservableObject, Identifiable {
     // MARK: - Close All
 
     func closeAllTerminals() {
+        stopBuilder()
+        stopDevServer()
         for panel in terminals.values {
             panel.close()
         }
         terminals.removeAll()
+        browserPanels.removeAll()
+        splitPane = nil
         tabs.removeAll()
         selectedTabId = nil
         specWatcher?.stopWatching()
@@ -409,24 +635,41 @@ final class TaskState: ObservableObject, Identifiable {
         }
 
         for tabSnapshot in snapshot.tabs {
-            let panel = TerminalPanel(workingDirectory: worktreePath)
-            let tabId = panel.id
-            panel.title = tabSnapshot.title
+            if tabSnapshot.isBrowser == true {
+                // Restore browser tab
+                let url = tabSnapshot.browserURL.flatMap(URL.init(string:))
+                let panel = BrowserPanel(url: url)
+                let tabId = panel.id
+                let tab = TabInfo(
+                    id: tabId,
+                    title: tabSnapshot.title,
+                    isRunning: false,
+                    tabType: .browser(url: url)
+                )
+                tabs.append(tab)
+                browserPanels[tabId] = panel
+                observeBrowserTitle(id: tabId, state: panel.state)
+            } else {
+                // Restore terminal tab
+                let panel = TerminalPanel(workingDirectory: worktreePath)
+                let tabId = panel.id
+                panel.title = tabSnapshot.title
 
-            var tab = TabInfo(id: tabId, title: tabSnapshot.title, isRunning: false)
-            tab.claudeSessionId = tabSnapshot.claudeSessionId
-            tab.tmuxSession = tabSnapshot.tmuxSession
-            tab.restoredTitle = tabSnapshot.title  // Protect from shell title overwrites
-            if let modeRaw = tabSnapshot.agentMode {
-                tab.agentMode = AgentMode(rawValue: modeRaw)
+                var tab = TabInfo(id: tabId, title: tabSnapshot.title, isRunning: false)
+                tab.claudeSessionId = tabSnapshot.claudeSessionId
+                tab.tmuxSession = tabSnapshot.tmuxSession
+                tab.restoredTitle = tabSnapshot.title  // Protect from shell title overwrites
+                if let modeRaw = tabSnapshot.agentMode {
+                    tab.agentMode = AgentMode(rawValue: modeRaw)
+                }
+
+                panel.tmuxSession = tabSnapshot.tmuxSession
+                tabs.append(tab)
+                terminals[tabId] = panel
+
+                // tmux reattach (conversation intact) or fresh launch
+                launchClaudeInTab(tabId, agent: tab.agentMode, tmuxSession: tabSnapshot.tmuxSession)
             }
-
-            panel.tmuxSession = tabSnapshot.tmuxSession
-            tabs.append(tab)
-            terminals[tabId] = panel
-
-            // tmux reattach (conversation intact) or fresh launch
-            launchClaudeInTab(tabId, agent: tab.agentMode, tmuxSession: tabSnapshot.tmuxSession)
         }
 
         // Restore selected tab by position
@@ -475,7 +718,9 @@ final class TaskState: ObservableObject, Identifiable {
                 agentMode: tab.agentMode?.rawValue,
                 isActive: tab.id == selectedTabId,
                 scrollbackPath: scrollbackPath,
-                tmuxSession: tab.tmuxSession
+                tmuxSession: tab.tmuxSession,
+                isBrowser: tab.isBrowser ? true : nil,
+                browserURL: browserPanels[tab.id]?.state.lastURL?.absoluteString
             ))
         }
 

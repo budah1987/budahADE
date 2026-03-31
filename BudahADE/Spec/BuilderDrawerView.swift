@@ -1,0 +1,72 @@
+import SwiftUI
+
+/// Overlay drawer showing the builder agent's terminal output.
+/// Slides down from the spec strip, overlays the regular CLI terminals.
+struct BuilderDrawerView: View {
+    @ObservedObject var panel: TerminalPanel
+    @ObservedObject var buildStatus: BuildStatusState
+    var onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header bar
+            HStack(spacing: 8) {
+                // Status dot
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 6, height: 6)
+
+                Text("Builder")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Theme.textPrimary)
+
+                if let task = buildStatus.currentTaskTitle {
+                    Text(task)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textMuted)
+                        .lineLimit(1)
+                }
+
+                if let elapsed = buildStatus.elapsed {
+                    Text(elapsed)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(Theme.textMuted.opacity(0.6))
+                }
+
+                Spacer()
+
+                Button(action: onClose) {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Theme.textMuted)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Theme.surface2)
+
+            Rectangle()
+                .fill(Theme.borderSubtle)
+                .frame(height: 0.5)
+
+            // Builder terminal output
+            TerminalPanelView(panel: panel)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 280)
+        .background(Theme.contentBg)
+        .clipShape(RoundedRectangle(cornerRadius: 0))
+        .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+    }
+
+    private var statusColor: Color {
+        switch buildStatus.status {
+        case .working:   return Theme.accent
+        case .blocked:   return Color(hex: 0xE06C75)
+        case .completed: return Theme.success
+        case .idle:      return Theme.textMuted
+        }
+    }
+}

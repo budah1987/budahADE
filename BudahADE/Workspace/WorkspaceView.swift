@@ -16,7 +16,56 @@ struct WorkspaceView: View {
     /// Role selection modal (shown as sheet when adding new plan tab)
     @State private var showRoleModal: Bool = false
 
+    /// Plan → Build transition overlay
+    @State private var buildTransition: BuildTransitionState? = nil
+
+
     var body: some View {
+        coreView
+            .onReceive(NotificationCenter.default.publisher(for: .selectTabByIndex)) { notification in
+                guard !appState.isWorkspaceSwitcherOpen,
+                      let index = notification.userInfo?["index"] as? Int else { return }
+                if let task = state.activeTask, task.mode == .plan {
+                    task.selectPlanTabByIndex(index)
+                } else {
+                    state.activeTask?.selectTabByIndex(index)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newTask)) { _ in
+                state.showNewTaskSheet = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .selectTaskByIndex)) { notification in
+                guard let index = notification.userInfo?["index"] as? Int else { return }
+                state.selectTaskByIndex(index)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .renameTab)) { _ in
+                guard let task = state.activeTask,
+                      let tabId = task.selectedTabId,
+                      let tab = task.tabs.first(where: { $0.id == tabId }) else { return }
+                renameText = tab.title
+                renameTarget = .tab(taskId: task.id, tabId: tabId)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleTaskMode)) { _ in
+                if let task = state.activeTask {
+                    if task.mode == .plan { task.enterBuildMode() }
+                    else { task.enterPlanMode() }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .renameTask)) { _ in
+                guard let task = state.activeTask else { return }
+                renameText = task.name
+                renameTarget = .task(taskId: task.id)
+            }
+            .onChange(of: renameTarget) { _, newValue in
+                if newValue != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        renameFieldFocused = true
+                    }
+                }
+            }
+    }
+
+    private var coreView: some View {
         ZStack {
             Theme.appBackground.ignoresSafeArea()
 
@@ -60,6 +109,9 @@ struct WorkspaceView: View {
                                         siblingTabs: task.planTabs.filter { $0.id != selectedId },
                                         onHandOff: { targetId in
                                             task.handOff(from: selectedId, to: targetId)
+                                        },
+                                        onApproveToBuild: { itemCount in
+                                            startBuildTransition(task: task, itemCount: itemCount)
                                         }
                                     )
                                     .id(task.selectedPlanTabId)
@@ -111,6 +163,11 @@ struct WorkspaceView: View {
             if renameTarget != nil {
                 renamePalette
             }
+
+            // ── BUILD TRANSITION OVERLAY ──
+            if let transition = buildTransition {
+                BuildTransitionOverlay(state: transition)
+            }
         }
         .coordinateSpace(name: "workspace")
         .animation(.easeInOut(duration: 0.2), value: state.leftPanelVisible)
@@ -149,6 +206,26 @@ struct WorkspaceView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in
+            if let task = state.activeTask, task.mode == .build {
+                if let existing = task.tabs.first(where: { $0.isBrowser }) {
+                    task.selectTab(existing.id)
+                } else {
+                    task.createBrowserTab()
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusNextPane)) { _ in
+            state.activeTask?.moveFocus(.next)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusPrevPane)) { _ in
+            state.activeTask?.moveFocus(.previous)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .closeSplit)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                state.activeTask?.closeSplit()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .closeTerminalTab)) { _ in
             if let task = state.activeTask {
                 if task.mode == .plan {
@@ -167,45 +244,32 @@ struct WorkspaceView: View {
                 state.deleteTask(task.id)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .selectTabByIndex)) { notification in
-            guard !appState.isWorkspaceSwitcherOpen,
-                  let index = notification.userInfo?["index"] as? Int else { return }
-            if let task = state.activeTask, task.mode == .plan {
-                task.selectPlanTabByIndex(index)
-            } else {
-                state.activeTask?.selectTabByIndex(index)
-            }
+    }
+
+    // MARK: - Build Transition
+
+    private func startBuildTransition(task: TaskState, itemCount: Int) {
+        let transition = BuildTransitionState()
+        buildTransition = transition
+
+        // Step 1: Writing spec.md… (already done by handleApprove)
+        transition.step = .writingSpec
+
+        // Step 2: Launching builder agent…
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            transition.step = .launchingBuilder
         }
-        .onReceive(NotificationCenter.default.publisher(for: .newTask)) { _ in
-            state.showNewTaskSheet = true
+
+        // Step 3: Switching to Build mode…
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            transition.step = .switchingMode
+            task.enterBuildMode()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .selectTaskByIndex)) { notification in
-            guard let index = notification.userInfo?["index"] as? Int else { return }
-            state.selectTaskByIndex(index)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .renameTab)) { _ in
-            guard let task = state.activeTask,
-                  let tabId = task.selectedTabId,
-                  let tab = task.tabs.first(where: { $0.id == tabId }) else { return }
-            renameText = tab.title
-            renameTarget = .tab(taskId: task.id, tabId: tabId)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleTaskMode)) { _ in
-            if let task = state.activeTask {
-                if task.mode == .plan { task.enterBuildMode() }
-                else { task.enterPlanMode() }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .renameTask)) { _ in
-            guard let task = state.activeTask else { return }
-            renameText = task.name
-            renameTarget = .task(taskId: task.id)
-        }
-        .onChange(of: renameTarget) { _, newValue in
-            if newValue != nil {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    renameFieldFocused = true
-                }
+
+        // Dismiss overlay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                buildTransition = nil
             }
         }
     }
@@ -224,13 +288,23 @@ struct WorkspaceView: View {
                     renameTarget: renameTarget,
                     onSelectTab: { task.selectTab($0) },
                     onCloseTab: { requestCloseTab(.build($0)) },
-                    onNewTab: { task.createTab() }
+                    onNewTab: { task.createTab() },
+                    onNewBrowserTab: { task.createBrowserTab() }
                 )
 
                 // Inline spec strip (only when spec exists)
                 if task.specState.hasSpec {
-                    SpecStripView(specState: task.specState, buildStatus: task.buildStatus, variant: .inline)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    SpecStripView(
+                        specState: task.specState,
+                        buildStatus: task.buildStatus,
+                        variant: .inline,
+                        hasBuilder: task.builderPanel != nil,
+                        isBuilderDrawerOpen: Binding(
+                            get: { task.isBuilderDrawerOpen },
+                            set: { task.isBuilderDrawerOpen = $0 }
+                        )
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
 
                     Rectangle()
                         .fill(Theme.borderSubtle)
@@ -238,31 +312,102 @@ struct WorkspaceView: View {
                 }
             }
 
-            ZStack {
-                ForEach(state.tasks) { task in
-                    ForEach(task.tabs) { tab in
-                        if let panel = task.terminals[tab.id] {
-                            TerminalPanelView(panel: panel)
-                                .opacity(task.id == state.activeTaskId && tab.id == task.selectedTabId ? 1 : 0)
-                                .allowsHitTesting(task.id == state.activeTaskId && tab.id == task.selectedTabId)
+            ZStack(alignment: .top) {
+                // Tab content panels (terminal + browser) — single or split
+                if let task = state.activeTask, let split = task.splitPane {
+                    PaneLayout(orientation: split.orientation) {
+                        tabContentView(for: task, tabId: task.selectedTabId)
+                            .overlay(paneFocusBorder(focused: task.focusedPane == .primary))
+                            .onTapGesture { task.focusedPane = .primary }
+                    } second: {
+                        tabContentView(for: task, tabId: split.secondaryTabId)
+                            .overlay(paneFocusBorder(focused: task.focusedPane == .secondary))
+                            .onTapGesture { task.focusedPane = .secondary }
+                    }
+                } else {
+                    ZStack {
+                        ForEach(state.tasks) { task in
+                            let isActiveTask = task.id == state.activeTaskId
+                            ForEach(task.tabs) { tab in
+                                let isVisible = isActiveTask && tab.id == task.selectedTabId
+                                tabContentPanel(task: task, tab: tab)
+                                    .opacity(isVisible ? 1 : 0)
+                                    .allowsHitTesting(isVisible)
+                            }
+                        }
+
+                        if state.tasks.isEmpty {
+                            VStack(spacing: 8) {
+                                Text("No tasks yet")
+                                    .font(Theme.label(14))
+                                    .foregroundColor(Theme.textMuted)
+                                Text("Press ⌘N to create a task")
+                                    .font(Theme.caption(12))
+                                    .foregroundColor(Theme.textMuted.opacity(0.6))
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
                 }
 
-                if state.tasks.isEmpty {
-                    VStack(spacing: 8) {
-                        Text("No tasks yet")
-                            .font(Theme.label(14))
-                            .foregroundColor(Theme.textMuted)
-                        Text("Press ⌘N to create a task")
-                            .font(Theme.caption(12))
-                            .foregroundColor(Theme.textMuted.opacity(0.6))
+                // Drop zone overlay for tab splitting (always present, invisible until drag targets)
+                if let task = state.activeTask, task.splitPane == nil {
+                    SplitDropOverlay { zone, tabIdString in
+                        if let tabId = UUID(uuidString: tabIdString) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                task.splitTab(tabId, to: zone)
+                            }
+                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+
+                // Builder drawer overlay — slides down from top
+                if let task = state.activeTask,
+                   task.isBuilderDrawerOpen,
+                   let builderPanel = task.builderPanel {
+                    BuilderDrawerView(
+                        panel: builderPanel,
+                        buildStatus: task.buildStatus,
+                        onClose: { task.isBuilderDrawerOpen = false }
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .background(Theme.contentBg)
+            .animation(.easeInOut(duration: 0.25), value: state.activeTask?.isBuilderDrawerOpen)
         }
+    }
+
+    // MARK: - Tab Content Helpers
+
+    /// Render a single tab's content panel (terminal or browser).
+    @ViewBuilder
+    private func tabContentPanel(task: TaskState, tab: TabInfo) -> some View {
+        if tab.isTerminal, let panel = task.terminals[tab.id] {
+            TerminalPanelView(panel: panel)
+        } else if tab.isBrowser, let panel = task.browserPanels[tab.id] {
+            BrowserPanelView(
+                state: panel.state,
+                assignedPort: task.assignedPort,
+                onPopOut: { panel.popOut() }
+            )
+        }
+    }
+
+    /// Render the content for a specific tab ID (used by split pane).
+    @ViewBuilder
+    private func tabContentView(for task: TaskState, tabId: UUID?) -> some View {
+        if let tabId, let tab = task.tabs.first(where: { $0.id == tabId }) {
+            tabContentPanel(task: task, tab: tab)
+        } else {
+            Color.clear
+        }
+    }
+
+    private func paneFocusBorder(focused: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 2)
+            .strokeBorder(focused ? Theme.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
+            .allowsHitTesting(false)
     }
 
     // MARK: - Rename Palette
@@ -428,6 +573,85 @@ struct RenameSpotlightKey: PreferenceKey {
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         let next = nextValue()
         if next != .zero { value = next }
+    }
+}
+
+// MARK: - Rename Target
+
+// MARK: - Build Transition State
+
+@MainActor
+final class BuildTransitionState: ObservableObject {
+    enum Step: Int, CaseIterable {
+        case writingSpec
+        case launchingBuilder
+        case switchingMode
+
+        var label: String {
+            switch self {
+            case .writingSpec:      return "Writing spec.md\u{2026}"
+            case .launchingBuilder: return "Launching builder agent\u{2026}"
+            case .switchingMode:    return "Switching to Build mode\u{2026}"
+            }
+        }
+    }
+
+    @Published var step: Step = .writingSpec
+}
+
+// MARK: - Build Transition Overlay
+
+struct BuildTransitionOverlay: View {
+    @ObservedObject var state: BuildTransitionState
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(BuildTransitionState.Step.allCases, id: \.rawValue) { step in
+                    HStack(spacing: 8) {
+                        if step.rawValue < state.step.rawValue {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Theme.success)
+                                .frame(width: 14)
+                        } else if step == state.step {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .frame(width: 14)
+                        } else {
+                            Circle()
+                                .fill(Theme.textMuted.opacity(0.3))
+                                .frame(width: 6, height: 6)
+                                .frame(width: 14)
+                        }
+
+                        Text(step.label)
+                            .font(.system(size: 13, weight: step == state.step ? .medium : .regular))
+                            .foregroundColor(
+                                step.rawValue <= state.step.rawValue
+                                    ? Theme.textPrimary
+                                    : Theme.textMuted
+                            )
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Theme.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Theme.borderSubtle, lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
+            )
+        }
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.2), value: state.step)
     }
 }
 

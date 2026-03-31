@@ -3,6 +3,7 @@ import SwiftUI
 struct SpecPanelView: View {
     @ObservedObject var specState: SpecState
     @ObservedObject var buildStatus: BuildStatusState
+    @State private var isExpanded: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,47 +27,69 @@ struct SpecPanelView: View {
                     .padding(.bottom, 4)
             }
 
-            // Progress header
-            progressHeader
-                .padding(.horizontal, 12)
-                .padding(.top, specState.allSpecs.count > 1 ? 4 : 10)
-                .padding(.bottom, 8)
-
-            // Build status row
-            if buildStatus.status != .idle {
-                buildStatusRow
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+            // Progress header with collapse toggle
+            HStack {
+                progressHeader
+                collapseToggle
             }
+            .padding(.horizontal, 12)
+            .padding(.top, specState.allSpecs.count > 1 ? 4 : 10)
+            .padding(.bottom, 6)
 
-            Rectangle()
-                .fill(Theme.borderSubtle)
-                .frame(height: 1)
+            // Block graph — always visible (even when collapsed)
+            SpecBlockGraphView(specState: specState, buildStatus: buildStatus)
 
-            // Section-grouped task list
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    if let spec = specState.activeSpec {
-                        if spec.sections.isEmpty {
-                            // Fallback: flat task list for specs without sections
-                            ForEach(spec.tasks) { task in
-                                taskRow(task: task, spec: spec)
-                            }
-                        } else {
-                            ForEach(spec.sections) { section in
-                                sectionGroup(section: section, spec: spec)
+            if isExpanded {
+                // Build status row with elapsed time
+                if buildStatus.status != .idle {
+                    buildStatusRow
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                }
+
+                Rectangle()
+                    .fill(Theme.borderSubtle)
+                    .frame(height: 1)
+
+                // Section-grouped task list
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        if let spec = specState.activeSpec {
+                            if spec.sections.isEmpty {
+                                ForEach(spec.tasks) { task in
+                                    taskRow(task: task, spec: spec)
+                                }
+                            } else {
+                                ForEach(spec.sections) { section in
+                                    sectionGroup(section: section, spec: spec)
+                                }
                             }
                         }
                     }
+                    .padding(.vertical, 6)
                 }
-                .padding(.vertical, 6)
-            }
 
-            // File path
-            if let spec = specState.activeSpec {
-                filePath(spec)
+                // File path
+                if let spec = specState.activeSpec {
+                    filePath(spec)
+                }
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
+    }
+
+    // MARK: - Collapse Toggle
+
+    private var collapseToggle: some View {
+        Button {
+            isExpanded.toggle()
+        } label: {
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(Theme.textMuted)
+                .frame(width: 16, height: 16)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Section Group
@@ -139,7 +162,13 @@ struct SpecPanelView: View {
                 Text(action)
                     .font(.system(size: 10))
                     .foregroundColor(Theme.textMuted)
-                    .lineLimit(2)
+                    .lineLimit(1)
+
+                if let elapsed = buildStatus.elapsed {
+                    Text(elapsed)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(Theme.textMuted.opacity(0.6))
+                }
             }
 
             Spacer()

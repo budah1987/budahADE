@@ -99,7 +99,7 @@ private struct ApproveButton: View {
             HStack(spacing: 5) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 11, weight: .semibold))
-                Text("Approve")
+                Text("Approve & Build")
                     .font(Theme.label(12))
             }
             .foregroundColor(.white)
