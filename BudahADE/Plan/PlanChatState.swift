@@ -160,10 +160,12 @@ final class PlanChatState: ObservableObject {
 
     func persistConversation() {
         persistenceTask?.cancel()
+        // Capture session reference before the async sleep — plannerSession may be
+        // cleared (tab closed) during the 1-second debounce window.
+        guard let session = plannerSession else { return }
         persistenceTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
-            guard let session = plannerSession else { return }
             let snapshot = ConversationSnapshot(
                 tabId: self.tabId,
                 role: self.role,
