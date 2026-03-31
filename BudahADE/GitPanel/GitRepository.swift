@@ -33,6 +33,7 @@ enum GitError: Error, LocalizedError {
 
 // MARK: - Git Repository
 
+@MainActor
 final class GitRepository: ObservableObject {
     let path: String
 
@@ -60,7 +61,7 @@ final class GitRepository: ObservableObject {
     func startPolling() {
         stopPolling()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-            self?.refresh()
+            Task { @MainActor [weak self] in self?.refresh() }
         }
     }
 

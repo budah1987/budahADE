@@ -215,6 +215,7 @@ final class AgentSession: ObservableObject, Identifiable {
             status: .inProgress
         )
         activityFeed.append(entry)
+        if activityFeed.count > 200 { activityFeed.removeFirst(activityFeed.count - 200) }
     }
 
     func handleToolResult(_ event: ToolResultEvent) {
@@ -235,6 +236,7 @@ final class AgentSession: ObservableObject, Identifiable {
                 status: .inProgress
             )
             activityFeed.append(entry)
+            if activityFeed.count > 200 { activityFeed.removeFirst(activityFeed.count - 200) }
         }
     }
 
@@ -250,6 +252,7 @@ final class AgentSession: ObservableObject, Identifiable {
                 status: .inProgress
             )
             activityFeed.append(entry)
+            if activityFeed.count > 200 { activityFeed.removeFirst(activityFeed.count - 200) }
         }
     }
 

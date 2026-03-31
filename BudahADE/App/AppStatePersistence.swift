@@ -25,7 +25,11 @@ struct AppSnapshot: Codable {
 enum AppStatePersistence {
     private static var filePath: String {
         let dir = (NSHomeDirectory() as NSString).appendingPathComponent(".budahade")
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        } catch {
+            print("[AppStatePersistence] ⚠️ Failed to create state directory: \(error)")
+        }
         return (dir as NSString).appendingPathComponent("app-state.json")
     }
 
