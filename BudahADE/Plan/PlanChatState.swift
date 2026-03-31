@@ -61,6 +61,10 @@ final class PlanChatState: ObservableObject {
         }
         var prompt = plannerSystemPrompt()
 
+        // Inject environment context (directory structure, tooling, git branch)
+        let envContext = EnvironmentContext.discover(workingDirectory: worktreePath)
+        prompt += envContext
+
         // Load sibling conversations for context injection
         let siblings = PlanConversationPersistence.loadAllExcluding(
             tabId: self.tabId,
@@ -83,12 +87,30 @@ final class PlanChatState: ObservableObject {
 
         let session = chatManager.createSession(
             model: selectedModel,
-            agentMode: nil,
+            agentMode: role,
             systemPrompt: prompt,
             workingDirectory: worktreePath,
             enableAgentTeams: true,
             disableMcp: true
         )
+
+        // Wire auto-verification: when the agent finishes, send a verification prompt
+        let taskNameCopy = taskName
+        let roleCopy = role
+        chatManager.onSessionComplete = { [weak self] sessionId in
+            guard let self = self,
+                  let session = self.plannerSession,
+                  session.id == sessionId,
+                  !session.hasVerified else { return }
+
+            if let verifyPrompt = SelfVerification.verificationPrompt(
+                taskName: taskNameCopy, role: roleCopy
+            ) {
+                session.hasVerified = true
+                self.chatManager.send(sessionId: sessionId, prompt: verifyPrompt)
+            }
+        }
+
         plannerSession = session
         return session
     }

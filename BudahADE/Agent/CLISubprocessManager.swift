@@ -70,14 +70,21 @@ final class CLISubprocessManager: ObservableObject {
             return
         }
 
-        session.addUserMessage(prompt)
+        // Prepend loop warning if one was triggered during the previous turn
+        var effectivePrompt = prompt
+        if let loopWarning = session.pendingLoopWarning {
+            effectivePrompt = loopWarning + "\n\n" + prompt
+            session.pendingLoopWarning = nil
+        }
+
+        session.addUserMessage(prompt) // Show original prompt in UI
         session.status = .connecting
         session.currentStreamingText = ""
 
         let systemPromptPath = writeSystemPrompt(session: session)
         let resumeId = session.claudeSessionId
         let command = buildCommand(
-            prompt: prompt,
+            prompt: effectivePrompt,
             model: session.model,
             systemPromptPath: systemPromptPath,
             sessionId: resumeId,

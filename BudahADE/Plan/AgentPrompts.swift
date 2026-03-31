@@ -83,11 +83,13 @@ enum AgentPrompts {
         """
 
         let specBlock = specInstructions(filePath: specFilePath, progress: specProgress)
+        let verificationBlock = SelfVerification.verificationGuidance(for: agent)
 
         switch agent {
         case .claude:
             return """
             \(context)
+            \(verificationBlock)
             \(specBlock)
             """
 
@@ -109,6 +111,7 @@ enum AgentPrompts {
             return """
             \(context)
             You are a Senior Architect & Developer. Assess feasibility, suggest architecture, identify risks and dependencies. When asked, write code that is simple, efficient, and follows existing codebase patterns — code that would impress a human engineer. Reference file paths and line numbers. Think about performance, maintainability, and incremental delivery.
+            \(verificationBlock)
             \(specBlock)
             """
 
@@ -133,6 +136,7 @@ enum AgentPrompts {
 
             Spec format: Problem statement, goals, architecture, components, data flow, edge cases, implementation checklist.
             Be concise. Every sentence should earn its place.
+            \(verificationBlock)
             \(specBlock)
             """
         }

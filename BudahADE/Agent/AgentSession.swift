@@ -109,6 +109,13 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var isThinking: Bool = false
     var process: Process?
 
+    /// Loop detection: tracks repeated edits to the same file
+    let loopDetector = LoopDetector()
+    /// Whether this session has already completed a verification pass
+    var hasVerified: Bool = false
+    /// Pending loop warning to inject on next turn
+    @Published var pendingLoopWarning: String?
+
     struct StagedContent {
         let content: String
         let fromAgent: String
@@ -225,6 +232,12 @@ final class AgentSession: ObservableObject, Identifiable {
             status: .inProgress
         )
         activityFeed.append(entry)
+
+        // Loop detection: track edits and flag doom loops
+        if let filePath = loopDetector.filePathFromToolEvent(event),
+           let warning = loopDetector.recordEdit(filePath: filePath) {
+            pendingLoopWarning = warning
+        }
     }
 
     func handleToolResult(_ event: ToolResultEvent) {
