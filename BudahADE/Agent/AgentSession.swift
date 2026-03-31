@@ -27,6 +27,16 @@ enum AgentModel: String, CaseIterable, Identifiable, Codable {
         case .opus:     return "Opus 4.6"
         }
     }
+
+    /// Approximate context window size in tokens for each model
+    var contextWindowTokens: Int {
+        switch self {
+        case .haiku:    return 200_000
+        case .sonnet:   return 200_000
+        case .sonnet1m: return 1_000_000
+        case .opus:     return 200_000
+        }
+    }
 }
 
 // MARK: - ActivityFeedEntry
@@ -549,7 +559,7 @@ final class AgentSession: ObservableObject, Identifiable {
         return result
     }
 
-    // MARK: - Token Formatting
+    // MARK: - Token Formatting & Context Window Tracking
 
     var totalTokens: Int {
         totalInputTokens + totalOutputTokens
@@ -563,6 +573,26 @@ final class AgentSession: ObservableObject, Identifiable {
             let formatted = Double(total) / 1000.0
             return String(format: "%.1f", formatted) + "k"
         }
+    }
+
+    /// Fraction of the model's context window consumed (0.0–1.0), based on cumulative input tokens.
+    /// Input tokens reflect the growing conversation context sent to the model each turn.
+    var contextUtilization: Double {
+        let limit = model.contextWindowTokens
+        guard limit > 0 else { return 0 }
+        return min(Double(totalInputTokens) / Double(limit), 1.0)
+    }
+
+    /// True when context usage exceeds 75% of the model's window
+    var isContextWindowHigh: Bool {
+        contextUtilization > 0.75
+    }
+
+    /// Human-readable context utilization string (e.g., "42% of 200k")
+    var formattedContextUtilization: String {
+        let pct = Int(contextUtilization * 100)
+        let windowK = model.contextWindowTokens / 1000
+        return "\(pct)% of \(windowK)k"
     }
 
     // MARK: - Auto-Forward Support

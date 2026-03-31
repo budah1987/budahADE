@@ -241,7 +241,7 @@ enum AgentPrompts {
         let fm = FileManager.default
         var sections: [String] = []
 
-        // --- Spec progress ---
+        // --- Spec progress (counts only — agent can read the file for details) ---
         let specPath = (worktreePath as NSString)
             .appendingPathComponent(".budahade/spec.md")
         if let specContent = try? String(contentsOfFile: specPath, encoding: .utf8) {
@@ -251,28 +251,37 @@ enum AgentPrompts {
             let total = completed.count + remaining.count
             if total > 0 {
                 var specSection = "### Spec Progress\n"
-                specSection += "\(completed.count) of \(total) tasks completed\n\n"
-                for line in completed { specSection += "\(line)\n" }
-                for line in remaining { specSection += "\(line)\n" }
-                sections.append(specSection.trimmingCharacters(in: .newlines))
+                specSection += "\(completed.count) of \(total) tasks completed.\n"
+                specSection += "Read `.budahade/spec.md` for full task details."
+                sections.append(specSection)
             }
         }
 
-        // --- Agent output ---
+        // --- Agent output (truncated to last 500 chars each for efficiency) ---
         let agentOutputDir = (worktreePath as NSString)
             .appendingPathComponent(".budahade/agent-output")
         if let files = try? fm.contentsOfDirectory(atPath: agentOutputDir) {
             let mdFiles = files.filter { $0.hasSuffix(".md") }.sorted()
             var outputParts: [String] = []
+            let maxCharsPerFile = 500
+            let maxTotalChars = 3000
+            var totalChars = 0
             for filename in mdFiles {
+                guard totalChars < maxTotalChars else { break }
                 let filePath = (agentOutputDir as NSString).appendingPathComponent(filename)
-                if let content = try? String(contentsOfFile: filePath, encoding: .utf8),
-                   !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    outputParts.append(content.trimmingCharacters(in: .whitespacesAndNewlines))
+                if let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
+                    let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { continue }
+                    // Take the tail (conclusion) of each file
+                    let truncated = trimmed.count > maxCharsPerFile
+                        ? "…" + String(trimmed.suffix(maxCharsPerFile))
+                        : trimmed
+                    outputParts.append(truncated)
+                    totalChars += truncated.count
                 }
             }
             if !outputParts.isEmpty {
-                sections.append("### Agent Output\n" + outputParts.joined(separator: "\n\n---\n\n"))
+                sections.append("### Agent Output (summaries)\n" + outputParts.joined(separator: "\n\n---\n\n"))
             }
         }
 
@@ -282,18 +291,44 @@ enum AgentPrompts {
 
     // MARK: - Sibling Context Injection
 
-    /// Build a context block from sibling conversations to inject into system prompt
+    /// Build a context block from sibling conversations to inject into system prompt.
+    /// Truncated for token efficiency: last 3 assistant messages per sibling, capped per-sibling and total.
     static func siblingContextBlock(from siblings: [ConversationSnapshot]) -> String {
         guard !siblings.isEmpty else { return "" }
+
+        let maxCharsPerSibling = 2000
+        let maxTotalChars = 4000
+        var totalChars = 0
 
         var block = "\n## Context from other planning conversations\n"
 
         for sibling in siblings {
-            block += "\n### \(sibling.role.displayName)\n"
-            for message in sibling.messages {
-                let prefix = message.role == .user ? "**User:**" : "**\(sibling.role.displayName):**"
-                block += "\(prefix) \(message.content)\n\n"
+            guard totalChars < maxTotalChars else { break }
+
+            // Only include the last 3 assistant messages (skip user prompts — they're noise)
+            let assistantMessages = sibling.messages
+                .filter { $0.role == .assistant && !$0.content.isEmpty }
+                .suffix(3)
+
+            guard !assistantMessages.isEmpty else { continue }
+
+            var siblingBlock = "\n### \(sibling.role.displayName)\n"
+            var siblingChars = 0
+
+            for message in assistantMessages {
+                let remaining = min(maxCharsPerSibling - siblingChars, maxTotalChars - totalChars)
+                guard remaining > 0 else { break }
+
+                let content = message.content
+                let truncated = content.count > remaining
+                    ? String(content.prefix(remaining)) + "…"
+                    : content
+                siblingBlock += "\(truncated)\n\n"
+                siblingChars += truncated.count
+                totalChars += truncated.count
             }
+
+            block += siblingBlock
         }
 
         return block

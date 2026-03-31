@@ -189,15 +189,16 @@ final class PlanChatState: ObservableObject {
     // MARK: - Hand Off
 
     /// Receives handed-off content from another tab.
-    /// If a session already exists, sends it as a message so the agent sees it immediately.
+    /// If a session already exists, sends it as a message (NOT duplicated in system prompt).
     /// If no session yet, stores it for system prompt injection on session creation.
     func receiveHandOff(from role: AgentMode, content: String) {
-        handedOffContext.append((role: role, content: content))
-
-        // If session already exists, inject as a user message so it's seen immediately
+        // If session already exists, send as user message only (not stored for system prompt)
         if plannerSession != nil {
             let handOffMessage = "[Handed off from \(role.displayName)]\n\n\(content)"
             sendMessage(handOffMessage)
+        } else {
+            // No session yet — store for system prompt injection on creation
+            handedOffContext.append((role: role, content: content))
         }
     }
 

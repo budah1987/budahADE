@@ -106,6 +106,7 @@ final class CLISubprocessManager: ObservableObject {
     func removeSession(sessionId: UUID) {
         cancel(sessionId: sessionId)
         sessions.removeValue(forKey: sessionId)
+        systemPromptCache.removeValue(forKey: sessionId)
     }
 
     // MARK: - Workspace-level Token Tracking
@@ -223,13 +224,25 @@ final class CLISubprocessManager: ObservableObject {
 
     // MARK: - Private: Write System Prompt
 
+    /// Cache of system prompt file paths — only rewrite when content changes
+    private var systemPromptCache: [UUID: (path: String, hash: Int)] = [:]
+
     private func writeSystemPrompt(session: AgentSession) -> String {
         let dir = URL(fileURLWithPath: session.workingDirectory)
             .appendingPathComponent(".budahade")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let fileURL = dir.appendingPathComponent("chat-\(session.id.uuidString)-prompt.md")
+        let path = fileURL.path
+
+        // Only write to disk if the prompt content has changed
+        let contentHash = session.systemPrompt.hashValue
+        if let cached = systemPromptCache[session.id], cached.hash == contentHash {
+            return cached.path
+        }
+
         try? session.systemPrompt.write(to: fileURL, atomically: true, encoding: .utf8)
-        return fileURL.path
+        systemPromptCache[session.id] = (path: path, hash: contentHash)
+        return path
     }
 
     // MARK: - Private: Find Claude Binary
