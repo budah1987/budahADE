@@ -75,17 +75,41 @@ final class CLISubprocessManager: ObservableObject {
         if let loopWarning = session.pendingLoopWarning {
             effectivePrompt = loopWarning + "\n\n" + prompt
             session.pendingLoopWarning = nil
+            // Record loop event to failure memory
+            FailureMemory.record(
+                lesson: "Loop warning triggered. Agent was repeatedly editing the same file.",
+                worktreePath: session.workingDirectory
+            )
+        }
+
+        // Turn budget warning: nudge agent when approaching max turns
+        let userTurnCount = session.messages.filter { $0.role == .user }.count + 1
+        if let warning = TurnBudget.warningIfNeeded(
+            currentTurn: userTurnCount,
+            maxTurns: session.agentMode?.chatMaxTurns
+        ) {
+            effectivePrompt = warning + "\n\n" + effectivePrompt
         }
 
         session.addUserMessage(prompt) // Show original prompt in UI
         session.status = .connecting
         session.currentStreamingText = ""
 
+        // Reasoning sandwich: switch model based on phase
+        let phase = ReasoningSandwich.currentPhase(
+            turnCount: userTurnCount,
+            hasVerified: session.hasVerified,
+            maxTurns: session.agentMode?.chatMaxTurns
+        )
+        let phaseModel = ReasoningSandwich.modelForPhase(
+            phase, role: session.agentMode, defaultModel: session.model
+        )
+
         let systemPromptPath = writeSystemPrompt(session: session)
         let resumeId = session.claudeSessionId
         let command = buildCommand(
             prompt: effectivePrompt,
-            model: session.model,
+            model: phaseModel,
             systemPromptPath: systemPromptPath,
             sessionId: resumeId,
             allowedTools: session.agentMode?.chatAllowedTools,

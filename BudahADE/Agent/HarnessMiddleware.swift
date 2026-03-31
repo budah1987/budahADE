@@ -188,20 +188,18 @@ final class LoopDetector {
 enum SelfVerification {
 
     /// Returns a verification prompt to send after the agent's initial completion.
-    static func verificationPrompt(taskName: String, role: AgentMode?) -> String? {
+    /// If a spec exists, includes unchecked items for targeted verification.
+    static func verificationPrompt(taskName: String, role: AgentMode?, worktreePath: String? = nil) -> String? {
         // Only auto-verify roles that produce artifacts (code, specs)
         guard let role = role else { return nil }
         switch role {
-        case .developer, .specAuthor:
-            break
-        case .claude:
-            // Claude mode gets verification too — it's unrestricted and does everything
+        case .developer, .specAuthor, .claude:
             break
         default:
             return nil  // Researcher, ideator, designer don't need artifact verification
         }
 
-        return """
+        var prompt = """
         VERIFICATION PASS — Before finishing, verify your work:
         1. Re-read the original task: "\(taskName)"
         2. Run any tests or build commands to confirm the code works
@@ -210,6 +208,19 @@ enum SelfVerification {
         5. If you find issues, fix them now. If everything passes, confirm completion.
         Do NOT just re-read your code and say it looks good. Actually run it.
         """
+
+        // Spec-aware: inject unchecked items so verification is targeted
+        if let path = worktreePath {
+            let specItems = uncheckedSpecItems(worktreePath: path)
+            if !specItems.isEmpty {
+                prompt += "\n\nVerify these specific spec requirements are met:\n"
+                for item in specItems {
+                    prompt += "- \(item)\n"
+                }
+            }
+        }
+
+        return prompt
     }
 
     /// System prompt addition that encourages build-verify-fix loops
@@ -237,6 +248,219 @@ enum SelfVerification {
             """
         default:
             return ""
+        }
+    }
+
+    /// Reads unchecked items from the spec file for targeted verification
+    private static func uncheckedSpecItems(worktreePath: String) -> [String] {
+        let specPath = (worktreePath as NSString).appendingPathComponent(".budahade/spec.md")
+        guard let content = try? String(contentsOfFile: specPath, encoding: .utf8) else { return [] }
+        return content.components(separatedBy: "\n")
+            .filter { $0.contains("- [ ]") }
+            .map { $0.trimmingCharacters(in: .whitespaces)
+                     .replacingOccurrences(of: "- [ ] ", with: "") }
+            .prefix(10)
+            .map { String($0) }
+    }
+}
+
+// MARK: - Reasoning Sandwich
+
+/// Manages model switching per phase within a session.
+/// Planning → high reasoning (Opus), Implementation → fast (Sonnet), Verification → high reasoning (Opus).
+enum ReasoningSandwich {
+
+    enum Phase {
+        case planning       // First turn — understanding + planning
+        case implementation // Middle turns — writing code
+        case verification   // Final turn — checking work
+    }
+
+    /// Determines the current phase based on turn count and verification state
+    static func currentPhase(turnCount: Int, hasVerified: Bool, maxTurns: Int?) -> Phase {
+        if hasVerified { return .verification }
+        if turnCount <= 1 { return .planning }
+        return .implementation
+    }
+
+    /// Returns the recommended model for the current phase, given the role's default
+    static func modelForPhase(_ phase: Phase, role: AgentMode?, defaultModel: AgentModel) -> AgentModel {
+        // Only apply sandwich to roles that benefit from it
+        guard let role = role else { return defaultModel }
+        switch role {
+        case .developer, .claude:
+            break
+        default:
+            return defaultModel
+        }
+
+        switch phase {
+        case .planning:
+            return .opus       // High reasoning for understanding the problem
+        case .implementation:
+            return defaultModel // Use whatever the user/role selected (usually Sonnet)
+        case .verification:
+            return .opus       // High reasoning for catching mistakes
+        }
+    }
+}
+
+// MARK: - Turn Budget Warnings
+
+/// Injects warnings when approaching the max turn limit so agents prioritize finishing.
+enum TurnBudget {
+
+    /// Returns a warning string if the agent is close to running out of turns, nil otherwise.
+    static func warningIfNeeded(currentTurn: Int, maxTurns: Int?) -> String? {
+        guard let max = maxTurns, max > 3 else { return nil }
+        let remaining = max - currentTurn
+
+        if remaining == 3 {
+            return "[Turn Budget] You have 3 turns remaining. Prioritize finishing and verifying over starting new work."
+        } else if remaining == 1 {
+            return "[Turn Budget] LAST TURN. Submit your final, verified solution now."
+        }
+        return nil
+    }
+}
+
+// MARK: - Failure Memory
+
+/// Persists and loads lessons learned from agent failures across sessions.
+/// Stored in `.budahade/failures.md` per worktree.
+enum FailureMemory {
+
+    /// Records a failure/lesson learned to persistent storage
+    static func record(lesson: String, worktreePath: String) {
+        let dir = (worktreePath as NSString).appendingPathComponent(".budahade")
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let path = (dir as NSString).appendingPathComponent("failures.md")
+
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let entry = "- [\(timestamp)] \(lesson)\n"
+
+        if FileManager.default.fileExists(atPath: path) {
+            if let handle = FileHandle(forWritingAtPath: path) {
+                handle.seekToEndOfFile()
+                if let data = entry.data(using: .utf8) {
+                    handle.write(data)
+                }
+                handle.closeFile()
+            }
+        } else {
+            try? ("# Lessons Learned\n\n" + entry).write(toFile: path, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Records a loop detection event as a failure lesson
+    static func recordLoopDetected(file: String, editCount: Int, worktreePath: String) {
+        record(
+            lesson: "Doom loop on `\(file)` (\(editCount) edits). Consider a fundamentally different approach next time.",
+            worktreePath: worktreePath
+        )
+    }
+
+    /// Loads failure lessons for injection into system prompt.
+    /// Returns empty string if no lessons exist.
+    static func contextBlock(worktreePath: String) -> String {
+        let path = (worktreePath as NSString).appendingPathComponent(".budahade/failures.md")
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return "" }
+
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        // Only include the last 10 lessons to avoid bloat
+        let lines = trimmed.components(separatedBy: "\n")
+            .filter { $0.hasPrefix("- [") }
+            .suffix(10)
+
+        guard !lines.isEmpty else { return "" }
+
+        var block = "\n## Lessons from Previous Attempts\n"
+        block += "Avoid repeating these mistakes:\n"
+        for line in lines {
+            block += "\(line)\n"
+        }
+        return block
+    }
+}
+
+// MARK: - Sibling Summary (Haiku-powered)
+
+/// Generates concise Haiku summaries of sibling conversations instead of raw truncation.
+enum SiblingSummarizer {
+
+    /// Summarizes a sibling conversation's assistant messages using Haiku.
+    /// Falls back to truncation if Haiku is unavailable.
+    static func summarize(snapshot: ConversationSnapshot) async -> String {
+        let assistantText = snapshot.messages
+            .filter { $0.role == .assistant && !$0.content.isEmpty }
+            .suffix(5)
+            .map { $0.content }
+            .joined(separator: "\n\n")
+
+        guard !assistantText.isEmpty else { return "" }
+
+        let truncated = String(assistantText.prefix(3000))
+        let prompt = """
+        Summarize this \(snapshot.role.displayName) agent's findings in 2-3 sentences for a developer. \
+        Focus on decisions made, key findings, and actionable conclusions:\n\n\(truncated)
+        """
+
+        return await runHaikuSummary(prompt: prompt)
+    }
+
+    /// Summarizes all siblings in parallel and returns a formatted context block.
+    static func summarizeAll(_ siblings: [ConversationSnapshot]) async -> String {
+        guard !siblings.isEmpty else { return "" }
+
+        let summaries = await withTaskGroup(of: (AgentMode, String).self) { group in
+            for sibling in siblings {
+                group.addTask {
+                    let summary = await summarize(snapshot: sibling)
+                    return (sibling.role, summary)
+                }
+            }
+            var results: [(AgentMode, String)] = []
+            for await result in group {
+                results.append(result)
+            }
+            return results
+        }
+
+        let nonEmpty = summaries.filter { !$0.1.isEmpty }
+        guard !nonEmpty.isEmpty else { return "" }
+
+        var block = "\n## Context from other planning conversations\n"
+        for (role, summary) in nonEmpty {
+            block += "\n### \(role.displayName)\n\(summary)\n"
+        }
+        return block
+    }
+
+    private static nonisolated func runHaikuSummary(prompt: String) async -> String {
+        let claudeBin = CLISubprocessManager.claudePath
+        let process = Process()
+        if claudeBin == "/usr/bin/env" {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["claude", "-p", prompt, "--model", "haiku", "--max-turns", "1"]
+        } else {
+            process.executableURL = URL(fileURLWithPath: claudeBin)
+            process.arguments = ["-p", prompt, "--model", "haiku", "--max-turns", "1"]
+        }
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            // Fallback to truncation if Haiku fails
+            return output.isEmpty ? String(prompt.prefix(200)) : output
+        } catch {
+            return String(prompt.prefix(200))
         }
     }
 }

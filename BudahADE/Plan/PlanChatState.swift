@@ -65,12 +65,17 @@ final class PlanChatState: ObservableObject {
         let envContext = EnvironmentContext.discover(workingDirectory: worktreePath)
         prompt += envContext
 
-        // Load sibling conversations for context injection
+        // Inject failure memory from previous sessions
+        let failureContext = FailureMemory.contextBlock(worktreePath: worktreePath)
+        prompt += failureContext
+
+        // Load sibling conversations — use truncated fallback initially,
+        // then upgrade to Haiku summaries asynchronously
         let siblings = PlanConversationPersistence.loadAllExcluding(
             tabId: self.tabId,
             from: worktreePath
         )
-        let siblingContext = AgentPrompts.siblingContextBlock(from: siblings)
+        let siblingContext = AgentPrompts.siblingContextBlock(from: siblings, worktreePath: worktreePath)
         let buildContext = AgentPrompts.buildContextBlock(worktreePath: worktreePath)
 
         // Append sibling context and build context to system prompt
@@ -94,9 +99,10 @@ final class PlanChatState: ObservableObject {
             disableMcp: true
         )
 
-        // Wire auto-verification: when the agent finishes, send a verification prompt
+        // Wire auto-verification: when the agent finishes, send a spec-aware verification prompt
         let taskNameCopy = taskName
         let roleCopy = role
+        let worktreePathCopy = worktreePath
         chatManager.onSessionComplete = { [weak self] sessionId in
             guard let self = self,
                   let session = self.plannerSession,
@@ -104,10 +110,26 @@ final class PlanChatState: ObservableObject {
                   !session.hasVerified else { return }
 
             if let verifyPrompt = SelfVerification.verificationPrompt(
-                taskName: taskNameCopy, role: roleCopy
+                taskName: taskNameCopy, role: roleCopy, worktreePath: worktreePathCopy
             ) {
                 session.hasVerified = true
                 self.chatManager.send(sessionId: sessionId, prompt: verifyPrompt)
+            }
+        }
+
+        // Fire-and-forget: generate Haiku summaries for sibling context.
+        // These will be available for the next session creation.
+        if !siblings.isEmpty {
+            let siblingsCopy = siblings
+            let pathCopy = worktreePath
+            Task {
+                let summaryBlock = await SiblingSummarizer.summarizeAll(siblingsCopy)
+                if !summaryBlock.isEmpty {
+                    // Persist summaries so next session picks them up without re-summarizing
+                    let cachePath = (pathCopy as NSString)
+                        .appendingPathComponent(".budahade/sibling-summaries.md")
+                    try? summaryBlock.write(toFile: cachePath, atomically: true, encoding: .utf8)
+                }
             }
         }
 
