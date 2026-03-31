@@ -79,7 +79,7 @@ final class BuildStatusWatcher {
         }
 
         // Track elapsed time per task
-        if buildStatus.currentTaskTitle != previousTask {
+        if buildStatus.currentTaskTitle != previousTask || (buildStatus.status == .working && buildStatus.taskStartedAt == nil) {
             buildStatus.taskStartedAt = Date()
         }
     }

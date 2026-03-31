@@ -112,7 +112,15 @@ final class TaskState: ObservableObject, Identifiable {
 
     func enterBuildMode() {
         mode = .build
-        focusActiveTerminal()
+
+        // If no build tabs exist yet, create one and launch the builder agent
+        if tabs.isEmpty {
+            let tabId = createTab(launchAgent: false)
+            launchClaudeInTab(tabId)
+        } else {
+            focusActiveTerminal()
+        }
+
         // Start build status watcher if we have a spec
         if specState.hasSpec && buildStatusWatcher == nil {
             buildStatusWatcher = BuildStatusWatcher(worktreePath: worktreePath, buildStatus: buildStatus)
