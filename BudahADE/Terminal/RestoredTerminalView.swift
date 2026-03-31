@@ -12,7 +12,7 @@ struct RestoredTerminalView: View {
                 // Previous session scrollback (read-only, faded)
                 ScrollView {
                     Text(panel.restoredScrollback ?? "")
-                        .font(.system(size: 13, design: .monospaced))
+                        .font(Theme.code(13))
                         .foregroundColor(Color.white.opacity(0.5))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)

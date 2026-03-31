@@ -91,7 +91,7 @@ struct ChatTileView: View {
                     .frame(width: 10, height: 10)
 
                 Text(role.name)
-                    .font(Theme.mono(13))
+                    .font(Theme.label(13))
                     .foregroundColor(.white)
 
                 HStack(spacing: 4) {
@@ -99,7 +99,7 @@ struct ChatTileView: View {
                         .fill(statusColor)
                         .frame(width: 5, height: 5)
                     Text(statusText)
-                        .font(Theme.mono(13))
+                        .font(Theme.body(13))
                         .foregroundColor(statusColor)
                 }
 
@@ -390,7 +390,7 @@ struct ChatTileView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(selectedModel.displayName.lowercased())
-                            .font(Theme.mono(14))
+                            .font(Theme.label(14))
                             .foregroundColor(Color(hex: 0x938d8d))
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 9))
@@ -404,7 +404,7 @@ struct ChatTileView: View {
                 // Token count
                 if session.totalTokens > 0 {
                     Text(session.formattedTokenCount)
-                        .font(Theme.mono(10))
+                        .font(Theme.caption(10))
                         .foregroundColor(Color(hex: 0x938d8d))
                 }
             }
@@ -746,7 +746,7 @@ private struct MessageBubble: View {
                                 .font(.system(size: 9))
                                 .foregroundColor(Theme.textMuted)
                             Text("\(tools.count) tool\(tools.count == 1 ? "" : "s")")
-                                .font(Theme.mono(10))
+                                .font(Theme.caption(10))
                                 .foregroundColor(Theme.textMuted)
                         }
                         .padding(.bottom, 2)
@@ -839,7 +839,7 @@ private struct ModelSelectorMenu: View {
                 } label: {
                     HStack {
                         Text(model.displayName)
-                            .font(Theme.mono(13))
+                            .font(Theme.body(13))
                             .foregroundColor(model == selectedModel ? .white : Color(hex: 0x938d8d))
                         Spacer()
                         if model == selectedModel {

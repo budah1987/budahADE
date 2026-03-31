@@ -2,16 +2,12 @@ import SwiftUI
 
 struct BranchHeaderView: View {
     @ObservedObject var repo: GitRepository
+    let projectPath: String
     @State private var isEditing = false
     @State private var editedName: String = ""
     @State private var selectedPrefix: String?
     @State private var showPrefixDropdown = false
     @State private var showTargetDropdown = false
-    @State private var isCreatingBranch = false
-    @State private var newBranchName = ""
-    @State private var branchSearchText = ""
-    @FocusState private var isSearchFocused: Bool
-
     var body: some View {
         VStack(spacing: 0) {
             if isEditing {
@@ -48,13 +44,13 @@ struct BranchHeaderView: View {
                 if let prefix = BranchNameValidator.detectPrefix(repo.currentBranch) {
                     prefixBadge(prefix)
                     Text("/")
-                        .font(Theme.mono(11))
+                        .font(Theme.body(11))
                         .foregroundColor(Theme.textMuted)
                 }
 
                 let (_, name) = BranchNameValidator.split(repo.currentBranch)
                 Text(name)
-                    .font(Theme.mono(12, weight: .semibold))
+                    .font(Theme.label(12))
                     .foregroundColor(Theme.info)
             }
 
@@ -78,14 +74,18 @@ struct BranchHeaderView: View {
                 }
                 .buttonStyle(.plain)
                 .popover(isPresented: $showTargetDropdown, arrowEdge: .bottom) {
-                    targetDropdown
+                    BasedOnDropdownView(
+                        projectPath: projectPath,
+                        baseBranch: $repo.mergeTarget,
+                        isPresented: $showTargetDropdown
+                    )
                 }
 
                 Spacer()
 
                 if repo.aheadCount > 0 {
                     Text("\(repo.aheadCount) ahead")
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.success)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -95,7 +95,7 @@ struct BranchHeaderView: View {
 
                 if repo.behindCount > 0 {
                     Text("\(repo.behindCount) behind")
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.error)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -118,7 +118,7 @@ struct BranchHeaderView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Text(selectedPrefix ?? "none")
-                            .font(Theme.mono(11))
+                            .font(Theme.body(11))
                             .foregroundColor(selectedPrefix != nil ? prefixColor(selectedPrefix!) : Theme.textMuted)
                         Image(systemName: showPrefixDropdown ? "chevron.up" : "chevron.down")
                             .font(.system(size: 6))
@@ -140,13 +140,13 @@ struct BranchHeaderView: View {
 
                 if selectedPrefix != nil {
                     Text("/")
-                        .font(Theme.mono(11))
+                        .font(Theme.body(11))
                         .foregroundColor(Theme.textMuted)
                 }
 
                 TextField("branch-name", text: $editedName)
                     .textFieldStyle(.plain)
-                    .font(Theme.mono(11))
+                    .font(Theme.body(11))
                     .foregroundColor(Theme.textPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
@@ -194,14 +194,18 @@ struct BranchHeaderView: View {
                 }
                 .buttonStyle(.plain)
                 .popover(isPresented: $showTargetDropdown, arrowEdge: .bottom) {
-                    targetDropdown
+                    BasedOnDropdownView(
+                        projectPath: projectPath,
+                        baseBranch: $repo.mergeTarget,
+                        isPresented: $showTargetDropdown
+                    )
                 }
 
                 Spacer()
 
                 if repo.aheadCount > 0 {
                     Text("\(repo.aheadCount) ahead")
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.success)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -224,7 +228,7 @@ struct BranchHeaderView: View {
                         .foregroundColor(Theme.info)
                         .frame(width: 12)
                     Text("none")
-                        .font(Theme.mono(11))
+                        .font(Theme.body(11))
                         .foregroundColor(Theme.textMuted)
                     Spacer()
                 }
@@ -246,7 +250,7 @@ struct BranchHeaderView: View {
                             .foregroundColor(Theme.info)
                             .frame(width: 12)
                         Text(type.prefix)
-                            .font(Theme.mono(11))
+                            .font(Theme.body(11))
                             .foregroundColor(prefixColor(type.prefix))
                             .lineLimit(1)
                         Spacer()
@@ -266,126 +270,10 @@ struct BranchHeaderView: View {
         .padding(4)
     }
 
-    private var filteredBranches: [String] {
-        let allBranches = repo.branches.filter { !$0.hasPrefix("remotes/") && $0 != repo.currentBranch }
-        if branchSearchText.isEmpty { return allBranches }
-        return allBranches.filter { $0.localizedCaseInsensitiveContains(branchSearchText) }
-    }
-
-    private var targetDropdown: some View {
-        VStack(spacing: 0) {
-            // Search pill
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10))
-                    .foregroundColor(Theme.textMuted)
-                TextField("Search branches...", text: $branchSearchText)
-                    .textFieldStyle(.plain)
-                    .font(Theme.mono(11))
-                    .foregroundColor(Theme.textPrimary)
-                    .focused($isSearchFocused)
-                if !branchSearchText.isEmpty {
-                    Button {
-                        branchSearchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textMuted)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(Theme.surface2)
-
-            Divider().opacity(0.3)
-
-            // Branch list
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(filteredBranches, id: \.self) { branch in
-                        Button {
-                            repo.mergeTarget = branch
-                            branchSearchText = ""
-                            showTargetDropdown = false
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: branch == repo.mergeTarget ? "checkmark" : "")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(Theme.info)
-                                    .frame(width: 12)
-                                Text(branch)
-                                    .font(Theme.mono(11))
-                                    .foregroundColor(Theme.textSecondary)
-                                    .lineLimit(1)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        Divider().opacity(0.3)
-                    }
-                }
-            }
-            .frame(maxHeight: 200)
-
-            // New branch option
-            if isCreatingBranch {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 8))
-                        .foregroundColor(Theme.success)
-                        .frame(width: 12)
-                    TextField("new-branch", text: $newBranchName)
-                        .textFieldStyle(.plain)
-                        .font(Theme.mono(11))
-                        .foregroundColor(Theme.textPrimary)
-                        .onChange(of: newBranchName) { _, newValue in
-                            newBranchName = BranchNameValidator.sanitize(newValue)
-                        }
-                        .onSubmit {
-                            createNewBranch()
-                        }
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-            } else {
-                Button {
-                    isCreatingBranch = true
-                    newBranchName = ""
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 8))
-                            .foregroundColor(Theme.success)
-                            .frame(width: 12)
-                        Text("New branch...")
-                            .font(Theme.mono(11))
-                            .foregroundColor(Theme.success)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(width: 220)
-        .padding(4)
-        .onAppear {
-            branchSearchText = ""
-            isCreatingBranch = false
-            isSearchFocused = true
-        }
-    }
 
     private func prefixBadge(_ prefix: String) -> some View {
         Text(prefix)
-            .font(Theme.mono(10, weight: .medium))
+            .font(Theme.label(10))
             .foregroundColor(prefixColor(prefix))
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
@@ -425,14 +313,4 @@ struct BranchHeaderView: View {
         showPrefixDropdown = false
     }
 
-    private func createNewBranch() {
-        let sanitized = BranchNameValidator.sanitize(newBranchName)
-        guard !sanitized.isEmpty else { return }
-        if repo.createBranch(sanitized) {
-            repo.mergeTarget = sanitized
-        }
-        isCreatingBranch = false
-        newBranchName = ""
-        showTargetDropdown = false
-    }
 }

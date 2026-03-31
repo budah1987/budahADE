@@ -183,7 +183,7 @@ struct TextData: Equatable, Codable {
         let w: Font.Weight = isBold ? .bold : weight.fontWeight
         switch fontFamily {
         case .system:
-            return .system(size: fontSize, weight: w)
+            return .custom("Geist-Regular", size: fontSize).weight(w)
         case .monospace:
             return .system(size: fontSize, weight: w, design: .monospaced)
         case .serif:
@@ -195,11 +195,17 @@ struct TextData: Equatable, Codable {
         let w: NSFont.Weight = isBold ? .bold : weight.nsFontWeight
         switch fontFamily {
         case .system:
-            return NSFont.systemFont(ofSize: fontSize, weight: w)
+            let geistName: String
+            switch w {
+            case .black: geistName = "Geist-Black"
+            case .bold:  geistName = "Geist-Bold"
+            case .medium, .semibold: geistName = "Geist-Medium"
+            default: geistName = "Geist-Regular"
+            }
+            return NSFont(name: geistName, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize, weight: w)
         case .monospace:
             return NSFont.monospacedSystemFont(ofSize: fontSize, weight: w)
         case .serif:
-            // macOS has no built-in serif system font factory; use New York if available
             let descriptor = NSFontDescriptor.preferredFontDescriptor(forTextStyle: .body)
                 .withDesign(.serif) ?? NSFontDescriptor(name: "Georgia", size: fontSize)
             return NSFont(descriptor: descriptor, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize, weight: w)

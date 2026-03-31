@@ -401,7 +401,7 @@ struct PlanChatView: View {
                             .font(.system(size: 10))
                             .foregroundColor(Theme.accent)
                         Text("pipeline")
-                            .font(Theme.mono(14))
+                            .font(Theme.code(14))
                             .foregroundColor(Theme.accent)
                     }
                     .onTapGesture {
@@ -415,7 +415,7 @@ struct PlanChatView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(state.selectedModel.displayName.lowercased())
-                                .font(Theme.mono(14))
+                                .font(Theme.code(14))
                                 .foregroundColor(Color(hex: 0x938d8d))
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.system(size: 9))
@@ -447,7 +447,7 @@ struct PlanChatView: View {
                         .foregroundColor(Color(hex: 0x938d8d))
                 } else if let session, session.totalTokens > 0 {
                     Text(session.formattedTokenCount)
-                        .font(Theme.mono(10))
+                        .font(Theme.caption(10))
                         .foregroundColor(Color(hex: 0x938d8d))
                 }
             }
@@ -822,7 +822,7 @@ private struct PlanMessageBubble: View {
                         .font(.system(size: 9))
                         .foregroundColor(Theme.textMuted)
                     Text("\(tools.count) tool\(tools.count == 1 ? "" : "s")")
-                        .font(Theme.mono(10))
+                        .font(Theme.caption(10))
                         .foregroundColor(Theme.textMuted)
                 }
                 .padding(.bottom, 2)
@@ -1114,15 +1114,15 @@ private struct OptionButtonsSheet: View {
     private var keyboardFooter: some View {
         HStack {
             Text("↑↓ navigate")
-                .font(Theme.mono(11))
+                .font(Theme.label(11))
                 .foregroundColor(Theme.textMuted)
             + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
             + Text("Enter select")
-                .font(Theme.mono(11))
+                .font(Theme.label(11))
                 .foregroundColor(Theme.textMuted)
             + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
             + Text("Esc skip")
-                .font(Theme.mono(11))
+                .font(Theme.label(11))
                 .foregroundColor(Theme.textMuted)
 
             Spacer()
@@ -1194,7 +1194,7 @@ private struct CompactOptionRow: View {
             HStack(spacing: 10) {
                 // Badge
                 Text(option.label)
-                    .font(Theme.mono(11, weight: .semibold))
+                    .font(Theme.label(11))
                     .foregroundColor(Theme.accent)
                     .frame(width: 22, height: 22)
                     .background(
@@ -1259,7 +1259,7 @@ private struct DetailedOptionCard: View {
                 // Header: badge + title + arrow
                 HStack(spacing: 10) {
                     Text(option.label)
-                        .font(Theme.mono(11, weight: .semibold))
+                        .font(Theme.label(11))
                         .foregroundColor(Theme.accent)
                         .frame(width: 22, height: 22)
                         .background(
@@ -1415,7 +1415,7 @@ private struct PlanModelSelectorMenu: View {
                 } label: {
                     HStack {
                         Text(model.displayName)
-                            .font(Theme.mono(13))
+                            .font(Theme.body(13))
                             .foregroundColor(model == selectedModel ? .white : Color(hex: 0x938d8d))
                         Spacer()
                         if model == selectedModel {

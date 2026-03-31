@@ -96,7 +96,7 @@ struct WorkspaceView: View {
                                     .fill(Theme.border)
                                     .frame(width: 1)
 
-                                GitSidebarView(task: task)
+                                GitSidebarView(task: task, projectPath: state.projectPath)
                                     .id(state.activeTaskId)
                                     .transition(.move(edge: .trailing).combined(with: .opacity))
                             }
@@ -322,7 +322,7 @@ struct WorkspaceView: View {
                         .foregroundStyle(Theme.textSecondary)
                     Spacer()
                     Text("esc to cancel")
-                        .font(Theme.mono(10))
+                        .font(Theme.caption(10))
                         .foregroundStyle(Theme.textMuted)
                 }
                 .padding(.horizontal, 14)

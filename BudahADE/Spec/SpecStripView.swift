@@ -35,7 +35,7 @@ struct SpecStripView: View {
                     .lineLimit(1)
                 Spacer()
                 Text("\(specState.completedCount)/\(specState.totalCount)")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .font(Theme.label(9))
                     .foregroundColor(Theme.textMuted)
             }
 
@@ -69,7 +69,7 @@ struct SpecStripView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Text("SPEC")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(Theme.headline(9))
                     .foregroundColor(progressColor)
 
                 // Segmented progress bar (section-aware)
@@ -77,7 +77,7 @@ struct SpecStripView: View {
                     .frame(width: 120)
 
                 Text("\(specState.completedCount)/\(specState.totalCount)")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .font(Theme.label(10))
                     .foregroundColor(Theme.textSecondary)
 
                 if let section = specState.currentSection {

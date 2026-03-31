@@ -72,7 +72,7 @@ struct EditableMarkdownRenderer: View {
     @ViewBuilder
     private func editableBlock(block: MarkdownBlockItem) -> some View {
         TextEditor(text: $editText)
-            .font(Theme.mono(13))
+            .font(Theme.code(13))
             .foregroundColor(Theme.textPrimary)
             .scrollContentBackground(.hidden)
             .frame(minHeight: 60)

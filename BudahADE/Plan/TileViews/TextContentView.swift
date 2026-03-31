@@ -112,7 +112,7 @@ struct TextStyleToolbar: View {
                 }
             } label: {
                 Text("\(Int(textData.fontSize))")
-                    .font(Theme.mono(10))
+                    .font(Theme.caption(10))
                     .foregroundColor(Theme.textSecondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -129,7 +129,7 @@ struct TextStyleToolbar: View {
                 }
             } label: {
                 Text(textData.weight.rawValue.prefix(3).uppercased())
-                    .font(Theme.mono(10))
+                    .font(Theme.caption(10))
                     .foregroundColor(Theme.textSecondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -146,7 +146,7 @@ struct TextStyleToolbar: View {
                 }
             } label: {
                 Text(textData.fontFamily.rawValue.prefix(4).uppercased())
-                    .font(Theme.mono(10))
+                    .font(Theme.caption(10))
                     .foregroundColor(Theme.textSecondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)

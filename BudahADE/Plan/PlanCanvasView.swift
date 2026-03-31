@@ -418,7 +418,7 @@ struct PlanCanvasView: View {
             HStack(alignment: .bottom) {
                 // Zoom indicator
                 Text("\(Int(localZoom * 100))%")
-                    .font(Theme.mono(11))
+                    .font(Theme.caption(11))
                     .foregroundColor(Theme.textMuted)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)

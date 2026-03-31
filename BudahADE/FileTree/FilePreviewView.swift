@@ -57,7 +57,7 @@ struct FilePreviewView: View {
     private var textPreview: some View {
         ScrollView([.vertical], showsIndicators: false) {
             Text(previewContent)
-                .font(.system(size: 10.5, design: .monospaced))
+                .font(Theme.code(10.5))
                 .foregroundColor(Theme.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)

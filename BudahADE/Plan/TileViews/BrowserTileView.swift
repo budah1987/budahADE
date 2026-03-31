@@ -52,7 +52,7 @@ struct BrowserTileView: View {
 
                     TextField("URL", text: $urlText)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Theme.body(11))
                         .foregroundColor(Theme.textPrimary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)

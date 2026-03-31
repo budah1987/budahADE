@@ -37,7 +37,7 @@ struct TaskRailView: View {
                     .foregroundColor(Theme.textMuted)
                 Spacer()
                 Text("\(workspace.tasks.count)")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .font(Theme.label(9))
                     .foregroundColor(Theme.textMuted)
             }
             .padding(.horizontal, 14)
@@ -160,7 +160,7 @@ private struct TaskCardView: View {
                         .foregroundColor(Theme.textMuted)
 
                     Text(task.branchName)
-                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.textMuted)
                         .lineLimit(1)
                 }
@@ -239,7 +239,7 @@ private struct TaskCardView: View {
             Spacer()
 
             Text(task.elapsedTime)
-                .font(.system(size: 9, design: .monospaced))
+                .font(Theme.caption(9))
                 .foregroundColor(Color.white.opacity(0.18))
         }
     }

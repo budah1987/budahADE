@@ -60,7 +60,7 @@ struct MarkdownTileView: View {
     private func progressBar(_ spec: SpecParseResult) -> some View {
         HStack(spacing: 8) {
             Text("\(spec.completedCount)/\(spec.totalCount)")
-                .font(Theme.mono(12))
+                .font(Theme.label(12))
                 .foregroundColor(spec.progress >= 1.0 ? Theme.success : Theme.textSecondary)
 
             GeometryReader { geo in
@@ -101,7 +101,7 @@ struct MarkdownTileView: View {
                 if !section.checkboxItems.isEmpty {
                     let done = section.checkboxItems.filter(\.isCompleted).count
                     Text("\(done)/\(section.checkboxItems.count)")
-                        .font(Theme.mono(11))
+                        .font(Theme.caption(11))
                         .foregroundColor(done == section.checkboxItems.count ? Theme.success : Theme.textMuted)
                 }
 
@@ -260,7 +260,7 @@ struct MarkdownTileView: View {
                 .font(.system(size: 9))
                 .foregroundColor(Theme.textMuted)
             Text(filename)
-                .font(Theme.mono(11))
+                .font(Theme.body(11))
                 .foregroundColor(Theme.textMuted)
             Spacer()
             Text("\(sections.count) sections")

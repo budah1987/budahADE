@@ -248,6 +248,7 @@ final class AgentSession: ObservableObject, Identifiable {
             status: .inProgress
         )
         activityFeed.append(entry)
+        if activityFeed.count > 200 { activityFeed.removeFirst(activityFeed.count - 200) }
 
         // Loop detection: track edits and flag doom loops
         if let filePath = loopDetector.filePathFromToolEvent(event),
@@ -292,6 +293,7 @@ final class AgentSession: ObservableObject, Identifiable {
                 status: .inProgress
             )
             activityFeed.append(entry)
+            if activityFeed.count > 200 { activityFeed.removeFirst(activityFeed.count - 200) }
         }
     }
 
@@ -307,6 +309,7 @@ final class AgentSession: ObservableObject, Identifiable {
                 status: .inProgress
             )
             activityFeed.append(entry)
+            if activityFeed.count > 200 { activityFeed.removeFirst(activityFeed.count - 200) }
         }
     }
 

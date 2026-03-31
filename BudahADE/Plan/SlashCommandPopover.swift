@@ -112,7 +112,7 @@ private struct CommandRow: View {
         Button(action: onSelect) {
             HStack(spacing: 8) {
                 Text("/")
-                    .font(Theme.mono(12))
+                    .font(Theme.label(12))
                     .foregroundColor(Theme.textMuted)
                 Text(command)
                     .font(Theme.body(13))
@@ -150,7 +150,7 @@ private struct KeyHint: View {
 
     var body: some View {
         Text(text)
-            .font(Theme.mono(9))
+            .font(Theme.caption(9))
             .foregroundColor(Theme.textMuted)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)

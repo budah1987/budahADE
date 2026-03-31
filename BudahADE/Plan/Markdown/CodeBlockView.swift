@@ -19,7 +19,7 @@ struct CodeBlockView: View {
         HStack {
             if let lang = language {
                 Text(lang)
-                    .font(Theme.mono(11))
+                    .font(Theme.caption(11))
                     .foregroundColor(Theme.textMuted)
             }
 
@@ -29,7 +29,7 @@ struct CodeBlockView: View {
                 copyToClipboard()
             } label: {
                 Text(copied ? "Copied" : "Copy")
-                    .font(Theme.mono(11))
+                    .font(Theme.caption(11))
                     .foregroundColor(Theme.textMuted)
             }
             .buttonStyle(.plain)
@@ -48,7 +48,7 @@ struct CodeBlockView: View {
         let highlighted = SyntaxHighlighter.highlight(code, language: language)
         return ScrollView(.horizontal, showsIndicators: false) {
             Text(highlighted)
-                .font(Theme.mono(13))
+                .font(Theme.code(13))
                 .textSelection(.enabled)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)

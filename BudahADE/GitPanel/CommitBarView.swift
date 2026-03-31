@@ -13,7 +13,7 @@ struct CommitBarView: View {
         VStack(spacing: 6) {
             TextField("Commit message...", text: $commitMessage, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(Theme.mono(11))
+                .font(Theme.body(11))
                 .foregroundColor(Theme.textPrimary)
                 .lineLimit(1...4)
                 .padding(8)

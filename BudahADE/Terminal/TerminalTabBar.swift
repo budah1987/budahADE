@@ -113,7 +113,7 @@ struct ConversationTab: View {
 
                 if agentState != .idle {
                     Text(agentState == .working ? "working" : "done")
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundStyle(
                             agentState == .working
                                 ? Color(hex: 0x818cf8)
