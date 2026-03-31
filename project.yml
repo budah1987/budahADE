@@ -25,6 +25,9 @@ targets:
       - path: BudahADE
         excludes:
           - "**/.DS_Store"
+    resources:
+      - path: BudahADE/Resources/Fonts
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.budah.ade
