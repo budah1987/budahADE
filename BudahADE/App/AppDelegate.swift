@@ -32,6 +32,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         // Save all state BEFORE Ghostty shutdown destroys surfaces
         appState?.saveAllState()
+
+        // Stop all dev servers to prevent orphaned processes
+        if let workspaces = appState?.workspaces {
+            for workspace in workspaces {
+                for task in workspace.tasks {
+                    task.stopDevServer()
+                }
+            }
+        }
+
         GhosttyAppManager.shared.shutdown()
     }
 

@@ -635,24 +635,41 @@ final class TaskState: ObservableObject, Identifiable {
         }
 
         for tabSnapshot in snapshot.tabs {
-            let panel = TerminalPanel(workingDirectory: worktreePath)
-            let tabId = panel.id
-            panel.title = tabSnapshot.title
+            if tabSnapshot.isBrowser == true {
+                // Restore browser tab
+                let url = tabSnapshot.browserURL.flatMap(URL.init(string:))
+                let panel = BrowserPanel(url: url)
+                let tabId = panel.id
+                let tab = TabInfo(
+                    id: tabId,
+                    title: tabSnapshot.title,
+                    isRunning: false,
+                    tabType: .browser(url: url)
+                )
+                tabs.append(tab)
+                browserPanels[tabId] = panel
+                observeBrowserTitle(id: tabId, state: panel.state)
+            } else {
+                // Restore terminal tab
+                let panel = TerminalPanel(workingDirectory: worktreePath)
+                let tabId = panel.id
+                panel.title = tabSnapshot.title
 
-            var tab = TabInfo(id: tabId, title: tabSnapshot.title, isRunning: false)
-            tab.claudeSessionId = tabSnapshot.claudeSessionId
-            tab.tmuxSession = tabSnapshot.tmuxSession
-            tab.restoredTitle = tabSnapshot.title  // Protect from shell title overwrites
-            if let modeRaw = tabSnapshot.agentMode {
-                tab.agentMode = AgentMode(rawValue: modeRaw)
+                var tab = TabInfo(id: tabId, title: tabSnapshot.title, isRunning: false)
+                tab.claudeSessionId = tabSnapshot.claudeSessionId
+                tab.tmuxSession = tabSnapshot.tmuxSession
+                tab.restoredTitle = tabSnapshot.title  // Protect from shell title overwrites
+                if let modeRaw = tabSnapshot.agentMode {
+                    tab.agentMode = AgentMode(rawValue: modeRaw)
+                }
+
+                panel.tmuxSession = tabSnapshot.tmuxSession
+                tabs.append(tab)
+                terminals[tabId] = panel
+
+                // tmux reattach (conversation intact) or fresh launch
+                launchClaudeInTab(tabId, agent: tab.agentMode, tmuxSession: tabSnapshot.tmuxSession)
             }
-
-            panel.tmuxSession = tabSnapshot.tmuxSession
-            tabs.append(tab)
-            terminals[tabId] = panel
-
-            // tmux reattach (conversation intact) or fresh launch
-            launchClaudeInTab(tabId, agent: tab.agentMode, tmuxSession: tabSnapshot.tmuxSession)
         }
 
         // Restore selected tab by position
@@ -701,7 +718,9 @@ final class TaskState: ObservableObject, Identifiable {
                 agentMode: tab.agentMode?.rawValue,
                 isActive: tab.id == selectedTabId,
                 scrollbackPath: scrollbackPath,
-                tmuxSession: tab.tmuxSession
+                tmuxSession: tab.tmuxSession,
+                isBrowser: tab.isBrowser ? true : nil,
+                browserURL: browserPanels[tab.id]?.state.lastURL?.absoluteString
             ))
         }
 

@@ -382,7 +382,11 @@ struct WorkspaceView: View {
         if tab.isTerminal, let panel = task.terminals[tab.id] {
             TerminalPanelView(panel: panel)
         } else if tab.isBrowser, let panel = task.browserPanels[tab.id] {
-            BrowserPanelView(state: panel.state)
+            BrowserPanelView(
+                state: panel.state,
+                assignedPort: task.assignedPort,
+                onPopOut: { panel.popOut() }
+            )
         }
     }
 
