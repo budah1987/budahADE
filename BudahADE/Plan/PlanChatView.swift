@@ -11,6 +11,9 @@ struct PlanChatView: View {
     var siblingTabs: [PlanTabInfo] = []
     /// Called when user picks Hand off → target tab.
     var onHandOff: ((UUID) -> Void)? = nil
+    /// Called when user approves spec and wants to transition to Build mode.
+    /// Parameter: item count from the approved spec.
+    var onApproveToBuild: ((Int) -> Void)? = nil
 
     @State private var inputText: String = ""
     @State private var pendingImage: NSImage?
@@ -672,7 +675,17 @@ struct PlanChatView: View {
         guard let lastAssistant = session?.messages.last(where: { $0.role == .assistant }),
               !lastAssistant.content.isEmpty else { return }
         let version = SpecVersionManager.approve(content: lastAssistant.content, in: state.worktreePath)
-        state.sendMessage("✓ Spec approved and saved as version \(version).")
+
+        // Count spec items from the approved content
+        let itemCount = lastAssistant.content.components(separatedBy: "\n")
+            .filter { $0.contains("- [ ]") || $0.contains("- [x]") || $0.contains("- [X]") }
+            .count
+
+        // Inline confirmation in chat
+        state.sendMessage("→ spec.md written — \(itemCount) items")
+
+        // Trigger Plan → Build transition
+        onApproveToBuild?(itemCount)
     }
 
     private func handleEdit() {

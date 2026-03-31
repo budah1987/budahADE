@@ -35,6 +35,9 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var selectedPlanTabId: UUID?
     let specState = SpecState()
     let buildStatus = BuildStatusState()
+    /// Dedicated builder terminal — lives outside the tab bar, shown in spec strip drawer
+    @Published var builderPanel: TerminalPanel?
+    @Published var isBuilderDrawerOpen: Bool = false
     private var specWatcher: SpecWatcher?
     private var buildStatusWatcher: BuildStatusWatcher?
     let createdAt: Date = Date()
@@ -112,12 +115,91 @@ final class TaskState: ObservableObject, Identifiable {
 
     func enterBuildMode() {
         mode = .build
-        focusActiveTerminal()
+
+        // Synchronous spec discovery — ensures we detect spec files that were
+        // just written (e.g. via NewTaskSheet import) before the watcher polls.
+        if !specState.hasSpec {
+            let specFiles = SpecParser.findSpecFiles(in: worktreePath)
+            if !specFiles.isEmpty {
+                let results = specFiles.compactMap { SpecParser.parse(fileAt: $0) }
+                specState.updateAll(from: results)
+            }
+        }
+
+        // Launch builder in dedicated panel (not in tab bar)
+        if builderPanel == nil && specState.hasSpec {
+            launchBuilder()
+        }
+
+        // Create a regular CLI tab if none exist
+        if tabs.isEmpty {
+            createTab()
+        } else {
+            focusActiveTerminal()
+        }
+
         // Start build status watcher if we have a spec
         if specState.hasSpec && buildStatusWatcher == nil {
             buildStatusWatcher = BuildStatusWatcher(worktreePath: worktreePath, buildStatus: buildStatus)
             buildStatusWatcher?.startWatching()
         }
+    }
+
+    // MARK: - Builder Panel
+
+    /// Launch the builder agent in a dedicated terminal panel (outside the tab bar).
+    func launchBuilder() {
+        let panel = TerminalPanel(workingDirectory: worktreePath)
+        builderPanel = panel
+
+        let specPath = specState.activeSpec?.filePath
+        let progress: (completed: Int, total: Int)? = specState.activeSpec.map {
+            (completed: $0.completedCount, total: $0.totalCount)
+        }
+
+        let claudeCommand: String
+        if let specPath, let progress {
+            claudeCommand = AgentPrompts.builderLaunchCommand(
+                taskName: name,
+                branchName: branchName,
+                worktreePath: worktreePath,
+                specFilePath: specPath,
+                specProgress: progress
+            )
+        } else {
+            claudeCommand = AgentPrompts.launchCommand(
+                agent: .claude,
+                taskName: name,
+                branchName: branchName,
+                worktreePath: worktreePath
+            )
+        }
+
+        if TmuxSessionManager.isAvailable {
+            let sessionName = "builder-\(id.uuidString.prefix(8))"
+            let tmuxCmd = TmuxSessionManager.newSessionCommand(
+                name: sessionName, workingDirectory: worktreePath
+            )
+            panel.sendCommandWhenReady(tmuxCmd)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                panel.sendCommandWhenReady(claudeCommand)
+            }
+            panel.tmuxSession = sessionName
+        } else {
+            panel.sendCommandWhenReady(claudeCommand)
+        }
+
+        isBuilderDrawerOpen = true
+    }
+
+    /// Stop the builder and clean up its panel.
+    func stopBuilder() {
+        if let tmux = builderPanel?.tmuxSession {
+            TmuxSessionManager.killSession(tmux)
+        }
+        builderPanel?.close()
+        builderPanel = nil
+        isBuilderDrawerOpen = false
     }
 
     // MARK: - Plan Tab Management
@@ -384,6 +466,7 @@ final class TaskState: ObservableObject, Identifiable {
     // MARK: - Close All
 
     func closeAllTerminals() {
+        stopBuilder()
         for panel in terminals.values {
             panel.close()
         }
