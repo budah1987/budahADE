@@ -48,34 +48,21 @@
 
 ---
 
-## Phase 1 — Close the Spec > Builder Loop
+## Phase 1 — Close the Spec > Builder Loop ✓
 
-### 1.1 Fix SpecParser.findSpecFiles()
-Scan `.budahade/spec.md` in addition to root-level patterns. Without this, the entire pipeline is broken — approved specs are invisible to the UI.
+> **Completed.** All four items shipped on `tab-plan` branch.
 
-### 1.2 Approve & Build transition (inline, no extra confirmation)
-The Approve button IS the confirmation. Flow:
-1. User clicks "Approve & send to Build" in Spec Author tab
-2. Inline confirmation line appears in chat: "→ spec.md written — 7 items"
-3. ~2 second overlay appears with three status lines:
-   - "Writing spec.md…" → "Launching builder agent…" → "Switching to Build mode…"
-4. Mode auto-switches to Build, builder agent launches with spec path
-5. Overlay auto-dismisses
+### 1.1 Fix SpecParser.findSpecFiles() ✓
+`findSpecFiles()` now scans `.budahade/spec.md` in addition to root-level patterns. (`SpecParser.swift:171-175`)
 
-No modal, no extra confirmation step.
+### 1.2 Approve & Build transition ✓
+`handleApprove()` counts items, sends inline confirmation ("→ spec.md written — N items"), and fires `onApproveToBuild`. `WorkspaceView.startBuildTransition()` runs 3-step overlay → `enterBuildMode()` → auto-dismiss. (`PlanChatView.swift:674-689`, `WorkspaceView.swift:226-250`)
 
-### 1.3 Block graph component (new, in SpecPanelView)
-Standalone `SpecBlockGraphView` component, placed between panel header and checklist:
-- Horizontal row of 8×14px fixed-width blocks, 2px gaps
-- One block per spec item
-- Colors: dim (pending), pulsing accent (active via existing `PulsingModifier`), green (done), red (blocked)
-- Hover tooltip: phase ID + item text (e.g. "1.1 — Stream event parsing")
-- Click: no-op (read-only, state driven by build-status.json + spec.md polling)
-- Percentage label to the right (e.g. "42%")
-- **Collapse behavior**: panel collapse toggle hides checklist + status line but keeps block strip always visible as the at-a-glance view
+### 1.3 Block graph component ✓
+`SpecBlockGraphView` with 8×14px blocks, pulsing active state, hover tooltips, percentage label. Integrated into `SpecPanelView` between header and checklist, stays visible when collapsed. (`SpecBlockGraphView.swift`, `SpecPanelView.swift:40`)
 
-### 1.4 Elapsed time in status line
-Track `startedAt` timestamp in BuildStatusState. Display "Working on {task}... 2m 34s" in the spec strip status row.
+### 1.4 Elapsed time in status line ✓
+`BuildStatusState.taskStartedAt` + `elapsed` computed property. `BuildStatusWatcher` resets timestamp on task transitions. (`BuildStatusState.swift:22-34`, `BuildStatusWatcher.swift:82-84`)
 
 ---
 
