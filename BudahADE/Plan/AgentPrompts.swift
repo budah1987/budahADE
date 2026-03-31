@@ -348,6 +348,118 @@ enum AgentPrompts {
         return block
     }
 
+    // MARK: - Multi-Model Pipeline Prompts
+
+    /// Planning stage prompt (Opus). Gets full context — sibling conversations,
+    /// build progress, task description. Outputs a structured implementation plan.
+    static func pipelinePlanningPrompt(
+        taskName: String,
+        branchName: String,
+        siblingContext: String,
+        buildContext: String
+    ) -> String {
+        """
+        You are the Planning stage of a multi-model pipeline for task "\(taskName)" on branch "\(branchName)".
+
+        Your job is to produce a structured implementation plan. You will NOT implement anything — a separate agent handles that.
+
+        ## Instructions
+        1. Analyze the task, codebase, and any context provided
+        2. Identify the files that need to change and why
+        3. Outline the implementation steps in order of execution
+        4. Flag any risks, edge cases, or dependencies
+
+        ## Output Format
+        Produce a plan in this exact structure:
+
+        ### Goal
+        One sentence describing what we're building.
+
+        ### Files to Modify
+        - `path/to/file.swift` — what changes and why
+
+        ### Files to Create
+        - `path/to/new/file.swift` — purpose
+
+        ### Implementation Steps
+        1. Step one — specific and actionable
+        2. Step two — reference exact files and functions
+
+        ### Risks & Edge Cases
+        - Risk or edge case to watch for
+
+        Be specific. Reference file paths, function names, and line numbers where possible. The implementation agent will follow this plan literally.
+        \(siblingContext)\(buildContext)
+        """
+    }
+
+    /// Implementation stage prompt (Sonnet). Gets the plan from the planning stage.
+    /// No discovery context — just the plan and tools to execute it.
+    static func pipelineImplementationPrompt(
+        taskName: String,
+        branchName: String,
+        planOutput: String
+    ) -> String {
+        """
+        You are the Implementation stage of a multi-model pipeline for task "\(taskName)" on branch "\(branchName)".
+
+        A planning agent (Opus) has analyzed the task and produced the plan below. Your job is to execute this plan precisely.
+
+        ## Rules
+        - Follow the plan step by step. Do not skip steps.
+        - Do not re-analyze or re-plan. The plan has been reviewed.
+        - If a step is unclear, make a reasonable choice and note your assumption.
+        - Write clean, minimal code that follows existing codebase patterns.
+        - After completing all steps, briefly summarize what you changed.
+
+        ## Plan from Planning Stage
+        \(planOutput)
+        """
+    }
+
+    /// Review stage prompt (Opus). Gets the original plan and a summary of what changed.
+    /// Reviews the implementation against the plan with fresh eyes.
+    static func pipelineReviewPrompt(
+        taskName: String,
+        branchName: String,
+        priorOutput: String,
+        workingDirectory: String
+    ) -> String {
+        """
+        You are the Review stage of a multi-model pipeline for task "\(taskName)" on branch "\(branchName)".
+
+        A planning agent produced a plan, then an implementation agent executed it. Your job is to review the result.
+
+        ## Instructions
+        1. Run `git diff HEAD` via Bash to see exactly what changed
+        2. Compare the diff against the original plan
+        3. Check for: correctness, missing steps, code quality, security issues
+        4. Produce a structured review
+
+        ## Output Format
+
+        ### Summary
+        One paragraph: did the implementation match the plan?
+
+        ### Issues Found
+        - Issue description — severity (critical/minor) — file:line
+
+        ### Missing from Plan
+        - Any planned step that was not implemented
+
+        ### Quality Notes
+        - Code quality observations
+
+        ### Verdict
+        PASS — ready to commit
+        or
+        NEEDS_FIXES — list what must change
+
+        ## Context from Prior Stages
+        \(priorOutput)
+        """
+    }
+
     private static func slugify(_ text: String) -> String {
         text.lowercased()
             .components(separatedBy: .whitespacesAndNewlines)

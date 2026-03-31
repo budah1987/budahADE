@@ -385,28 +385,67 @@ struct PlanChatView: View {
                 .padding(.top, 8)
             }
 
+            // Pipeline stage indicator
+            if let pipeline = state.activePipeline {
+                PipelineStageBar(pipeline: pipeline)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+            }
+
             // Model selector row
             HStack(spacing: 4) {
-                Button {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        showModelMenu.toggle()
-                    }
-                } label: {
+                if state.pipelineMode {
+                    // Pipeline mode: show indicator instead of model picker
                     HStack(spacing: 4) {
-                        Text(state.selectedModel.displayName.lowercased())
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.accent)
+                        Text("pipeline")
                             .font(Theme.mono(14))
-                            .foregroundColor(Color(hex: 0x938d8d))
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color(hex: 0x938d8d))
+                            .foregroundColor(Theme.accent)
                     }
+                    .onTapGesture {
+                        state.pipelineMode = false
+                    }
+                } else {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            showModelMenu.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(state.selectedModel.displayName.lowercased())
+                                .font(Theme.mono(14))
+                                .foregroundColor(Color(hex: 0x938d8d))
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9))
+                                .foregroundColor(Color(hex: 0x938d8d))
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 Spacer()
 
+                // Pipeline toggle
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        state.pipelineMode.toggle()
+                    }
+                } label: {
+                    Image(systemName: state.pipelineMode ? "arrow.triangle.branch" : "arrow.triangle.branch")
+                        .font(.system(size: 11))
+                        .foregroundColor(state.pipelineMode ? Theme.accent : Color(hex: 0x938d8d).opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .help(state.pipelineMode ? "Pipeline mode ON" : "Pipeline mode OFF")
+
                 // Token count
-                if let session, session.totalTokens > 0 {
+                if let pipeline = state.activePipeline, pipeline.totalTokens > 0 {
+                    Text(pipeline.formattedTokenCount)
+                        .font(Theme.caption(10))
+                        .foregroundColor(Color(hex: 0x938d8d))
+                } else if let session, session.totalTokens > 0 {
                     Text(session.formattedTokenCount)
                         .font(Theme.mono(10))
                         .foregroundColor(Color(hex: 0x938d8d))
@@ -1406,6 +1445,60 @@ private struct PlanModelSelectorMenu: View {
         )
         .frame(width: 180)
         .shadow(color: .black.opacity(0.4), radius: 12)
+    }
+}
+
+// MARK: - Pipeline Stage Bar
+
+private struct PipelineStageBar: View {
+    @ObservedObject var pipeline: MultiModelPipeline
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(pipeline.stageResults.enumerated()), id: \.element.id) { index, result in
+                stageIndicator(index: index, result: result)
+                if index < pipeline.stageResults.count - 1 {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8))
+                        .foregroundColor(Color(hex: 0x938d8d).opacity(0.4))
+                        .padding(.horizontal, 4)
+                }
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func stageIndicator(index: Int, result: PipelineStageResult) -> some View {
+        let isActive = pipeline.currentStageIndex == index && !result.status.isTerminal
+        HStack(spacing: 4) {
+            Circle()
+                .fill(stageColor(for: result.status, active: isActive))
+                .frame(width: 6, height: 6)
+            Text("\(result.stageName) (\(result.model.displayName))")
+                .font(Theme.caption(10))
+                .foregroundColor(isActive ? .white : Color(hex: 0x938d8d))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            isActive
+                ? RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.06))
+                : nil
+        )
+    }
+
+    private func stageColor(for status: PipelineStageStatus, active: Bool) -> Color {
+        switch status {
+        case .pending:
+            return Color(hex: 0x938d8d).opacity(0.3)
+        case .running:
+            return Theme.accent
+        case .completed:
+            return Color(hex: 0x7ab5a0)
+        case .failed:
+            return .red
+        }
     }
 }
 

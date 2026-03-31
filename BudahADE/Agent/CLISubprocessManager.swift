@@ -28,6 +28,15 @@ final class CLISubprocessManager: ObservableObject {
     /// Called when a session finishes a turn (status → .done). Used for auto-forwarding.
     var onSessionComplete: ((UUID) -> Void)?
 
+    /// Per-session completion callbacks — used by pipeline stages to avoid
+    /// overwriting the global onSessionComplete handler.
+    private var sessionCompletionHandlers: [UUID: (UUID) -> Void] = [:]
+
+    /// Register a one-shot completion handler for a specific session.
+    func onComplete(sessionId: UUID, handler: @escaping (UUID) -> Void) {
+        sessionCompletionHandlers[sessionId] = handler
+    }
+
     // MARK: - Session Lifecycle
 
     @discardableResult
@@ -118,8 +127,8 @@ final class CLISubprocessManager: ObservableObject {
             model: phaseModel,
             systemPromptPath: systemPromptPath,
             sessionId: resumeId,
-            allowedTools: session.agentMode?.chatAllowedTools,
-            maxTurns: session.agentMode?.chatMaxTurns,
+            allowedTools: session.allowedToolsOverride ?? session.agentMode?.chatAllowedTools,
+            maxTurns: session.maxTurnsOverride ?? session.agentMode?.chatMaxTurns,
             disableMcp: session.disableMcp
         )
 
@@ -240,6 +249,10 @@ final class CLISubprocessManager: ObservableObject {
             case .result(let result):
                 logTiming("[TIMING] T7 result event received")
                 session.handleResult(result)
+                // Fire per-session handler first (pipeline stages), then global
+                if let handler = sessionCompletionHandlers.removeValue(forKey: session.id) {
+                    handler(session.id)
+                }
                 onSessionComplete?(session.id)
             case .toolUse(let event):
                 session.handleToolUse(event)

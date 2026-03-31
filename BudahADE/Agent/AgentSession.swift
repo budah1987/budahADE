@@ -92,6 +92,10 @@ final class AgentSession: ObservableObject, Identifiable {
     let workingDirectory: String
     let enableAgentTeams: Bool
     let disableMcp: Bool
+    /// Explicit tool restrictions (overrides agentMode.chatAllowedTools when set)
+    var allowedToolsOverride: [String]?
+    /// Explicit turn limit (overrides agentMode.chatMaxTurns when set)
+    var maxTurnsOverride: Int?
 
     @Published var status: AgentSessionStatus = .idle
     @Published var messages: [ChatMessage] = []

@@ -39,6 +39,12 @@ final class PlanChatState: ObservableObject {
     @Published var pendingSpec: String?
     @Published var editingMessageId: UUID?
     @Published var handedOffContext: [(role: AgentMode, content: String)] = []
+    /// When true, messages are routed through the multi-model pipeline
+    /// (Plan with Opus → Implement with Sonnet → Review with Opus)
+    @Published var pipelineMode: Bool = false
+    /// Active pipeline instance (non-nil while a pipeline is running)
+    @Published var activePipeline: MultiModelPipeline?
+    private var pipelineCancellable: AnyCancellable?
     private var sessionCancellable: AnyCancellable?
     private var persistenceTask: Task<Void, Never>?
 
@@ -184,6 +190,12 @@ final class PlanChatState: ObservableObject {
             return
         }
 
+        // Pipeline mode: route through multi-model pipeline
+        if pipelineMode {
+            startPipeline(prompt: text)
+            return
+        }
+
         let session = ensureSession()
         if conversationState == .idle {
             conversationState = .chatting
@@ -209,6 +221,11 @@ final class PlanChatState: ObservableObject {
                 selectedModel = models[(idx + 1) % models.count]
             }
             return "Switched to \(selectedModel.displayName)."
+        case "/pipeline":
+            pipelineMode.toggle()
+            return pipelineMode
+                ? "Pipeline mode ON — messages will route through Plan (Opus) → Implement (Sonnet) → Review (Opus)."
+                : "Pipeline mode OFF — messages go to a single session."
         default:
             return nil // Not a local command
         }
@@ -227,6 +244,55 @@ final class PlanChatState: ObservableObject {
         }
     }
 
+    // MARK: - Pipeline Lifecycle
+
+    /// Start a multi-model pipeline for the given prompt.
+    /// Creates a fresh pipeline with Plan → Implement → Review stages.
+    private func startPipeline(prompt: String) {
+        // Cancel any existing pipeline
+        activePipeline?.cancel()
+        pipelineCancellable?.cancel()
+
+        if conversationState == .idle {
+            conversationState = .chatting
+        }
+
+        // Build sibling + build context for the planning stage
+        let siblings = PlanConversationPersistence.loadAllExcluding(
+            tabId: self.tabId,
+            from: worktreePath
+        )
+        let siblingContext = AgentPrompts.siblingContextBlock(from: siblings, worktreePath: worktreePath)
+        let buildContext = AgentPrompts.buildContextBlock(worktreePath: worktreePath)
+
+        let pipeline = MultiModelPipeline.standard(
+            chatManager: chatManager,
+            workingDirectory: worktreePath,
+            taskName: taskName,
+            branchName: branchName,
+            siblingContext: siblingContext,
+            buildContext: buildContext
+        )
+        activePipeline = pipeline
+
+        // Forward pipeline's objectWillChange so the view re-renders
+        pipelineCancellable = pipeline.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+
+        // Add user message to the display session so it shows in chat
+        let session = ensureSession()
+        session.addUserMessage(prompt)
+
+        pipeline.execute(prompt: prompt)
+    }
+
+    func cancelPipeline() {
+        activePipeline?.cancel()
+        activePipeline = nil
+        pipelineCancellable?.cancel()
+    }
+
     func persistConversation() {
         persistenceTask?.cancel()
         persistenceTask = Task { @MainActor in
@@ -243,15 +309,21 @@ final class PlanChatState: ObservableObject {
     }
 
     func cancel() {
+        if activePipeline != nil {
+            cancelPipeline()
+            return
+        }
         guard let session = plannerSession else { return }
         chatManager.cancel(sessionId: session.id)
     }
 
     func newSession() {
+        cancelPipeline()
         if let existing = plannerSession {
             chatManager.removeSession(sessionId: existing.id)
         }
         plannerSession = nil
+        activePipeline = nil
         conversationState = .idle
     }
 
