@@ -43,6 +43,10 @@ final class GitRepository: ObservableObject {
     @Published var recentCommits: [GitCommit] = []
     @Published var hasRemote: Bool = false
     @Published var aheadCount: Int = 0
+    @Published var mergeTarget: String = "main"
+    @Published var behindCount: Int = 0
+    @Published var forkPointHash: String?
+    @Published var totalCommitCount: Int = 0
 
     private var pollTimer: Timer?
 
@@ -72,6 +76,7 @@ final class GitRepository: ObservableObject {
         parseBranches()
         parseLog()
         parseRemoteStatus()
+        parseMergeInfo()
     }
 
     // MARK: - Git Operations
@@ -315,6 +320,75 @@ final class GitRepository: ObservableObject {
         }
     }
 
+    // MARK: - Extended Parsing
+
+    func parseMergeInfo() {
+        if !mergeTarget.isEmpty, !currentBranch.isEmpty {
+            if let output = runGit(["rev-list", "--count", "HEAD..\(mergeTarget)"]) {
+                behindCount = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            } else {
+                behindCount = 0
+            }
+        }
+
+        if !mergeTarget.isEmpty {
+            if let output = runGit(["merge-base", "HEAD", mergeTarget]) {
+                forkPointHash = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                forkPointHash = nil
+            }
+        }
+
+        if let output = runGit(["rev-list", "--count", "HEAD"]) {
+            totalCommitCount = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        }
+    }
+
+    func renameBranch(from oldName: String, to newName: String) -> Bool {
+        let result = runGit(["branch", "-m", oldName, newName])
+        if result != nil {
+            refresh()
+            return true
+        }
+        return false
+    }
+
+    func extendedLog(limit: Int = 20) -> [GitCommit] {
+        guard let output = runGit(["log", "--oneline", "-\(limit)", "--format=%H|||%s|||%an|||%ar"]) else {
+            return []
+        }
+
+        return output
+            .components(separatedBy: "\n")
+            .filter { !$0.isEmpty }
+            .compactMap { line in
+                let parts = line.components(separatedBy: "|||")
+                guard parts.count == 4 else { return nil }
+                return GitCommit(
+                    id: parts[0],
+                    message: parts[1],
+                    author: parts[2],
+                    date: parts[3]
+                )
+            }
+    }
+
+    func diffForCommit(_ hash: String) -> String {
+        return runGit(["show", "--format=", hash]) ?? ""
+    }
+
+    func filesChangedInCommit(_ hash: String) -> [GitFileStatus] {
+        guard let output = runGit(["show", "--name-status", "--format=", hash]) else { return [] }
+        return output
+            .components(separatedBy: "\n")
+            .filter { !$0.isEmpty }
+            .compactMap { line in
+                let parts = line.components(separatedBy: "\t")
+                guard parts.count >= 2 else { return nil }
+                return GitFileStatus(status: mapStatusChar(parts[0]), path: parts[1])
+            }
+    }
+
     // MARK: - Static Helpers
 
     static func listBranches(at repoPath: String) async -> [String] {
@@ -401,7 +475,7 @@ final class GitRepository: ObservableObject {
         }
     }
 
-    private func mapStatusChar(_ char: String) -> String {
+    func mapStatusChar(_ char: String) -> String {
         switch char {
         case "M": return "M"
         case "A": return "A"
