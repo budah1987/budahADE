@@ -39,7 +39,7 @@ struct NewTaskSheet: View {
                     .font(Theme.label(15))
                     .foregroundColor(Theme.textPrimary)
                 Text(workspace.projectName)
-                    .font(Theme.mono(11))
+                    .font(Theme.code(11))
                     .foregroundColor(Theme.textMuted)
             }
             .padding(.top, 24)
@@ -333,7 +333,7 @@ struct NewTaskSheet: View {
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text((path as NSString).lastPathComponent)
-                            .font(Theme.mono(11))
+                            .font(Theme.code(11))
                             .foregroundColor(Theme.textPrimary)
                             .lineLimit(1)
                         Text("\(specItemCount) items")

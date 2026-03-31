@@ -21,6 +21,51 @@ struct WorkspaceView: View {
 
 
     var body: some View {
+        coreView
+            .onReceive(NotificationCenter.default.publisher(for: .selectTabByIndex)) { notification in
+                guard !appState.isWorkspaceSwitcherOpen,
+                      let index = notification.userInfo?["index"] as? Int else { return }
+                if let task = state.activeTask, task.mode == .plan {
+                    task.selectPlanTabByIndex(index)
+                } else {
+                    state.activeTask?.selectTabByIndex(index)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newTask)) { _ in
+                state.showNewTaskSheet = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .selectTaskByIndex)) { notification in
+                guard let index = notification.userInfo?["index"] as? Int else { return }
+                state.selectTaskByIndex(index)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .renameTab)) { _ in
+                guard let task = state.activeTask,
+                      let tabId = task.selectedTabId,
+                      let tab = task.tabs.first(where: { $0.id == tabId }) else { return }
+                renameText = tab.title
+                renameTarget = .tab(taskId: task.id, tabId: tabId)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleTaskMode)) { _ in
+                if let task = state.activeTask {
+                    if task.mode == .plan { task.enterBuildMode() }
+                    else { task.enterPlanMode() }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .renameTask)) { _ in
+                guard let task = state.activeTask else { return }
+                renameText = task.name
+                renameTarget = .task(taskId: task.id)
+            }
+            .onChange(of: renameTarget) { _, newValue in
+                if newValue != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        renameFieldFocused = true
+                    }
+                }
+            }
+    }
+
+    private var coreView: some View {
         ZStack {
             Theme.appBackground.ignoresSafeArea()
 
@@ -197,47 +242,6 @@ struct WorkspaceView: View {
         .onReceive(NotificationCenter.default.publisher(for: .closeTask)) { _ in
             if let task = state.activeTask {
                 state.deleteTask(task.id)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .selectTabByIndex)) { notification in
-            guard !appState.isWorkspaceSwitcherOpen,
-                  let index = notification.userInfo?["index"] as? Int else { return }
-            if let task = state.activeTask, task.mode == .plan {
-                task.selectPlanTabByIndex(index)
-            } else {
-                state.activeTask?.selectTabByIndex(index)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .newTask)) { _ in
-            state.showNewTaskSheet = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .selectTaskByIndex)) { notification in
-            guard let index = notification.userInfo?["index"] as? Int else { return }
-            state.selectTaskByIndex(index)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .renameTab)) { _ in
-            guard let task = state.activeTask,
-                  let tabId = task.selectedTabId,
-                  let tab = task.tabs.first(where: { $0.id == tabId }) else { return }
-            renameText = tab.title
-            renameTarget = .tab(taskId: task.id, tabId: tabId)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .toggleTaskMode)) { _ in
-            if let task = state.activeTask {
-                if task.mode == .plan { task.enterBuildMode() }
-                else { task.enterPlanMode() }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .renameTask)) { _ in
-            guard let task = state.activeTask else { return }
-            renameText = task.name
-            renameTarget = .task(taskId: task.id)
-        }
-        .onChange(of: renameTarget) { _, newValue in
-            if newValue != nil {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    renameFieldFocused = true
-                }
             }
         }
     }

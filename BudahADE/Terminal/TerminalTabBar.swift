@@ -121,62 +121,59 @@ struct ConversationTab: View {
     }
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 6) {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(Theme.textMuted)
-                }
-                .buttonStyle(.plain)
-
-                if isBrowser {
-                    Image(systemName: "globe")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(isSelected ? Theme.accent : Theme.textMuted)
-                }
-
-                Text(title)
-                    .font(Theme.label(11))
-                    .foregroundStyle(isSelected ? Theme.textPrimary : Theme.textSecondary)
-                    .lineLimit(1)
-
-                if agentState != .idle {
-                    Text(agentState == .working ? "working" : "done")
-                        .font(Theme.caption(9))
-                        .foregroundStyle(
-                            agentState == .working
-                                ? Color(hex: 0x818cf8)
-                                : Theme.success
-                        )
-                }
+        HStack(spacing: 6) {
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(Theme.textMuted)
             }
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            .background(tabBackground)
-            .overlay(alignment: .bottom) {
-                // GlowBar outside clipped background so shadows can bleed
-                GlowBar(state: agentState)
-                    .frame(height: 3)
-                    .shadow(color: glowInnerShadow, radius: 10, y: 0)
-                    .shadow(color: glowOuterShadow, radius: 20, y: 2)
-                    .opacity(agentState == .idle ? 0 : 1)
+            .buttonStyle(.plain)
+
+            if isBrowser {
+                Image(systemName: "globe")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(isSelected ? Theme.accent : Theme.textMuted)
             }
-            .fixedSize()
-            .background(
-                GeometryReader { geo in
-                    Color.clear
-                        .preference(
-                            key: RenameSpotlightKey.self,
-                            value: isSpotlit
-                                ? geo.frame(in: .named("workspace"))
-                                : .zero
-                        )
-                }
-            )
+
+            Text(title)
+                .font(Theme.label(11))
+                .foregroundStyle(isSelected ? Theme.textPrimary : Theme.textSecondary)
+                .lineLimit(1)
+
+            if agentState != .idle {
+                Text(agentState == .working ? "working" : "done")
+                    .font(Theme.caption(9))
+                    .foregroundStyle(
+                        agentState == .working
+                            ? Color(hex: 0x818cf8)
+                            : Theme.success
+                    )
+            }
         }
-        .buttonStyle(.plain)
-        .draggable(id.uuidString)
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+        .background(tabBackground)
+        .overlay(alignment: .bottom) {
+            // GlowBar outside clipped background so shadows can bleed
+            GlowBar(state: agentState)
+                .frame(height: 3)
+                .shadow(color: glowInnerShadow, radius: 10, y: 0)
+                .shadow(color: glowOuterShadow, radius: 20, y: 2)
+                .opacity(agentState == .idle ? 0 : 1)
+        }
+        .fixedSize()
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(
+                        key: RenameSpotlightKey.self,
+                        value: isSpotlit
+                            ? geo.frame(in: .named("workspace"))
+                            : .zero
+                    )
+            }
+        )
+        .background(TabDragClickHandler(dragId: id.uuidString, onClick: onSelect, onMiddleClick: onClose))
         .overlay(MiddleClickOverlay(action: onClose))
         .onAppear { startBreathing() }
         .onChange(of: agentState) { _, _ in startBreathing() }
@@ -410,6 +407,80 @@ struct MiddleClickOverlay: NSViewRepresentable {
             } else {
                 super.otherMouseDown(with: event)
             }
+        }
+    }
+}
+
+// MARK: - Tab Drag+Click Handler
+//
+// SwiftUI's .draggable modifier on macOS blocks ALL click events (Button and onTapGesture alike)
+// because the NSDraggingSource machinery captures mouseDown before SwiftUI gestures can fire.
+// This NSViewRepresentable handles both click and drag at the AppKit level, bypassing the conflict.
+
+struct TabDragClickHandler: NSViewRepresentable {
+    let dragId: String
+    let onClick: () -> Void
+    let onMiddleClick: () -> Void
+
+    func makeNSView(context: Context) -> TabDragView {
+        let view = TabDragView()
+        view.dragId = dragId
+        view.onClick = onClick
+        return view
+    }
+
+    func updateNSView(_ nsView: TabDragView, context: Context) {
+        nsView.dragId = dragId
+        nsView.onClick = onClick
+    }
+
+    class TabDragView: NSView, NSDraggingSource {
+        var dragId: String = ""
+        var onClick: (() -> Void)?
+
+        private var mouseDownEvent: NSEvent?
+        private var dragStarted = false
+
+        private static let dragThreshold: CGFloat = 5
+
+        override var acceptsFirstResponder: Bool { false }
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func mouseDown(with event: NSEvent) {
+            mouseDownEvent = event
+            dragStarted = false
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let origin = mouseDownEvent, !dragStarted else { return }
+            let dx = event.locationInWindow.x - origin.locationInWindow.x
+            let dy = event.locationInWindow.y - origin.locationInWindow.y
+            guard sqrt(dx * dx + dy * dy) >= Self.dragThreshold else { return }
+
+            dragStarted = true
+            let item = NSDraggingItem(pasteboardWriter: dragId as NSString)
+            let img = NSImage(size: NSSize(width: 1, height: 1))
+            item.setDraggingFrame(NSRect(origin: .zero, size: NSSize(width: 1, height: 1)), contents: img)
+            beginDraggingSession(with: [item], event: origin, source: self)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            defer {
+                mouseDownEvent = nil
+                dragStarted = false
+            }
+            guard !dragStarted else { return }
+            // Confirm release is still within the view bounds
+            let loc = convert(event.locationInWindow, from: nil)
+            guard bounds.contains(loc) else { return }
+            DispatchQueue.main.async { [weak self] in self?.onClick?() }
+        }
+
+        // MARK: NSDraggingSource
+        func draggingSession(_ session: NSDraggingSession,
+                             sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+            return .move
         }
     }
 }
