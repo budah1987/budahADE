@@ -343,6 +343,7 @@ final class AgentSession: ObservableObject, Identifiable {
         let id: Int
         let label: String
         let text: String
+        let description: String  // Sub-lines between headings (pros/cons/description). Empty = compact variant.
     }
 
     func detectOptions(in text: String) -> [DetectedOption]? {
@@ -359,43 +360,75 @@ final class AgentSession: ObservableObject, Identifiable {
                 return questionPattern?.firstMatch(in: line, range: range) != nil
             }
         }()
-        guard hasQuestion else { return nil }
+        guard hasQuestion else {
+            return nil
+        }
 
         // Find option lines — numbered, lettered, or bulleted
         let numberedPattern = try! NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.+)$"#)
         let letteredPattern = try! NSRegularExpression(pattern: #"^([A-Za-z])[.)]\s+(.+)$"#)
-        let bulletPattern = try! NSRegularExpression(pattern: #"^[-•]\s+\*{0,2}(.+?)\*{0,2}\s*(—.*)?$"#)
-        // Bullet + lettered: "• **A) Label** — desc" or "- **B) Label** — desc"
-        let bulletLetteredPattern = try! NSRegularExpression(pattern: #"^[-•]\s+\*{0,2}([A-Za-z])[.)]\s*(.+?)\*{0,2}\s*(—.*)?$"#)
+        let bulletPattern = try! NSRegularExpression(pattern: #"^[-•·‣›]\s+\*{0,2}(.+?)\*{0,2}\s*(—.*)?$"#)
+        // Bullet + lettered: "• **A) Label** — desc" or "· A) Label" etc.
+        let bulletLetteredPattern = try! NSRegularExpression(pattern: #"^[-•·‣›]\s+\*{0,2}([A-Za-z])[.)]\s*(.+?)\*{0,2}\s*(—.*)?$"#)
+        // "Option 1:" / "Option A:" / "**Option B:**" heading format
+        // Handles: "### **Option 1: …**", "- **Option 1:** …", "1. Option 1: …", plain "Option 1: …"
+        let optionHeadingPattern = try! NSRegularExpression(pattern: #"^(?:#{1,6}\s+|[-•·‣›]\s+|\d+[.)]\s+)?\*{0,2}Option\s+([A-Za-z0-9]+)\s*[:.]\s*\*{0,2}\s*(.+)$"#, options: .caseInsensitive)
 
         // Track which lines are inside code fences
         var inCodeBlock = false
         var options: [DetectedOption] = []
+        var foundOptionHeadings = false
+        var headingIndices: [Int] = []
 
+        // First pass: check if "Option N:" headings exist — if so, only use those
         for line in lines {
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+            if optionHeadingPattern.firstMatch(in: line, range: range) != nil {
+                foundOptionHeadings = true
+                break
+            }
+        }
+
+        for (lineIdx, line) in lines.enumerated() {
             if line.hasPrefix("```") { inCodeBlock.toggle(); continue }
             if inCodeBlock { continue }
 
             let range = NSRange(line.startIndex..<line.endIndex, in: line)
 
-            if let match = numberedPattern.firstMatch(in: line, range: range),
+            if let match = optionHeadingPattern.firstMatch(in: line, range: range),
+               let labelRange = Range(match.range(at: 1), in: line),
+               let textRange = Range(match.range(at: 2), in: line) {
+                // "Option 1: Auth-as-a-Service" or "**Option 2:** OAuth"
+                let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
+                headingIndices.append(lineIdx)
+                options.append(DetectedOption(
+                    id: options.count,
+                    label: String(line[labelRange]),
+                    text: rawText,
+                    description: ""
+                ))
+            } else if foundOptionHeadings {
+                // Skip other patterns when Option headings are the structure
+                continue
+            } else if let match = numberedPattern.firstMatch(in: line, range: range),
                let labelRange = Range(match.range(at: 1), in: line),
                let textRange = Range(match.range(at: 2), in: line) {
                 let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
                 options.append(DetectedOption(
                     id: options.count,
                     label: String(line[labelRange]),
-                    text: rawText
+                    text: rawText,
+                    description: ""
                 ))
             } else if let match = bulletLetteredPattern.firstMatch(in: line, range: range),
                       let labelRange = Range(match.range(at: 1), in: line),
                       let textRange = Range(match.range(at: 2), in: line) {
-                // Bullet-prefixed lettered option: "• **A) Label** — desc"
                 let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
                 options.append(DetectedOption(
                     id: options.count,
                     label: String(line[labelRange]),
-                    text: rawText
+                    text: rawText,
+                    description: ""
                 ))
             } else if let match = letteredPattern.firstMatch(in: line, range: range),
                       let labelRange = Range(match.range(at: 1), in: line),
@@ -404,7 +437,8 @@ final class AgentSession: ObservableObject, Identifiable {
                 options.append(DetectedOption(
                     id: options.count,
                     label: String(line[labelRange]),
-                    text: rawText
+                    text: rawText,
+                    description: ""
                 ))
             } else if let match = bulletPattern.firstMatch(in: line, range: range),
                       let textRange = Range(match.range(at: 1), in: line) {
@@ -412,13 +446,50 @@ final class AgentSession: ObservableObject, Identifiable {
                 options.append(DetectedOption(
                     id: options.count,
                     label: "\(options.count + 1)",
-                    text: rawText
+                    text: rawText,
+                    description: ""
                 ))
             }
         }
 
+        // Second pass: collect description lines between option headings
+        if foundOptionHeadings && !headingIndices.isEmpty {
+            for (i, headingIdx) in headingIndices.enumerated() {
+                let nextBound = (i + 1 < headingIndices.count) ? headingIndices[i + 1] : lines.count
+                var descLines: [String] = []
+                for lineIdx in (headingIdx + 1)..<nextBound {
+                    let l = lines[lineIdx]
+                    guard !l.isEmpty else { continue }
+                    // Skip the question line (last non-empty line) — it's not part of a description
+                    if l.hasSuffix("?") && lineIdx >= lines.count - 3 { continue }
+                    // Clean markdown markers
+                    let cleaned = l.replacingOccurrences(of: "**", with: "")
+                                   .trimmingCharacters(in: .whitespaces)
+                    if !cleaned.isEmpty {
+                        // Strip leading bullet markers for cleaner display
+                        var c = cleaned
+                        for prefix in ["- ", "• ", "· ", "‣ ", "› "] {
+                            if c.hasPrefix(prefix) { c = String(c.dropFirst(prefix.count)); break }
+                        }
+                        descLines.append(c)
+                    }
+                }
+                if !descLines.isEmpty && i < options.count {
+                    let desc = descLines.joined(separator: "\n")
+                    options[i] = DetectedOption(
+                        id: options[i].id,
+                        label: options[i].label,
+                        text: options[i].text,
+                        description: desc
+                    )
+                }
+            }
+        }
+
         // Must have 2-6 options
-        guard options.count >= 2 && options.count <= 6 else { return nil }
+        guard options.count >= 2 && options.count <= 6 else {
+            return nil
+        }
 
         return options
     }
