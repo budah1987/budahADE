@@ -118,21 +118,7 @@ struct PlanChatView: View {
                     .allowsHitTesting(false)
                 }
 
-            // Option sheet — only shows when assistant presents structured choices
-            let _ = {
-                if let s = session {
-                    let lastRole = s.messages.last?.role
-                    let lastLen = s.messages.last?.content.count ?? 0
-                    NSLog("[OptionSheet] session exists, dismissed=%d, msgCount=%d, lastRole=%@, lastContentLen=%d, status=%@",
-                          s.optionsDismissed ? 1 : 0,
-                          s.messages.count,
-                          lastRole == .assistant ? "assistant" : (lastRole == .user ? "user" : "other"),
-                          lastLen,
-                          "\(s.status)")
-                } else {
-                    NSLog("[OptionSheet] session is nil")
-                }
-            }()
+            // Option sheet replaces input when structured choices are detected
             if let session,
                !session.optionsDismissed,
                let lastMsg = session.messages.last,
@@ -156,24 +142,26 @@ struct PlanChatView: View {
                         state.sendMessage(text)
                     }
                 )
+                .frame(maxWidth: 640)
+                .frame(maxWidth: .infinity)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            } else {
+                // Action buttons — shown when there's at least one assistant message
+                if hasAssistantMessage {
+                    PlanActionButtons(
+                        onApprove: handleApprove,
+                        onEdit: handleEdit,
+                        onHandOff: { targetTabId in
+                            onHandOff?(targetTabId)
+                        },
+                        siblingTabs: siblingTabs
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
 
-            // Action buttons — shown when there's at least one assistant message
-            if hasAssistantMessage {
-                PlanActionButtons(
-                    onApprove: handleApprove,
-                    onEdit: handleEdit,
-                    onHandOff: { targetTabId in
-                        onHandOff?(targetTabId)
-                    },
-                    siblingTabs: siblingTabs
-                )
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                // Input area
+                inputArea
             }
-
-            // Input area
-            inputArea
         }
         .background(Theme.contentBg)
         .onKeyPress(characters: CharacterSet(charactersIn: "p"), phases: .down) { press in
@@ -256,7 +244,7 @@ struct PlanChatView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 48)
                 .padding(.vertical, 12)
             }
             .onChange(of: session?.messages.count) { _, _ in
@@ -568,6 +556,7 @@ struct PlanChatView: View {
                 }
             }
         }
+        .padding(.horizontal, 48)
         .background(Color.clear)
         .onDrop(of: ["public.image", "public.file-url"], isTargeted: nil) { providers in
             handleDrop(providers: providers)
@@ -913,7 +902,7 @@ private struct OptionButtonsSheet: View {
                 // Keyboard hints footer
                 keyboardFooter
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 24)
             .padding(.vertical, 10)
         }
         .background(Theme.sidebar)
@@ -1291,12 +1280,6 @@ private struct DetailedOptionCard: View {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(isHighlighted ? Color.white.opacity(isFocused ? 0.04 : 0.03) : Color.clear)
             )
-            .overlay(alignment: .leading) {
-                // Left accent border
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(isFocused ? Theme.accent : (isHovered ? Theme.accent.opacity(0.3) : Color.clear))
-                    .frame(width: 2)
-            }
         }
         .buttonStyle(.plain)
         .onHover { hovering in
