@@ -23,6 +23,6 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>ATSApplicationFontsPath</key>
-	<string>Resources/Fonts</string>
+	<string>.</string>
 </dict>
 </plist>
