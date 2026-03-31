@@ -108,18 +108,38 @@ The 56-file canvas system is powerful but disconnected. Could serve as a visual 
 
 ---
 
-## Phase 4 — Hardening
+## Phase 4 — Stability
 
-### 4.1 Replace git polling with FSEvents
+### 4.1 ConnectionSummaryManager subprocess timeout (HIGH)
+`process.waitUntilExit()` blocks forever if the Haiku subprocess hangs. The class caps concurrent summaries at 3 — three simultaneous hangs silently exhaust all slots and no new summaries can be generated until the app restarts.
+**Fix:** 10-second timeout + `process.terminate()` on expiry.
+
+### 4.2 Git operations silently discard errors (MEDIUM)
+`stage()`, `commit()`, and `checkout()` in `GitRepository.swift` do not throw. A failed `git add` or `git commit` returns silently — the user sees success when the operation may have failed.
+**Fix:** Convert to `throws`, check `process.terminationStatus != 0`, surface errors to the Git panel UI.
+
+### 4.3 Worktree creation failure is console-only (MEDIUM)
+If `git worktree add` fails (path conflict, disk full), the task is still created and proceeds as if the worktree exists. The failure is logged to console only.
+**Fix:** Propagate worktree creation failure to the task creation flow and block task creation on failure.
+
+### 4.4 Fragile error enum comparison in HarnessMiddleware (LOW-MEDIUM)
+`session.status == .error("")` only matches empty-string errors. Any real error with an associated value (e.g. `.error("exit code 1")`) is silently missed.
+**Fix:** `if case .error = session.status { ... }`
+
+---
+
+## Phase 5 — Hardening
+
+### 5.1 Replace git polling with FSEvents
 GitRepository polls every 1.5s (5 git subprocess calls each). Replace with file system events.
 
-### 4.2 Claude CLI path detection
+### 5.2 Claude CLI path detection
 `AICommitService` hardcodes `/usr/local/bin/claude`. Use `which claude` or make configurable.
 
-### 4.3 Conversation search
+### 5.3 Conversation search
 Search across plan tab histories.
 
-### 4.4 Test coverage
+### 5.4 Test coverage
 DiffModalView, CommitHistoryView, and the spec-builder integration have no tests.
 
 ---
