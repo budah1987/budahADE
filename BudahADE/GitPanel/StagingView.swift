@@ -64,7 +64,7 @@ struct StagingView: View {
                 .textCase(.uppercase)
 
             Text("\(count)")
-                .font(Theme.mono(10))
+                .font(Theme.caption(10))
                 .foregroundColor(Theme.textMuted)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1)
@@ -139,7 +139,7 @@ struct StagingView: View {
     @ViewBuilder
     private func statusBadge(_ status: String) -> some View {
         Text(status)
-            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .font(Theme.label(10))
             .foregroundColor(statusColor(status))
             .frame(width: 18, height: 18)
             .background(statusColor(status).opacity(0.12))

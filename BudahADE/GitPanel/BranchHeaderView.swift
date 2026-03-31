@@ -48,13 +48,13 @@ struct BranchHeaderView: View {
                 if let prefix = BranchNameValidator.detectPrefix(repo.currentBranch) {
                     prefixBadge(prefix)
                     Text("/")
-                        .font(Theme.mono(11))
+                        .font(Theme.body(11))
                         .foregroundColor(Theme.textMuted)
                 }
 
                 let (_, name) = BranchNameValidator.split(repo.currentBranch)
                 Text(name)
-                    .font(Theme.mono(12, weight: .semibold))
+                    .font(Theme.label(12))
                     .foregroundColor(Theme.info)
             }
 
@@ -85,7 +85,7 @@ struct BranchHeaderView: View {
 
                 if repo.aheadCount > 0 {
                     Text("\(repo.aheadCount) ahead")
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.success)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -95,7 +95,7 @@ struct BranchHeaderView: View {
 
                 if repo.behindCount > 0 {
                     Text("\(repo.behindCount) behind")
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.error)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -118,7 +118,7 @@ struct BranchHeaderView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Text(selectedPrefix ?? "none")
-                            .font(Theme.mono(11))
+                            .font(Theme.body(11))
                             .foregroundColor(selectedPrefix != nil ? prefixColor(selectedPrefix!) : Theme.textMuted)
                         Image(systemName: showPrefixDropdown ? "chevron.up" : "chevron.down")
                             .font(.system(size: 6))
@@ -140,13 +140,13 @@ struct BranchHeaderView: View {
 
                 if selectedPrefix != nil {
                     Text("/")
-                        .font(Theme.mono(11))
+                        .font(Theme.body(11))
                         .foregroundColor(Theme.textMuted)
                 }
 
                 TextField("branch-name", text: $editedName)
                     .textFieldStyle(.plain)
-                    .font(Theme.mono(11))
+                    .font(Theme.body(11))
                     .foregroundColor(Theme.textPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
@@ -201,7 +201,7 @@ struct BranchHeaderView: View {
 
                 if repo.aheadCount > 0 {
                     Text("\(repo.aheadCount) ahead")
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.success)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -224,7 +224,7 @@ struct BranchHeaderView: View {
                         .foregroundColor(Theme.info)
                         .frame(width: 12)
                     Text("none")
-                        .font(Theme.mono(11))
+                        .font(Theme.body(11))
                         .foregroundColor(Theme.textMuted)
                     Spacer()
                 }
@@ -246,7 +246,7 @@ struct BranchHeaderView: View {
                             .foregroundColor(Theme.info)
                             .frame(width: 12)
                         Text(type.prefix)
-                            .font(Theme.mono(11))
+                            .font(Theme.body(11))
                             .foregroundColor(prefixColor(type.prefix))
                             .lineLimit(1)
                         Spacer()
@@ -281,7 +281,7 @@ struct BranchHeaderView: View {
                     .foregroundColor(Theme.textMuted)
                 TextField("Search branches...", text: $branchSearchText)
                     .textFieldStyle(.plain)
-                    .font(Theme.mono(11))
+                    .font(Theme.body(11))
                     .foregroundColor(Theme.textPrimary)
                     .focused($isSearchFocused)
                 if !branchSearchText.isEmpty {
@@ -316,7 +316,7 @@ struct BranchHeaderView: View {
                                     .foregroundColor(Theme.info)
                                     .frame(width: 12)
                                 Text(branch)
-                                    .font(Theme.mono(11))
+                                    .font(Theme.body(11))
                                     .foregroundColor(Theme.textSecondary)
                                     .lineLimit(1)
                                 Spacer()
@@ -341,7 +341,7 @@ struct BranchHeaderView: View {
                         .frame(width: 12)
                     TextField("new-branch", text: $newBranchName)
                         .textFieldStyle(.plain)
-                        .font(Theme.mono(11))
+                        .font(Theme.body(11))
                         .foregroundColor(Theme.textPrimary)
                         .onChange(of: newBranchName) { _, newValue in
                             newBranchName = BranchNameValidator.sanitize(newValue)
@@ -363,7 +363,7 @@ struct BranchHeaderView: View {
                             .foregroundColor(Theme.success)
                             .frame(width: 12)
                         Text("New branch...")
-                            .font(Theme.mono(11))
+                            .font(Theme.body(11))
                             .foregroundColor(Theme.success)
                         Spacer()
                     }
@@ -385,7 +385,7 @@ struct BranchHeaderView: View {
 
     private func prefixBadge(_ prefix: String) -> some View {
         Text(prefix)
-            .font(Theme.mono(10, weight: .medium))
+            .font(Theme.label(10))
             .foregroundColor(prefixColor(prefix))
             .padding(.horizontal, 5)
             .padding(.vertical, 1)

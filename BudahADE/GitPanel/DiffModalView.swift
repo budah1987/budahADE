@@ -42,11 +42,11 @@ struct DiffModalView: View {
                 statusBadge(file.status)
 
                 Text((file.path as NSString).lastPathComponent)
-                    .font(Theme.mono(13, weight: .semibold))
+                    .font(Theme.label(13))
                     .foregroundColor(Theme.textPrimary)
 
                 Text((file.path as NSString).deletingLastPathComponent)
-                    .font(Theme.mono(11))
+                    .font(Theme.caption(11))
                     .foregroundColor(Theme.textMuted)
             }
 
@@ -58,10 +58,10 @@ struct DiffModalView: View {
                 let removes = diffText.components(separatedBy: "\n").filter { $0.hasPrefix("-") && !$0.hasPrefix("---") }.count
 
                 Text("+\(adds)")
-                    .font(Theme.mono(11))
+                    .font(Theme.body(11))
                     .foregroundColor(Theme.success)
                 Text("−\(removes)")
-                    .font(Theme.mono(11))
+                    .font(Theme.body(11))
                     .foregroundColor(Theme.error)
 
                 Button {
@@ -167,13 +167,13 @@ struct DiffModalView: View {
                 ForEach(Array(diff.components(separatedBy: "\n").enumerated()), id: \.offset) { idx, line in
                     HStack(spacing: 0) {
                         Text("\(idx + 1)")
-                            .font(Theme.mono(10))
+                            .font(Theme.code(10))
                             .foregroundColor(Theme.textMuted)
                             .frame(width: 36, alignment: .trailing)
                             .padding(.trailing, 8)
 
                         Text(line)
-                            .font(Theme.mono(11))
+                            .font(Theme.code(11))
                             .foregroundColor(lineColor(line))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -298,13 +298,13 @@ struct DiffModalView: View {
     private func diffLineView(lineNumber: Int?, text: String, type: LineType) -> some View {
         HStack(spacing: 0) {
             Text(lineNumber.map { "\($0)" } ?? "")
-                .font(Theme.mono(10))
+                .font(Theme.code(10))
                 .foregroundColor(Theme.textMuted)
                 .frame(width: 36, alignment: .trailing)
                 .padding(.trailing, 8)
 
             Text(text)
-                .font(Theme.mono(11))
+                .font(Theme.code(11))
                 .foregroundColor(lineTypeColor(type))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -315,7 +315,7 @@ struct DiffModalView: View {
 
     private func statusBadge(_ status: String) -> some View {
         Text(status)
-            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .font(Theme.label(10))
             .foregroundColor(statusColor(status))
             .frame(width: 14, height: 14)
             .background(statusColor(status).opacity(0.12))

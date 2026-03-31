@@ -84,7 +84,7 @@ struct ChangesListView: View {
 
             if count > 0 {
                 Text("\(count)")
-                    .font(Theme.mono(9))
+                    .font(Theme.caption(9))
                     .foregroundColor(countColor)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
@@ -103,7 +103,7 @@ struct ChangesListView: View {
             statusBadge(file.status)
 
             Text(file.path)
-                .font(Theme.mono(11))
+                .font(Theme.body(11))
                 .foregroundColor(Theme.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -133,7 +133,7 @@ struct ChangesListView: View {
 
     private func statusBadge(_ status: String) -> some View {
         Text(status)
-            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .font(Theme.label(10))
             .foregroundColor(statusColor(status))
             .frame(width: 14, height: 14)
             .background(statusColor(status).opacity(0.12))

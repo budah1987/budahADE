@@ -24,7 +24,7 @@ struct BranchPicker: View {
                     .foregroundColor(Theme.textMuted)
 
                 Text(repo.currentBranch.isEmpty ? "No branch" : repo.currentBranch)
-                    .font(Theme.mono(12, weight: .medium))
+                    .font(Theme.label(12))
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1)
 

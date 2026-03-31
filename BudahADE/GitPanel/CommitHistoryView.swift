@@ -28,7 +28,7 @@ struct CommitHistoryView: View {
                         .tracking(0.8)
 
                     Text("\(repo.totalCommitCount)")
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.textMuted)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
@@ -127,7 +127,7 @@ struct CommitHistoryView: View {
 
                 HStack(spacing: 6) {
                     Text(String(commit.id.prefix(7)))
-                        .font(Theme.mono(9))
+                        .font(Theme.caption(9))
                         .foregroundColor(Theme.textMuted)
 
                     Text(commit.date)
@@ -160,7 +160,7 @@ struct CommitHistoryView: View {
 
     private func badgePill(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(Theme.mono(8))
+            .font(Theme.caption(8))
             .foregroundColor(color)
             .padding(.horizontal, 5)
             .padding(.vertical, 1)

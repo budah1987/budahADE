@@ -8,7 +8,7 @@ struct DiffView: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(diff.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
                     Text(line)
-                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .font(Theme.code(11))
                         .foregroundColor(lineColor(for: line))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 8)

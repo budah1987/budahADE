@@ -49,7 +49,7 @@ struct GitPanelView: View {
                 if let file = selectedFile {
                     HStack {
                         Text(file)
-                            .font(Theme.mono(11, weight: .medium))
+                            .font(Theme.label(11))
                             .foregroundColor(Theme.textSecondary)
                             .lineLimit(1)
 
