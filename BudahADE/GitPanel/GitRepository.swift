@@ -400,30 +400,82 @@ final class GitRepository: ObservableObject {
 
     // MARK: - Static Helpers
 
-    static func listBranches(at repoPath: String) async -> [String] {
+    /// Groups branches into "on GitHub" vs "local only".
+    /// Queries the remote directly via ls-remote for accuracy — local tracking refs
+    /// go stale until `git fetch --prune` is run, so we can't rely on them.
+    /// Falls back to local-only listing if there is no remote or network is unavailable.
+    static func listBranchesGrouped(at repoPath: String) async -> (local: [String], remote: [String]) {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = ["branch", "--format=%(refname:short)"]
-                process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = Pipe()
-                do {
-                    try process.run()
+                func run(_ args: [String]) -> String {
+                    let process = Process()
+                    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                    process.arguments = args
+                    process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
+                    let pipe = Pipe()
+                    process.standardOutput = pipe
+                    process.standardError = Pipe()
+                    try? process.run()
                     process.waitUntilExit()
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let output = String(data: data, encoding: .utf8) ?? ""
-                    let branches = output.components(separatedBy: .newlines)
-                        .map { $0.trimmingCharacters(in: .whitespaces) }
-                        .filter { !$0.isEmpty }
-                    continuation.resume(returning: branches)
-                } catch {
-                    continuation.resume(returning: ["main"])
+                    return String(data: data, encoding: .utf8) ?? ""
                 }
+
+                // Local branches — always accurate
+                let localOutput = run(["for-each-ref", "refs/heads/", "--format=%(refname:short)"])
+                let localBranches = localOutput
+                    .components(separatedBy: .newlines)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+
+                // Live remote branches from GitHub — single lightweight network call
+                // ls-remote output: "<hash>\trefs/heads/<name>"
+                let remoteOutput = run(["ls-remote", "--heads", "origin"])
+                let remoteBranches: Set<String> = Set(
+                    remoteOutput
+                        .components(separatedBy: .newlines)
+                        .compactMap { line -> String? in
+                            guard let tabIdx = line.firstIndex(of: "\t") else { return nil }
+                            let ref = String(line[line.index(after: tabIdx)...])
+                            let prefix = "refs/heads/"
+                            guard ref.hasPrefix(prefix) else { return nil }
+                            return String(ref.dropFirst(prefix.count))
+                        }
+                )
+
+                if remoteBranches.isEmpty {
+                    // No remote / offline — just show all local branches in one group
+                    continuation.resume(returning: (
+                        local: localBranches.isEmpty ? ["main"] : localBranches,
+                        remote: []
+                    ))
+                    return
+                }
+
+                var onGitHub: [String] = []
+                var localOnly: [String] = []
+                for branch in localBranches {
+                    if remoteBranches.contains(branch) {
+                        onGitHub.append(branch)
+                    } else {
+                        localOnly.append(branch)
+                    }
+                }
+                // Remote branches not checked out locally
+                let localSet = Set(localBranches)
+                let remoteOnly = remoteBranches.subtracting(localSet).sorted()
+
+                continuation.resume(returning: (
+                    local: onGitHub + remoteOnly,
+                    remote: localOnly
+                ))
             }
         }
+    }
+
+    static func listBranches(at repoPath: String) async -> [String] {
+        let grouped = await listBranchesGrouped(at: repoPath)
+        return grouped.local + grouped.remote
     }
 
     // MARK: - Private
