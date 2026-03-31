@@ -506,12 +506,9 @@ final class TaskState: ObservableObject, Identifiable {
                       let index = self.tabs.firstIndex(where: { $0.id == surfaceId }) else { return }
 
                 // If we have a restored title, don't let shell/path titles overwrite it.
-                // Only accept titles from Claude (contain "Claude" or spinner indicators).
-                if let restoredTitle = self.tabs[index].restoredTitle {
-                    let isClaude = title.contains("Claude") ||
-                        title.unicodeScalars.contains { $0.value >= 0x2800 && $0.value <= 0x28FF } ||
-                        title.contains("✳")
-                    if isClaude {
+                // Only accept titles from Claude (spinner or "Claude" keyword).
+                if self.tabs[index].restoredTitle != nil {
+                    if Self.parseAgentStatus(from: title) != .inactive {
                         // Claude set a real title — accept it and clear the restored flag
                         self.tabs[index].title = title
                         self.tabs[index].restoredTitle = nil
