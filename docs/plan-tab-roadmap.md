@@ -214,6 +214,87 @@ Search across plan tab histories.
 - [ ] Build-status.json missing → graceful idle state, no errors
 - [ ] Kill builder mid-task → status dot goes gray, drawer still accessible
 
+### Phase 2 — In-App Browser
+
+#### Unit Tests (new)
+
+**WebViewStore — lifecycle & navigation**
+- [ ] `ensureWebView()` creates WKWebView on first call, returns same instance on second
+- [ ] `navigate(to:)` loads the given URL in the web view
+- [ ] `navigate(to:)` auto-prepends `https://` when URL has no scheme
+- [ ] `goBack()` / `goForward()` forward to WKWebView (no crash when history is empty)
+- [ ] `title` updates via KVO when page finishes loading
+- [ ] `canGoBack` / `canGoForward` update via KVO after navigation
+
+**TabType — browser discrimination**
+- [ ] TabInfo with `.browser` type round-trips through encode/decode
+- [ ] TabInfo with `.terminal` type is unaffected by browser additions
+- [ ] Creating a browser tab assigns a unique UUID distinct from terminal tabs
+
+**URL detection — pattern matching**
+- [ ] Detects `http://localhost:3000` in plain text
+- [ ] Detects `https://example.com/path` in plain text
+- [ ] Detects `localhost:XXXX` without scheme prefix
+- [ ] Does not false-positive on non-URL text (e.g. "use port 3000 for this")
+- [ ] Returns multiple URLs when text contains more than one
+- [ ] Ignores duplicate URLs in same message
+
+**Page content extraction**
+- [ ] `extractPageText()` returns `document.body.innerText` via JS evaluation
+- [ ] `extractPageText()` returns nil/empty for about:blank
+- [ ] Extracted text is truncated to a sane limit (e.g. 20k chars)
+
+#### Integration Tests (new)
+
+**Browser tab creation**
+- [ ] `createBrowserTab(url:)` adds a browser tab to `tabs` array
+- [ ] `createBrowserTab(url:)` selects the new tab
+- [ ] Browser tab appears in TerminalTabBar alongside terminal tabs
+- [ ] Closing browser tab removes it and selects adjacent tab
+- [ ] `closeAllTerminals()` also closes browser tabs
+
+**URL interception → browser tab**
+- [ ] Detected URL in chat message shows "Open in-app" button
+- [ ] Clicking "Open in-app" calls `createBrowserTab(url:)` with correct URL
+- [ ] Detected `localhost:XXXX` in terminal scrollback shows affordance
+- [ ] Opening URL that matches existing browser tab selects it instead of duplicating
+
+**Page content → chat injection**
+- [ ] "Show to Claude" extracts page text and sends as user message
+- [ ] Injected message includes page URL as attribution
+- [ ] "Show to Claude" with empty page content shows no-op / warning
+
+#### Manual Smoke Tests
+
+**Browser tab basics**
+- [ ] Click "+" in tab bar → option to add Browser tab
+- [ ] Browser tab shows URL bar, back/forward/reload buttons
+- [ ] Type URL → page loads, title updates in tab
+- [ ] Back/forward navigation works across page history
+- [ ] Tab shows globe icon or favicon, not terminal icon
+- [ ] Multiple browser tabs can coexist with terminal tabs
+- [ ] Middle-click closes browser tab
+- [ ] Switching between browser and terminal tabs preserves state in both
+
+**URL interception**
+- [ ] Claude returns a URL in chat → "Open in-app" affordance appears inline
+- [ ] Terminal prints `localhost:8080` → affordance appears (toast or inline)
+- [ ] Clicking affordance opens browser tab at that URL
+- [ ] If browser tab already open at that URL, selects it instead
+
+**Page content sharing**
+- [ ] Browser tab toolbar has "Show to Claude" button
+- [ ] Click it → page text injected into active chat as user message
+- [ ] Large pages are truncated with "[truncated]" indicator
+- [ ] Works on localhost dev server pages
+
+**Edge cases**
+- [ ] Browser tab with no URL → shows blank state, no crash
+- [ ] Navigate to invalid URL → error page shown in-app, no crash
+- [ ] Rapid tab switching between browser and terminal → no flicker or layout break
+- [ ] Session restore with browser tabs → URLs reload on reopen
+- [ ] Browser tab during Build mode → does not interfere with builder drawer
+
 ---
 
 ## Design Tokens (from spec)
