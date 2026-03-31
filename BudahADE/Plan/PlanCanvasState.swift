@@ -92,13 +92,21 @@ final class PlanCanvasState: ObservableObject {
         // Handle image asset copying
         if case .image(let path) = type {
             let assetsDir = (worktreePath as NSString).appendingPathComponent(".budahade/assets")
-            try? FileManager.default.createDirectory(
-                atPath: assetsDir, withIntermediateDirectories: true
-            )
+            do {
+                try FileManager.default.createDirectory(
+                    atPath: assetsDir, withIntermediateDirectories: true
+                )
+            } catch {
+                print("[PlanCanvasState] ⚠️ Failed to create assets directory: \(error)")
+            }
             let filename = (path as NSString).lastPathComponent
             let destPath = (assetsDir as NSString).appendingPathComponent(filename)
             if !FileManager.default.fileExists(atPath: destPath) {
-                try? FileManager.default.copyItem(atPath: path, toPath: destPath)
+                do {
+                    try FileManager.default.copyItem(atPath: path, toPath: destPath)
+                } catch {
+                    print("[PlanCanvasState] ⚠️ Failed to copy image \(filename): \(error)")
+                }
             }
             element = CanvasElement(
                 id: element.id,
@@ -192,7 +200,11 @@ final class PlanCanvasState: ObservableObject {
         let section = "\n\n## From \(fromAgent.name)\n\n<!-- source: \(fromAgent.id) -->\n\n\(content)"
 
         if let existing = try? String(contentsOfFile: path, encoding: .utf8) {
-            try? (existing + section).write(toFile: path, atomically: true, encoding: .utf8)
+            do {
+                try (existing + section).write(toFile: path, atomically: true, encoding: .utf8)
+            } catch {
+                print("[PlanCanvasState] ⚠️ Failed to append spec content to \((path as NSString).lastPathComponent): \(error)")
+            }
         }
     }
 
