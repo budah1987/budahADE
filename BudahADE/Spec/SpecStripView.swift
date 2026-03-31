@@ -12,6 +12,24 @@ struct SpecStripView: View {
     @ObservedObject var specState: SpecState
     @ObservedObject var buildStatus: BuildStatusState
     var variant: SpecStripVariant = .compact
+    /// Whether the builder is running (shows drawer toggle in inline variant)
+    var hasBuilder: Bool = false
+    /// Binding to toggle the builder drawer open/closed
+    var isBuilderDrawerOpen: Binding<Bool>
+
+    init(
+        specState: SpecState,
+        buildStatus: BuildStatusState,
+        variant: SpecStripVariant = .compact,
+        hasBuilder: Bool = false,
+        isBuilderDrawerOpen: Binding<Bool> = .constant(false)
+    ) {
+        self.specState = specState
+        self.buildStatus = buildStatus
+        self.variant = variant
+        self.hasBuilder = hasBuilder
+        self.isBuilderDrawerOpen = isBuilderDrawerOpen
+    }
 
     var body: some View {
         if specState.hasSpec {
@@ -92,6 +110,29 @@ struct SpecStripView: View {
                     .lineLimit(1)
 
                 Spacer()
+
+                // Builder drawer toggle
+                if hasBuilder {
+                    Button {
+                        isBuilderDrawerOpen.wrappedValue.toggle()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(builderDotColor)
+                                .frame(width: 5, height: 5)
+                            Image(systemName: isBuilderDrawerOpen.wrappedValue ? "chevron.up" : "terminal")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundColor(Theme.textMuted)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(isBuilderDrawerOpen.wrappedValue ? Theme.accent.opacity(0.12) : Color.white.opacity(0.05))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -112,6 +153,13 @@ struct SpecStripView: View {
                             ? Color(hex: 0xE06C75)
                             : Theme.textMuted)
                         .lineLimit(1)
+
+                    if buildStatus.status == .working, let elapsed = buildStatus.elapsed {
+                        Text(elapsed)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(Theme.textMuted.opacity(0.6))
+                    }
+
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -165,5 +213,14 @@ struct SpecStripView: View {
 
     private var progressColor: Color {
         specState.progress >= 1.0 ? Theme.success : Theme.accent
+    }
+
+    private var builderDotColor: Color {
+        switch buildStatus.status {
+        case .working:   return Theme.accent
+        case .blocked:   return Color(hex: 0xE06C75)
+        case .completed: return Theme.success
+        case .idle:      return Theme.textMuted
+        }
     }
 }

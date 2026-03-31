@@ -155,17 +155,26 @@ enum SpecParser {
         )
     }
 
-    /// Find spec files in a directory
+    /// Find spec files in a directory (root-level patterns + .budahade/spec.md)
     static func findSpecFiles(in directory: String) -> [String] {
         let fm = FileManager.default
-        guard let contents = try? fm.contentsOfDirectory(atPath: directory) else {
-            return []
+        var results: [String] = []
+
+        // Scan root for *-spec.md, *-plan.md, *.spec.md
+        if let contents = try? fm.contentsOfDirectory(atPath: directory) {
+            let specPatterns = ["-spec.md", "-plan.md", ".spec.md"]
+            results = contents
+                .filter { name in specPatterns.contains(where: { name.lowercased().hasSuffix($0) }) }
+                .map { (directory as NSString).appendingPathComponent($0) }
         }
 
-        let specPatterns = ["-spec.md", "-plan.md", ".spec.md"]
-        return contents
-            .filter { name in specPatterns.contains(where: { name.lowercased().hasSuffix($0) }) }
-            .map { (directory as NSString).appendingPathComponent($0) }
+        // Also check .budahade/spec.md (written by SpecVersionManager.approve)
+        let budahadeSpec = (directory as NSString).appendingPathComponent(".budahade/spec.md")
+        if fm.fileExists(atPath: budahadeSpec), !results.contains(budahadeSpec) {
+            results.append(budahadeSpec)
+        }
+
+        return results
     }
 
     // MARK: - Helpers

@@ -63,6 +63,7 @@ final class BuildStatusWatcher {
             return
         }
 
+        let previousTask = buildStatus.currentTaskTitle
         buildStatus.currentTaskTitle = dict["currentTask"] as? String
         buildStatus.currentTaskIndex = dict["taskIndex"] as? Int
         buildStatus.lastAction = dict["lastAction"] as? String
@@ -75,6 +76,11 @@ final class BuildStatusWatcher {
             case "completed": buildStatus.status = .completed
             default:          buildStatus.status = .idle
             }
+        }
+
+        // Track elapsed time per task
+        if buildStatus.currentTaskTitle != previousTask || (buildStatus.status == .working && buildStatus.taskStartedAt == nil) {
+            buildStatus.taskStartedAt = Date()
         }
     }
 
