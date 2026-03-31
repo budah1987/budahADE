@@ -116,6 +116,16 @@ final class TaskState: ObservableObject, Identifiable {
     func enterBuildMode() {
         mode = .build
 
+        // Synchronous spec discovery — ensures we detect spec files that were
+        // just written (e.g. via NewTaskSheet import) before the watcher polls.
+        if !specState.hasSpec {
+            let specFiles = SpecParser.findSpecFiles(in: worktreePath)
+            if !specFiles.isEmpty {
+                let results = specFiles.compactMap { SpecParser.parse(fileAt: $0) }
+                specState.updateAll(from: results)
+            }
+        }
+
         // Launch builder in dedicated panel (not in tab bar)
         if builderPanel == nil && specState.hasSpec {
             launchBuilder()
