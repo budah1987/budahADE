@@ -118,16 +118,32 @@ struct PlanChatView: View {
                     .allowsHitTesting(false)
                 }
 
-            // Question sheet — slides up when Claude asks a question
+            // Option sheet — only shows when assistant presents structured choices
+            let _ = {
+                if let s = session {
+                    let lastRole = s.messages.last?.role
+                    let lastLen = s.messages.last?.content.count ?? 0
+                    NSLog("[OptionSheet] session exists, dismissed=%d, msgCount=%d, lastRole=%@, lastContentLen=%d, status=%@",
+                          s.optionsDismissed ? 1 : 0,
+                          s.messages.count,
+                          lastRole == .assistant ? "assistant" : (lastRole == .user ? "user" : "other"),
+                          lastLen,
+                          "\(s.status)")
+                } else {
+                    NSLog("[OptionSheet] session is nil")
+                }
+            }()
             if let session,
                !session.optionsDismissed,
                let lastMsg = session.messages.last,
                lastMsg.role == .assistant,
                !lastMsg.content.isEmpty,
-               let question = session.detectQuestion(in: lastMsg.content) {
+               let options = session.detectOptions(in: lastMsg.content),
+               !options.isEmpty {
+                let question = session.detectQuestion(in: lastMsg.content)
                 OptionButtonsSheet(
-                    contextText: question.contextText,
-                    options: question.options,
+                    contextText: question?.contextText ?? "",
+                    options: options,
                     onSelect: { option in
                         session.optionsDismissed = true
                         state.sendMessage("\(option.label). \(option.text)")
@@ -860,77 +876,71 @@ private struct OptionButtonsSheet: View {
     let onCustomResponse: (String) -> Void
 
     @State private var customText: String = ""
+    @State private var focusedIndex: Int? = nil
     @FocusState private var sheetFocused: Bool
     @FocusState private var customFieldFocused: Bool
 
+    /// Auto-detect: if any option has a description, use detailed layout
+    private var isDetailed: Bool {
+        options.contains { !$0.description.isEmpty }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Header with context + close button
-            HStack(alignment: .top) {
-                // Question context
-                Text(cleanContext(contextText))
-                    .font(Theme.body(13))
-                    .foregroundColor(Theme.textPrimary)
-                    .lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 0) {
+            // Accent top border
+            Rectangle()
+                .fill(Theme.accent.opacity(0.4))
+                .frame(height: 1.5)
 
-                Spacer(minLength: 8)
+            VStack(alignment: .leading, spacing: 6) {
+                // Header: question + dismiss
+                sheetHeader
 
-                Button {
-                    withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(Theme.textMuted)
-                        .frame(width: 20, height: 20)
-                        .background(Theme.hoverFill)
-                        .clipShape(Circle())
+                Rectangle().fill(Color.white.opacity(0.08)).frame(height: 0.5)
+                    .padding(.bottom, 2)
+
+                // Option rows — compact or detailed
+                if isDetailed {
+                    detailedOptions
+                } else {
+                    compactOptions
                 }
-                .buttonStyle(.plain)
-            }
-            .padding(.bottom, 4)
 
-            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+                // Custom text field
+                customTextField
+                    .padding(.top, 4)
 
-            // Option rows (if any)
-            if !options.isEmpty {
-                ForEach(options) { option in
-                    OptionSheetRow(option: option, onSelect: onSelect)
-                }
+                // Keyboard hints footer
+                keyboardFooter
             }
-
-            // Free-text input — always shown
-            HStack(spacing: 8) {
-                Text("↵")
-                    .font(Theme.mono(12))
-                    .foregroundColor(Theme.textMuted)
-                    .frame(width: 18, alignment: .trailing)
-                TextField(options.isEmpty ? "Type your answer..." : "Something else...", text: $customText)
-                    .font(Theme.body(13))
-                    .foregroundColor(Theme.textPrimary)
-                    .textFieldStyle(.plain)
-                    .focused($customFieldFocused)
-                    .onSubmit {
-                        let trimmed = customText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmed.isEmpty else { return }
-                        onCustomResponse(trimmed)
-                    }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(Theme.hoverFill.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .padding(.top, 2)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Theme.surface2.opacity(0.6))
+        .background(Theme.sidebar)
         .focusable()
         .focused($sheetFocused)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 sheetFocused = true
             }
+        }
+        .onKeyPress(.upArrow) {
+            guard !customFieldFocused else { return .ignored }
+            moveFocus(delta: -1)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            guard !customFieldFocused else { return .ignored }
+            moveFocus(delta: 1)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard !customFieldFocused else { return .ignored }
+            if let idx = focusedIndex, idx < options.count {
+                withAnimation(.easeOut(duration: 0.15)) { onSelect(options[idx]) }
+                return .handled
+            }
+            return .ignored
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "123456789"), phases: .down) { press in
             guard !customFieldFocused else { return .ignored }
@@ -948,6 +958,23 @@ private struct OptionButtonsSheet: View {
             }
             return .ignored
         }
+        .onKeyPress(characters: CharacterSet.letters, phases: .down) { press in
+            guard !customFieldFocused else { return .ignored }
+            let char = String(press.characters).uppercased()
+            if let option = options.first(where: { $0.label.uppercased() == char }) {
+                withAnimation(.easeOut(duration: 0.15)) { onSelect(option) }
+                return .handled
+            }
+            return .ignored
+        }
+        .onKeyPress(.tab) {
+            if !customFieldFocused {
+                customFieldFocused = true
+                focusedIndex = nil
+                return .handled
+            }
+            return .ignored
+        }
         .onKeyPress(.escape) {
             if customFieldFocused {
                 customFieldFocused = false
@@ -959,14 +986,161 @@ private struct OptionButtonsSheet: View {
         }
     }
 
-    /// Strip markdown bold/italic markers and bullet prefixes for clean display
+    // MARK: - Header
+
+    private var sheetHeader: some View {
+        HStack(alignment: .top) {
+            Text(cleanContext(contextText))
+                .font(Theme.body(13))
+                .foregroundColor(Theme.textPrimary)
+                .lineLimit(4)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 8)
+
+            Button {
+                withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(Theme.textMuted)
+                    .frame(width: 22, height: 22)
+                    .background(Theme.hoverFill)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.bottom, 4)
+    }
+
+    // MARK: - Compact Options
+
+    private var compactOptions: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(options.enumerated()), id: \.element.id) { idx, option in
+                CompactOptionRow(
+                    option: option,
+                    isFocused: focusedIndex == idx,
+                    onSelect: { onSelect(option) },
+                    onHover: { hovering in
+                        if hovering { focusedIndex = idx }
+                    }
+                )
+                if idx < options.count - 1 {
+                    Rectangle().fill(Color.white.opacity(0.05)).frame(height: 0.5)
+                        .padding(.horizontal, 10)
+                }
+            }
+        }
+    }
+
+    // MARK: - Detailed Options
+
+    private var detailedOptions: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(options.enumerated()), id: \.element.id) { idx, option in
+                DetailedOptionCard(
+                    option: option,
+                    isFocused: focusedIndex == idx,
+                    onSelect: { onSelect(option) },
+                    onHover: { hovering in
+                        if hovering { focusedIndex = idx }
+                    }
+                )
+                if idx < options.count - 1 {
+                    Rectangle().fill(Color.white.opacity(0.05)).frame(height: 0.5)
+                        .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    // MARK: - Custom Text Field
+
+    private var customTextField: some View {
+        HStack(spacing: 8) {
+            Text("\u{270E}")  // pencil icon
+                .font(.system(size: 12))
+                .foregroundColor(Theme.textMuted)
+                .frame(width: 22, height: 22)
+
+            TextField(options.isEmpty ? "Type your answer..." : "Something else...", text: $customText)
+                .font(Theme.body(13))
+                .foregroundColor(Theme.textPrimary)
+                .textFieldStyle(.plain)
+                .focused($customFieldFocused)
+                .onSubmit {
+                    let trimmed = customText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    onCustomResponse(trimmed)
+                }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.white.opacity(0.025))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    // MARK: - Keyboard Footer
+
+    private var keyboardFooter: some View {
+        HStack {
+            Text("↑↓ navigate")
+                .font(Theme.mono(11))
+                .foregroundColor(Theme.textMuted)
+            + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
+            + Text("Enter select")
+                .font(Theme.mono(11))
+                .foregroundColor(Theme.textMuted)
+            + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
+            + Text("Esc skip")
+                .font(Theme.mono(11))
+                .foregroundColor(Theme.textMuted)
+
+            Spacer()
+
+            Button {
+                withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
+            } label: {
+                Text("Skip")
+                    .font(Theme.body(11))
+                    .foregroundColor(Theme.textSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(Theme.hoverFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 8)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Color.white.opacity(0.06)).frame(height: 0.5)
+        }
+    }
+
+    // MARK: - Focus Navigation
+
+    private func moveFocus(delta: Int) {
+        guard !options.isEmpty else { return }
+        if let current = focusedIndex {
+            focusedIndex = (current + delta + options.count) % options.count
+        } else {
+            focusedIndex = delta > 0 ? 0 : options.count - 1
+        }
+    }
+
+    // MARK: - Helpers
+
     private func cleanContext(_ text: String) -> String {
         text.replacingOccurrences(of: "**", with: "")
             .replacingOccurrences(of: "__", with: "")
             .components(separatedBy: "\n")
             .map { line in
                 var l = line
-                // Strip bullet prefixes
                 if l.hasPrefix("• ") { l = String(l.dropFirst(2)) }
                 if l.hasPrefix("- ") { l = String(l.dropFirst(2)) }
                 return l
@@ -975,40 +1149,76 @@ private struct OptionButtonsSheet: View {
     }
 }
 
-private struct OptionSheetRow: View {
+private struct CompactOptionRow: View {
     let option: AgentSession.DetectedOption
-    let onSelect: (AgentSession.DetectedOption) -> Void
+    let isFocused: Bool
+    let onSelect: () -> Void
+    let onHover: (Bool) -> Void
 
     @State private var isHovered = false
 
+    private var isHighlighted: Bool { isFocused || isHovered }
+
     var body: some View {
         Button {
-            withAnimation(.easeOut(duration: 0.15)) {
-                onSelect(option)
-            }
+            withAnimation(.easeOut(duration: 0.15)) { onSelect() }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
+                // Badge
                 Text(option.label)
-                    .font(Theme.mono(12))
+                    .font(Theme.mono(11, weight: .semibold))
                     .foregroundColor(Theme.accent)
-                    .frame(width: 18, alignment: .trailing)
-                InlineBoldText(option.text)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(isHighlighted
+                                  ? Color(hex: 0xc4785c).opacity(0.15)
+                                  : Color.white.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(isHighlighted
+                                          ? Color(hex: 0xc4785c).opacity(0.3)
+                                          : Color.white.opacity(0.1),
+                                          lineWidth: 1)
+                    )
+
+                // Option text
+                Text(option.text)
                     .font(Theme.body(13))
-                    .foregroundColor(isHovered ? .white : Theme.textPrimary)
+                    .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
+
                 Spacer()
+
+                // Arrow indicator
+                Text("→")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.accent)
+                    .opacity(isHighlighted ? 1 : 0)
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(isHovered ? Theme.hoverFill : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHighlighted ? Color.white.opacity(isFocused ? 0.06 : 0.04) : Color.clear)
+            )
         }
         .buttonStyle(.plain)
         .onHover { hovering in
             isHovered = hovering
+            onHover(hovering)
         }
     }
+}
+
+private struct DetailedOptionCard: View {
+    let option: AgentSession.DetectedOption
+    let isFocused: Bool
+    let onSelect: () -> Void
+    let onHover: (Bool) -> Void
+    var body: some View { EmptyView() }
 }
 
 // MARK: - Inline Bold Text
