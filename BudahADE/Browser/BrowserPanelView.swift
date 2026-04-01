@@ -9,6 +9,7 @@ struct BrowserPanelView: View {
     var assignedPort: Int?
     var detectedURLs: [URL] = []
     var onPopOut: (() -> Void)?
+    var onActivatePicker: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,6 +39,8 @@ struct BrowserPanelView: View {
             if let port = assignedPort {
                 portBadge(port)
             }
+
+            inspectButton
 
             if let onPopOut {
                 Button(action: onPopOut) {
@@ -127,6 +130,24 @@ struct BrowserPanelView: View {
             .padding(.vertical, 2)
             .background(Theme.accent.opacity(0.15))
             .cornerRadius(3)
+    }
+
+    private var inspectButton: some View {
+        let isActive = state.elementPicker.isActive
+        return Button(action: {
+            if isActive {
+                state.elementPicker.deactivate()
+            } else {
+                onActivatePicker?()
+            }
+        }) {
+            Image(systemName: "cursorarrow.square")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(isActive ? Theme.accent : Theme.textMuted)
+        }
+        .buttonStyle(.plain)
+        .help(isActive ? "Exit inspect mode (Esc)" : "Inspect element (⌘⇧I)")
+        .keyboardShortcut("i", modifiers: [.command, .shift])
     }
 
     // MARK: - Web Content

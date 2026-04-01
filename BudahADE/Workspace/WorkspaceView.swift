@@ -458,7 +458,11 @@ struct WorkspaceView: View {
                 state: panel.state,
                 assignedPort: task.assignedPort,
                 detectedURLs: task.devServerManager?.detectedURLs ?? [],
-                onPopOut: { panel.popOut() }
+                onPopOut: { panel.popOut() },
+                onActivatePicker: {
+                    guard let wv = panel.state.webView else { return }
+                    panel.state.elementPicker.activate(in: wv)
+                }
             )
         }
     }

@@ -66,19 +66,27 @@ _Last updated: 2026-04-01. Cross-referenced against codebase (122 Swift files)._
 - [x] Detected URLs dropdown in `BrowserPanelView` chrome — Menu-style picker, appears when `detectedURLs.count > 1`
 - [x] `SmartReloader` — FSEvents recursive worktree watcher (300ms coalescing); build-complete patterns for vite/next/webpack/parcel/turbopack; 3-second fallback; wired via `TaskState`
 
-### 2.C — Agent Control — NOT DONE
+### 2.C — Agent Control — COMPLETE ✓
 
-- [ ] `BrowserHTTPServer` on `NWListener` (default port `9222`), header-routed by `X-Task-Id`
-- [ ] Endpoints: `/navigate`, `/screenshot`, `/click`, `/type`, `/dom`, `/evaluate`, `/console`, `/network`, `/url`, `/reload`, `/capabilities`
-- [ ] Console + network capture via `WKScriptMessageHandler` — ring buffer in `BrowserState`
-- [ ] Server lifecycle tied to task open/close
+- [x] `BrowserAPIServerProtocol` — interface for server + task registry
+- [x] `BrowserHTTPServer` — `NWListener`-based HTTP/1.1 server, singleton, header-routed by `X-Task-Id`
+- [x] All 11 endpoints: `/capabilities`, `/url`, `/navigate`, `/reload`, `/screenshot` (full + selector-crop), `/click`, `/type`, `/dom`, `/evaluate`, `/console`, `/network`
+- [x] Console capture — `console.log/warn/error/info/debug` intercepted via JS, ring buffer (200 entries) in `BrowserState.consoleLogs`
+- [x] Network capture — `fetch` + XHR intercepted via JS, ring buffer (100 entries) in `BrowserState.networkLogs`
+- [x] `BrowserScripts` — all JS strings isolated in one enum for maintainability
+- [x] Server lifecycle: auto-starts on first `registerTask`, auto-stops when last task unregisters
+- [x] `TaskState.createBrowserTab` registers task; `closeTab` unregisters
 
-### 2.D — Element Picker — NOT DONE
+### 2.D — Element Picker — COMPLETE ✓
 
-- [ ] `ElementPicker` — JS overlay via `WKUserScript`, highlight on hover, capture on click (`Cmd+Shift+I`)
-- [ ] Context bundle: CSS selector path + outer HTML + cropped screenshot + computed styles
-- [ ] Chat injection — structured block with screenshot into active agent input
-- [ ] Pop-out window — `NSPanel` with dock-back button (stub exists in `BrowserPopoutWindow.swift`)
+- [x] `ElementPicker` class — activate/deactivate, JS injection via `evaluateJavaScript`, hover highlight + Esc support
+- [x] JS picker: CSS selector builder (`#id` > `.class` chain > tag path, max 5 levels), computed styles extraction, `getBoundingClientRect` for crop
+- [x] `WKWebView.takeSnapshot(with:)` cropped to element bounding rect
+- [x] `ElementContext.terminalBlock()` — formatted text block with selector, HTML preview, styles, screenshot path
+- [x] `TaskState.injectElementContext` — saves PNG to `.budahade/`, injects block as pending input via `TmuxSessionManager.sendKeys(literal: true)` (no Enter — user appends instruction before submitting)
+- [x] `BrowserPanelView` inspect button — `⌘⇧I` toggle, accent color when active
+- [x] `onActivatePicker` wired in `WorkspaceView` → `panel.state.elementPicker.activate(in: wv)`
+- [ ] Pop-out window dock-back (stub in `BrowserPopoutWindow.swift` — deferred)
 
 ---
 

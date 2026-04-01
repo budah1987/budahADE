@@ -441,10 +441,52 @@ final class TaskState: ObservableObject, Identifiable {
             reloader.onReloadNeeded = { [weak panel] in panel?.state.reload() }
         }
 
+        // Register with API server (starts server lazily on first registration)
+        BrowserHTTPServer.shared.registerTask(id: id, state: panel.state)
+
+        // Wire element picker → inject context into active terminal
+        panel.state.elementPicker.onElementPicked = { [weak self] context in
+            self?.injectElementContext(context)
+        }
+
         // Sync browser page title → tab title
         observeBrowserTitle(id: id, state: panel.state)
 
         return id
+    }
+
+    /// Saves screenshot to .budahade/ and injects the context block into the active terminal
+    /// as pending input (no Enter — user appends their instruction before submitting).
+    func injectElementContext(_ context: ElementContext) {
+        // Save screenshot PNG if present
+        var finalContext = context
+        if let image = context.screenshot, let filename = context.screenshotPath {
+            let dir = (worktreePath as NSString).appendingPathComponent(".budahade")
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            let path = (dir as NSString).appendingPathComponent(filename)
+            if let tiff = image.tiffRepresentation,
+               let bitmap = NSBitmapImageRep(data: tiff),
+               let png = bitmap.representation(using: .png, properties: [:]) {
+                try? png.write(to: URL(fileURLWithPath: path))
+                finalContext.screenshotPath = filename   // confirmed written
+            } else {
+                finalContext.screenshotPath = nil       // failed — omit from block
+            }
+        }
+
+        let block = finalContext.terminalBlock()
+
+        // Find the active terminal (skip browser tabs)
+        let terminalTabId = tabs.first(where: { $0.isTerminal && $0.id == selectedTabId })?.id
+            ?? tabs.first(where: { $0.isTerminal })?.id
+        guard let tabId = terminalTabId, let panel = terminals[tabId] else { return }
+
+        // Inject as pending input — no Enter, so user can append their instruction
+        if let session = panel.tmuxSession {
+            TmuxSessionManager.sendKeys(session: session, keys: block, literal: true)
+        } else {
+            panel.sendText(block)
+        }
     }
 
     private func observeBrowserTitle(id: UUID, state: BrowserState) {
@@ -481,6 +523,7 @@ final class TaskState: ObservableObject, Identifiable {
             terminals.removeValue(forKey: id)
         } else if tab.isBrowser {
             browserPanels.removeValue(forKey: id)
+            BrowserHTTPServer.shared.unregisterTask(id: id)
         }
 
         // Update split pane ownership when a tab is closed
