@@ -208,8 +208,8 @@ struct WorkspaceView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleBrowser)) { _ in
             if let task = state.activeTask, task.mode == .build {
-                if let existing = task.tabs.first(where: { $0.isBrowser }) {
-                    task.selectTab(existing.id)
+                if task.focusedPane == .secondary && task.splitPane != nil {
+                    task.createBrowserTabInSecondaryPane()
                 } else {
                     task.createBrowserTab()
                 }
