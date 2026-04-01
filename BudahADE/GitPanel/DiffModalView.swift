@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct DiffModalView: View {
     @ObservedObject var repo: GitRepository
@@ -9,6 +10,13 @@ struct DiffModalView: View {
     @State private var currentIndex: Int
     @State private var showSplit = true
     @State private var loadedDiff: String?
+    @State private var commitDetail: CommitDetail?
+    @State private var hashCopied = false
+    @State private var actionError: String?
+    @State private var showRevertConfirm = false
+    @State private var showCherryPick = false
+    @State private var cherryPickBranch = ""
+    @State private var githubURL: URL?
 
     init(repo: GitRepository, files: [GitFileStatus], initialFileIndex: Int, staged: Bool, commitHash: String? = nil) {
         self.repo = repo
@@ -26,17 +34,132 @@ struct DiffModalView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            headerBar
-            Divider().foregroundColor(Theme.borderSubtle)
+            if let hash = commitHash {
+                commitHeader(hash)
+                Divider().foregroundColor(Theme.borderSubtle)
+                fileList
+                Divider().foregroundColor(Theme.borderSubtle)
+            } else {
+                workingTreeHeader
+                Divider().foregroundColor(Theme.borderSubtle)
+            }
             diffContent
             Divider().foregroundColor(Theme.borderSubtle)
             footerBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.appBackground)
+        .task {
+            if let hash = commitHash {
+                commitDetail = repo.commitDetail(hash)
+                githubURL = repo.githubURLForCommit(hash)
+            }
+        }
     }
 
-    private var headerBar: some View {
+    // MARK: - Commit Header
+
+    private func commitHeader(_ hash: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Subject + body
+            VStack(alignment: .leading, spacing: 4) {
+                Text(commitDetail?.subject ?? "Loading...")
+                    .font(Theme.label(14))
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(2)
+
+                if let body = commitDetail?.body, !body.isEmpty {
+                    Text(body)
+                        .font(Theme.body(11))
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(4)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
+            // Metadata row
+            HStack(spacing: 8) {
+                Text(String(hash.prefix(7)))
+                    .font(Theme.code(11))
+                    .foregroundColor(Theme.textMuted)
+
+                Circle().fill(Theme.borderSubtle).frame(width: 3, height: 3)
+
+                Text(commitDetail?.author ?? "")
+                    .font(Theme.caption(11))
+                    .foregroundColor(Theme.textMuted)
+
+                Circle().fill(Theme.borderSubtle).frame(width: 3, height: 3)
+
+                Text(commitDetail?.date ?? "")
+                    .font(Theme.caption(11))
+                    .foregroundColor(Theme.textMuted)
+
+                if let detail = commitDetail, detail.parentCount > 1 {
+                    badgePill("merge", color: Theme.warning)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+
+            // Action buttons
+            HStack(spacing: 6) {
+                actionButton(icon: "doc.on.doc", label: hashCopied ? "Copied" : "Copy Hash") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(hash, forType: .string)
+                    hashCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { hashCopied = false }
+                }
+
+                if let url = githubURL {
+                    actionButton(icon: "arrow.up.right", label: "GitHub") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+
+                actionButton(icon: "arrow.uturn.backward", label: "Revert") {
+                    showRevertConfirm = true
+                }
+
+                actionButton(icon: "arrow.triangle.branch", label: "Cherry-pick") {
+                    showCherryPick = true
+                }
+
+                Spacer()
+
+                if let error = actionError {
+                    Text(error)
+                        .font(Theme.caption(10))
+                        .foregroundColor(Theme.error)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 10)
+        }
+        .background(Theme.surface2)
+        .alert("Revert this commit?", isPresented: $showRevertConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Revert", role: .destructive) { performRevert(hash) }
+        } message: {
+            Text("This creates a new commit that undoes the changes from \(String(hash.prefix(7))).")
+        }
+        .alert("Cherry-pick onto branch", isPresented: $showCherryPick) {
+            TextField("Branch name", text: $cherryPickBranch)
+            Button("Cancel", role: .cancel) { cherryPickBranch = "" }
+            Button("Cherry-pick") { performCherryPick(hash) }
+        } message: {
+            Text("Apply \(String(hash.prefix(7))) onto another branch.")
+        }
+    }
+
+    // MARK: - Working Tree Header (non-commit diffs)
+
+    private var workingTreeHeader: some View {
         HStack(spacing: 10) {
             if let file = currentFile {
                 statusBadge(file.status)
@@ -52,7 +175,7 @@ struct DiffModalView: View {
 
             Spacer()
 
-            if let file = currentFile, commitHash == nil, let diffText = loadedDiff {
+            if let file = currentFile, let diffText = loadedDiff {
                 let adds = diffText.components(separatedBy: "\n").filter { $0.hasPrefix("+") && !$0.hasPrefix("+++") }.count
                 let removes = diffText.components(separatedBy: "\n").filter { $0.hasPrefix("-") && !$0.hasPrefix("---") }.count
 
@@ -76,20 +199,45 @@ struct DiffModalView: View {
                 }
                 .buttonStyle(.plain)
             }
-
-            Button {
-                NSApp.keyWindow?.close()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Theme.textMuted)
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Theme.surface2)
     }
+
+    // MARK: - File List
+
+    private var fileList: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 2) {
+                ForEach(Array(files.enumerated()), id: \.element.id) { idx, file in
+                    let isActive = idx == currentIndex
+                    Button {
+                        currentIndex = idx
+                    } label: {
+                        HStack(spacing: 5) {
+                            statusBadge(file.status)
+
+                            Text((file.path as NSString).lastPathComponent)
+                                .font(Theme.caption(11))
+                                .foregroundColor(isActive ? Theme.textPrimary : Theme.textMuted)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(isActive ? Theme.surface3 : Color.clear)
+                        .cornerRadius(4)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+        }
+        .background(Theme.appBackground)
+    }
+
+    // MARK: - Diff Content
 
     private var diffContent: some View {
         Group {
@@ -120,11 +268,13 @@ struct DiffModalView: View {
         }
         loadedDiff = nil
         if let hash = commitHash {
-            loadedDiff = repo.diffForCommit(hash)
+            loadedDiff = repo.diffForCommitFile(hash, file: file.path)
         } else {
             loadedDiff = repo.diff(file: file.path, staged: staged)
         }
     }
+
+    // MARK: - Split Diff
 
     private func splitDiffView(_ diff: String) -> some View {
         let lines = diff.components(separatedBy: "\n")
@@ -171,6 +321,8 @@ struct DiffModalView: View {
         }
     }
 
+    // MARK: - Unified Diff
+
     private func unifiedDiffView(_ diff: String) -> some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 0) {
@@ -197,38 +349,40 @@ struct DiffModalView: View {
         }
     }
 
+    // MARK: - Footer
+
     private var footerBar: some View {
         HStack {
-            Button {
-                if currentIndex > 0 { currentIndex -= 1 }
-            } label: {
-                Text("← Prev")
-                    .font(Theme.caption(11))
-                    .foregroundColor(currentIndex > 0 ? Theme.info : Theme.textMuted)
-            }
-            .buttonStyle(.plain)
-            .disabled(currentIndex <= 0)
+            if commitHash == nil {
+                Button {
+                    if currentIndex > 0 { currentIndex -= 1 }
+                } label: {
+                    Text("← Prev")
+                        .font(Theme.caption(11))
+                        .foregroundColor(currentIndex > 0 ? Theme.info : Theme.textMuted)
+                }
+                .buttonStyle(.plain)
+                .disabled(currentIndex <= 0)
 
-            Text("\(currentIndex + 1) of \(files.count) files")
-                .font(Theme.caption(11))
-                .foregroundColor(Theme.textSecondary)
-
-            Button {
-                if currentIndex < files.count - 1 { currentIndex += 1 }
-            } label: {
-                Text("Next →")
+                Text("\(currentIndex + 1) of \(files.count) files")
                     .font(Theme.caption(11))
-                    .foregroundColor(currentIndex < files.count - 1 ? Theme.info : Theme.textMuted)
+                    .foregroundColor(Theme.textSecondary)
+
+                Button {
+                    if currentIndex < files.count - 1 { currentIndex += 1 }
+                } label: {
+                    Text("Next →")
+                        .font(Theme.caption(11))
+                        .foregroundColor(currentIndex < files.count - 1 ? Theme.info : Theme.textMuted)
+                }
+                .buttonStyle(.plain)
+                .disabled(currentIndex >= files.count - 1)
             }
-            .buttonStyle(.plain)
-            .disabled(currentIndex >= files.count - 1)
 
             Spacer()
 
             HStack(spacing: 0) {
-                Button {
-                    showSplit = false
-                } label: {
+                Button { showSplit = false } label: {
                     Text("Unified")
                         .font(Theme.caption(10))
                         .foregroundColor(!showSplit ? Theme.info : Theme.textMuted)
@@ -239,9 +393,7 @@ struct DiffModalView: View {
                 }
                 .buttonStyle(.plain)
 
-                Button {
-                    showSplit = true
-                } label: {
+                Button { showSplit = true } label: {
                     Text("Split")
                         .font(Theme.caption(10))
                         .foregroundColor(showSplit ? Theme.info : Theme.textMuted)
@@ -258,6 +410,62 @@ struct DiffModalView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(Theme.surface2)
+    }
+
+    // MARK: - Actions
+
+    private func performRevert(_ hash: String) {
+        Task {
+            do {
+                try await repo.revertCommit(hash)
+                actionError = nil
+            } catch {
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    private func performCherryPick(_ hash: String) {
+        let branch = cherryPickBranch.trimmingCharacters(in: .whitespaces)
+        cherryPickBranch = ""
+        guard !branch.isEmpty else { return }
+        Task {
+            do {
+                try await repo.cherryPickCommit(hash, onto: branch)
+                actionError = nil
+            } catch {
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    // MARK: - Shared Components
+
+    private func actionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                Text(label)
+                    .font(Theme.caption(10))
+            }
+            .foregroundColor(Theme.textSecondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Theme.surface3)
+            .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func badgePill(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(Theme.caption(9))
+            .foregroundColor(color)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(color.opacity(0.12))
+            .cornerRadius(3)
     }
 
     struct DiffLine {

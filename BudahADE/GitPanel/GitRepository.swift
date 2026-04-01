@@ -17,6 +17,15 @@ struct GitCommit: Identifiable {
     let date: String
 }
 
+struct CommitDetail {
+    let hash: String
+    let subject: String
+    let body: String
+    let author: String
+    let date: String
+    let parentCount: Int
+}
+
 enum GitError: Error, LocalizedError {
     case commandFailed(String)
     case noRemote
@@ -383,8 +392,71 @@ final class GitRepository: ObservableObject {
             }
     }
 
+    func commitDetail(_ hash: String) -> CommitDetail? {
+        // %H=hash, %s=subject, %b=body, %an=author, %ar=relative date, %P=parent hashes
+        guard let output = runGit(["show", "-s", "--format=%H|||%s|||%b|||%an|||%ar|||%P", hash]) else { return nil }
+        let parts = output.components(separatedBy: "|||")
+        guard parts.count >= 6 else { return nil }
+        let parentHashes = parts[5].trimmingCharacters(in: .whitespacesAndNewlines)
+        let parentCount = parentHashes.isEmpty ? 0 : parentHashes.components(separatedBy: " ").count
+        return CommitDetail(
+            hash: parts[0],
+            subject: parts[1],
+            body: parts[2].trimmingCharacters(in: .whitespacesAndNewlines),
+            author: parts[3],
+            date: parts[4],
+            parentCount: parentCount
+        )
+    }
+
     func diffForCommit(_ hash: String) -> String {
         return runGit(["show", "--format=", hash]) ?? ""
+    }
+
+    func diffForCommitFile(_ hash: String, file: String) -> String {
+        return runGit(["show", "--format=", hash, "--", file]) ?? ""
+    }
+
+    func githubURLForCommit(_ hash: String) -> URL? {
+        guard let remoteURL = runGit(["remote", "get-url", "origin"]) else { return nil }
+        let webURL: String
+        if remoteURL.hasPrefix("git@github.com:") {
+            let repoPath = remoteURL
+                .replacingOccurrences(of: "git@github.com:", with: "")
+                .replacingOccurrences(of: ".git", with: "")
+            webURL = "https://github.com/\(repoPath)"
+        } else if remoteURL.contains("github.com") {
+            webURL = remoteURL.replacingOccurrences(of: ".git", with: "")
+        } else {
+            return nil
+        }
+        return URL(string: "\(webURL)/commit/\(hash)")
+    }
+
+    func revertCommit(_ hash: String) async throws {
+        let result = try await runGitAsync(["revert", "--no-edit", hash])
+        if result.contains("error") || result.contains("CONFLICT") {
+            throw GitError.commandFailed(result)
+        }
+        await MainActor.run { refresh() }
+    }
+
+    func cherryPickCommit(_ hash: String, onto branch: String) async throws {
+        let originalBranch = currentBranch
+        let _ = try await runGitAsync(["checkout", branch])
+        do {
+            let result = try await runGitAsync(["cherry-pick", hash])
+            if result.contains("CONFLICT") {
+                _ = try? await runGitAsync(["cherry-pick", "--abort"])
+                _ = try? await runGitAsync(["checkout", originalBranch])
+                throw GitError.mergeConflict
+            }
+        } catch {
+            _ = try? await runGitAsync(["checkout", originalBranch])
+            throw error
+        }
+        _ = try? await runGitAsync(["checkout", originalBranch])
+        await MainActor.run { refresh() }
     }
 
     func filesChangedInCommit(_ hash: String) -> [GitFileStatus] {
