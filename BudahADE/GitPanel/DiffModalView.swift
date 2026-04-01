@@ -6,9 +6,9 @@ struct DiffModalView: View {
     let initialFileIndex: Int
     let staged: Bool
     let commitHash: String?
-    @Environment(\.dismiss) private var dismiss
     @State private var currentIndex: Int
     @State private var showSplit = true
+    @State private var loadedDiff: String?
 
     init(repo: GitRepository, files: [GitFileStatus], initialFileIndex: Int, staged: Bool, commitHash: String? = nil) {
         self.repo = repo
@@ -32,7 +32,7 @@ struct DiffModalView: View {
             Divider().foregroundColor(Theme.borderSubtle)
             footerBar
         }
-        .frame(minWidth: 700, minHeight: 500)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.appBackground)
     }
 
@@ -52,8 +52,7 @@ struct DiffModalView: View {
 
             Spacer()
 
-            if let file = currentFile, commitHash == nil {
-                let diffText = repo.diff(file: file.path, staged: staged)
+            if let file = currentFile, commitHash == nil, let diffText = loadedDiff {
                 let adds = diffText.components(separatedBy: "\n").filter { $0.hasPrefix("+") && !$0.hasPrefix("+++") }.count
                 let removes = diffText.components(separatedBy: "\n").filter { $0.hasPrefix("-") && !$0.hasPrefix("---") }.count
 
@@ -78,7 +77,9 @@ struct DiffModalView: View {
                 .buttonStyle(.plain)
             }
 
-            Button { dismiss() } label: {
+            Button {
+                NSApp.keyWindow?.close()
+            } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(Theme.textMuted)
@@ -92,25 +93,36 @@ struct DiffModalView: View {
 
     private var diffContent: some View {
         Group {
-            if let file = currentFile {
-                let rawDiff: String = {
-                    if let hash = commitHash {
-                        return repo.diffForCommit(hash)
-                    } else {
-                        return repo.diff(file: file.path, staged: staged)
-                    }
-                }()
-
+            if let rawDiff = loadedDiff {
                 if showSplit {
                     splitDiffView(rawDiff)
                 } else {
                     unifiedDiffView(rawDiff)
                 }
+            } else if currentFile != nil {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text("No file selected")
                     .foregroundColor(Theme.textMuted)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .task(id: currentIndex) {
+            await loadDiff()
+        }
+    }
+
+    private func loadDiff() async {
+        guard let file = currentFile else {
+            loadedDiff = nil
+            return
+        }
+        loadedDiff = nil
+        if let hash = commitHash {
+            loadedDiff = repo.diffForCommit(hash)
+        } else {
+            loadedDiff = repo.diff(file: file.path, staged: staged)
         }
     }
 
@@ -121,14 +133,13 @@ struct DiffModalView: View {
         return HStack(spacing: 0) {
             VStack(spacing: 0) {
                 Text("HEAD (before)")
-                    .font(Theme.caption(10))
-                    .foregroundColor(Theme.textMuted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
+                    .font(Theme.label(11))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 6)
                     .background(Theme.surface2)
 
-                ScrollView([.horizontal, .vertical]) {
+                ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(leftLines.enumerated()), id: \.offset) { _, line in
                             diffLineView(lineNumber: line.number, text: line.text, type: line.type)
@@ -138,18 +149,17 @@ struct DiffModalView: View {
                 }
             }
 
-            Divider().foregroundColor(Theme.borderSubtle)
+            Rectangle().fill(Theme.borderSubtle).frame(width: 1)
 
             VStack(spacing: 0) {
                 Text("Working Tree (after)")
-                    .font(Theme.caption(10))
-                    .foregroundColor(Theme.textMuted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
+                    .font(Theme.label(11))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 6)
                     .background(Theme.surface2)
 
-                ScrollView([.horizontal, .vertical]) {
+                ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(rightLines.enumerated()), id: \.offset) { _, line in
                             diffLineView(lineNumber: line.number, text: line.text, type: line.type)
@@ -162,22 +172,24 @@ struct DiffModalView: View {
     }
 
     private func unifiedDiffView(_ diff: String) -> some View {
-        ScrollView([.horizontal, .vertical]) {
+        ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(diff.components(separatedBy: "\n").enumerated()), id: \.offset) { idx, line in
                     HStack(spacing: 0) {
                         Text("\(idx + 1)")
                             .font(Theme.code(10))
                             .foregroundColor(Theme.textMuted)
-                            .frame(width: 36, alignment: .trailing)
-                            .padding(.trailing, 8)
+                            .frame(width: 32, alignment: .trailing)
+                            .padding(.trailing, 4)
 
                         Text(line)
                             .font(Theme.code(11))
                             .foregroundColor(lineColor(line))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 4)
                     .padding(.vertical, 1)
                     .background(lineBackground(line))
                 }
@@ -300,15 +312,17 @@ struct DiffModalView: View {
             Text(lineNumber.map { "\($0)" } ?? "")
                 .font(Theme.code(10))
                 .foregroundColor(Theme.textMuted)
-                .frame(width: 36, alignment: .trailing)
-                .padding(.trailing, 8)
+                .frame(width: 32, alignment: .trailing)
+                .padding(.trailing, 4)
 
             Text(text)
                 .font(Theme.code(11))
                 .foregroundColor(lineTypeColor(type))
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 4)
         .padding(.vertical, 1)
         .background(lineTypeBackground(type))
     }

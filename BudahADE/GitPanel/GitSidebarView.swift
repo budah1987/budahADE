@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct GitSidebarView: View {
     @ObservedObject var taskState: TaskState
@@ -72,14 +73,10 @@ struct GitSidebarView: View {
             }
             .onDisappear { repo.stopPolling() }
         }
-        .sheet(isPresented: $showDiffModal) {
-            DiffModalView(
-                repo: repo,
-                files: diffFiles,
-                initialFileIndex: diffFileIndex,
-                staged: diffStaged,
-                commitHash: diffCommitHash
-            )
+        .onChange(of: showDiffModal) { _, show in
+            if show {
+                presentDiffWindow()
+            }
         }
     }
 
@@ -95,11 +92,49 @@ struct GitSidebarView: View {
     }
 
     private func openDiffForCommit(_ commit: GitCommit) {
-        diffFiles = repo.filesChangedInCommit(commit.id)
-        diffFileIndex = 0
-        diffStaged = false
-        diffCommitHash = commit.id
-        showDiffModal = true
+        Task {
+            let files = repo.filesChangedInCommit(commit.id)
+            diffFiles = files
+            diffFileIndex = 0
+            diffStaged = false
+            diffCommitHash = commit.id
+            showDiffModal = true
+        }
+    }
+
+    private func presentDiffWindow() {
+        let content = DiffModalView(
+            repo: repo,
+            files: diffFiles,
+            initialFileIndex: diffFileIndex,
+            staged: diffStaged,
+            commitHash: diffCommitHash
+        )
+
+        let hostingView = NSHostingView(rootView: content)
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 650),
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        panel.contentView = hostingView
+        panel.title = currentFile(diffFiles, diffFileIndex)
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
+        panel.minSize = NSSize(width: 500, height: 350)
+        panel.center()
+        panel.isReleasedWhenClosed = false
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.makeKeyAndOrderFront(nil)
+
+        showDiffModal = false
+    }
+
+    private func currentFile(_ files: [GitFileStatus], _ index: Int) -> String {
+        guard index >= 0, index < files.count else { return "Diff" }
+        return (files[index].path as NSString).lastPathComponent
     }
 
     // MARK: - Action Bar
