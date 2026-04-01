@@ -666,7 +666,7 @@ enum TraceAnalysis {
         let outcome: String
         if result.stopReason == "max_turns" {
             outcome = "timeout"
-        } else if session.status == .error("") {
+        } else if case .error = session.status {
             outcome = "error"
         } else {
             outcome = "completed"
