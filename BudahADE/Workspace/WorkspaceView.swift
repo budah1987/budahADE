@@ -19,6 +19,9 @@ struct WorkspaceView: View {
     /// Plan → Build transition overlay
     @State private var buildTransition: BuildTransitionState? = nil
 
+    /// True while a tab drag session is in progress — gates the inter-pane drop overlay
+    @State private var isTabDragging = false
+
 
     var body: some View {
         coreView
@@ -62,6 +65,12 @@ struct WorkspaceView: View {
                         renameFieldFocused = true
                     }
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .tabDragBegan)) { _ in
+                isTabDragging = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .tabDragEnded)) { _ in
+                isTabDragging = false
             }
     }
 
@@ -130,7 +139,7 @@ struct WorkspaceView: View {
                             if state.leftPanelVisible {
                                 LeftPanelView(
                                     state: state,
-                                    worktreePath: state.activeTask?.worktreePath ?? state.projectPath
+                                    worktreePath: state.activeTask?.repoPath ?? state.projectPath
                                 )
                                 .id("\(state.activeTaskId?.uuidString ?? "")-\(state.activeTask?.tabs.count ?? 0)")
                                 .transition(.move(edge: .leading).combined(with: .opacity))
@@ -201,6 +210,8 @@ struct WorkspaceView: View {
             if let task = state.activeTask {
                 if task.mode == .plan {
                     showRoleModal = true
+                } else if task.focusedPane == .secondary && task.splitPane != nil {
+                    task.createTabInSecondaryPane()
                 } else {
                     task.createTab()
                 }
@@ -239,7 +250,13 @@ struct WorkspaceView: View {
                         requestCloseTab(.plan(id))
                     }
                 } else {
-                    if let id = task.selectedTabId {
+                    let tabId: UUID?
+                    if task.focusedPane == .secondary, let split = task.splitPane {
+                        tabId = split.secondarySelectedId
+                    } else {
+                        tabId = task.selectedTabId
+                    }
+                    if let id = tabId {
                         requestCloseTab(.build(id))
                     }
                 }
@@ -330,39 +347,39 @@ struct WorkspaceView: View {
                             TerminalTabBar(
                                 selectedTabID: Binding(
                                     get: { task.selectedTabId ?? UUID() },
-                                    set: { task.selectTab($0) }
+                                    set: { task.focusedPane = .primary; task.selectTab($0) }
                                 ),
                                 tabs: task.primaryTabs,
                                 renameTarget: renameTarget,
-                                onSelectTab: { task.selectTab($0) },
+                                onSelectTab: { task.focusedPane = .primary; task.selectTab($0) },
                                 onCloseTab: { requestCloseTab(.build($0)) },
                                 onNewTab: { task.createTab() },
                                 onNewBrowserTab: { task.createBrowserTab() }
                             )
                             tabContentView(for: task, tabId: task.selectedTabId)
                                 .overlay(paneFocusBorder(focused: task.focusedPane == .primary))
-                                .onTapGesture { task.focusedPane = .primary }
                         }
-                        .overlay(paneScrim(focused: task.focusedPane == .primary))
+                        .opacity(task.focusedPane == .primary ? 1.0 : 0.6)
+                        .animation(.easeInOut(duration: 0.15), value: task.focusedPane)
                     } second: {
                         VStack(spacing: 0) {
                             TerminalTabBar(
                                 selectedTabID: Binding(
                                     get: { split.secondarySelectedId ?? UUID() },
-                                    set: { task.selectSecondaryTab($0) }
+                                    set: { task.focusedPane = .secondary; task.selectSecondaryTab($0) }
                                 ),
                                 tabs: task.secondaryTabs,
                                 renameTarget: renameTarget,
-                                onSelectTab: { task.selectSecondaryTab($0) },
+                                onSelectTab: { task.focusedPane = .secondary; task.selectSecondaryTab($0) },
                                 onCloseTab: { requestCloseTab(.build($0)) },
                                 onNewTab: { task.createTabInSecondaryPane() },
                                 onNewBrowserTab: { task.createBrowserTabInSecondaryPane() }
                             )
                             tabContentView(for: task, tabId: split.secondarySelectedId)
                                 .overlay(paneFocusBorder(focused: task.focusedPane == .secondary))
-                                .onTapGesture { task.focusedPane = .secondary }
                         }
-                        .overlay(paneScrim(focused: task.focusedPane == .secondary))
+                        .opacity(task.focusedPane == .secondary ? 1.0 : 0.6)
+                        .animation(.easeInOut(duration: 0.15), value: task.focusedPane)
                     }
                 } else {
                     ZStack {
@@ -390,12 +407,23 @@ struct WorkspaceView: View {
                     }
                 }
 
-                // Drop zone overlay — only when not already split
+                // Create-split drag overlay — only when not already split
                 if let task = state.activeTask, task.splitPane == nil {
                     SplitDropOverlay { zone, tabIdString in
                         if let tabId = UUID(uuidString: tabIdString) {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 task.splitTab(tabId, to: zone)
+                            }
+                        }
+                    }
+                }
+
+                // Inter-pane move overlay — only while a tab drag is active in split mode
+                if let task = state.activeTask, let split = task.splitPane, isTabDragging {
+                    PaneMoveDropOverlay(orientation: split.orientation) { pane, tabIdStr in
+                        if let tabId = UUID(uuidString: tabIdStr) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                task.moveTab(tabId, to: pane)
                             }
                         }
                     }
@@ -450,12 +478,6 @@ struct WorkspaceView: View {
             .allowsHitTesting(false)
     }
 
-    private func paneScrim(focused: Bool) -> some View {
-        Color.black
-            .opacity(focused ? 0 : 0.25)
-            .allowsHitTesting(false)
-            .animation(.easeInOut(duration: 0.15), value: focused)
-    }
 
     // MARK: - Rename Palette
 

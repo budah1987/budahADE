@@ -346,4 +346,6 @@ extension Notification.Name {
     static let toggleRightPanel = Notification.Name("budahADE.toggleRightPanel")
     static let toggleBrowser = Notification.Name("budahADE.toggleBrowser")
     static let focusInput = Notification.Name("budahADE.focusInput")
+    static let tabDragBegan = Notification.Name("budahADE.tabDragBegan")
+    static let tabDragEnded = Notification.Name("budahADE.tabDragEnded")
 }

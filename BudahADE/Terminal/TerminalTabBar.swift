@@ -1,5 +1,12 @@
 import SwiftUI
 
+// MARK: - Tab Drag Tracking
+//
+// Module-level var so SplitDropDelegate can read the dragging tab ID without
+// relying on NSItemProvider's async pasteboard API (which is unreliable for
+// AppKit NSDraggingSession items in SwiftUI DropDelegate).
+var currentlyDraggingTabId: UUID?
+
 // MARK: - Agent Status
 
 enum AgentStatus: Equatable {
@@ -173,8 +180,7 @@ struct ConversationTab: View {
                     )
             }
         )
-        .background(TabDragClickHandler(dragId: id.uuidString, onClick: onSelect, onMiddleClick: onClose))
-        .overlay(MiddleClickOverlay(action: onClose))
+        .overlay(TabDragClickHandler(dragId: id.uuidString, onClick: onSelect, onMiddleClick: onClose))
         .onAppear { startBreathing() }
         .onChange(of: agentState) { _, _ in startBreathing() }
     }
@@ -432,11 +438,13 @@ struct TabDragClickHandler: NSViewRepresentable {
     func updateNSView(_ nsView: TabDragView, context: Context) {
         nsView.dragId = dragId
         nsView.onClick = onClick
+        nsView.onMiddleClick = onMiddleClick
     }
 
     class TabDragView: NSView, NSDraggingSource {
         var dragId: String = ""
         var onClick: (() -> Void)?
+        var onMiddleClick: (() -> Void)?
 
         private var mouseDownEvent: NSEvent?
         private var dragStarted = false
@@ -459,6 +467,8 @@ struct TabDragClickHandler: NSViewRepresentable {
             guard sqrt(dx * dx + dy * dy) >= Self.dragThreshold else { return }
 
             dragStarted = true
+            currentlyDraggingTabId = UUID(uuidString: dragId)
+            NotificationCenter.default.post(name: .tabDragBegan, object: nil)
             let item = NSDraggingItem(pasteboardWriter: dragId as NSString)
             let img = NSImage(size: NSSize(width: 1, height: 1))
             item.setDraggingFrame(NSRect(origin: .zero, size: NSSize(width: 1, height: 1)), contents: img)
@@ -477,10 +487,27 @@ struct TabDragClickHandler: NSViewRepresentable {
             DispatchQueue.main.async { [weak self] in self?.onClick?() }
         }
 
+        override func otherMouseDown(with event: NSEvent) {
+            if event.buttonNumber == 2 {
+                DispatchQueue.main.async { [weak self] in self?.onMiddleClick?() }
+            } else {
+                super.otherMouseDown(with: event)
+            }
+        }
+
         // MARK: NSDraggingSource
         func draggingSession(_ session: NSDraggingSession,
                              sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
             return .move
+        }
+
+        func draggingSession(_ session: NSDraggingSession,
+                             endedAt screenPoint: NSPoint,
+                             operation: NSDragOperation) {
+            currentlyDraggingTabId = nil
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .tabDragEnded, object: nil)
+            }
         }
     }
 }

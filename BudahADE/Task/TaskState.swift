@@ -561,9 +561,45 @@ final class TaskState: ObservableObject, Identifiable {
     func selectSecondaryTab(_ id: UUID) {
         guard let split = splitPane, split.secondaryTabIds.contains(id) else { return }
         splitPane?.secondarySelectedId = id
+        focusedPane = .secondary
         if let index = tabs.firstIndex(where: { $0.id == id }) {
             if tabs[index].agentStatus == .completed { tabs[index].agentStatus = .inactive }
             if tabs[index].isTerminal { terminals[id]?.focus() }
+        }
+    }
+
+    /// Move a tab from one pane to the other. Collapses split if secondary becomes empty.
+    func moveTab(_ tabId: UUID, to pane: PanePosition) {
+        guard var split = splitPane else { return }
+        let isInSecondary = split.secondaryTabIds.contains(tabId)
+
+        switch pane {
+        case .secondary:
+            guard !isInSecondary else { return }
+            split.secondaryTabIds.append(tabId)
+            split.secondarySelectedId = tabId
+            if selectedTabId == tabId {
+                let remaining = tabs.filter { t in
+                    t.id != tabId && !split.secondaryTabIds.contains(t.id)
+                }
+                selectedTabId = remaining.first?.id
+            }
+            splitPane = split
+            focusedPane = .secondary
+
+        case .primary:
+            guard isInSecondary else { return }
+            split.secondaryTabIds.removeAll { $0 == tabId }
+            if split.secondarySelectedId == tabId {
+                split.secondarySelectedId = split.secondaryTabIds.last
+            }
+            if split.secondaryTabIds.isEmpty {
+                splitPane = nil
+            } else {
+                splitPane = split
+            }
+            selectedTabId = tabId
+            focusedPane = .primary
         }
     }
 
@@ -647,16 +683,28 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     func selectTabByIndex(_ index: Int) {
-        guard !tabs.isEmpty else { return }
+        // In split mode, cycle within the focused pane's tabs only
+        let targetTabs: [TabInfo]
+        let inSecondary = splitPane != nil && focusedPane == .secondary
+        if splitPane != nil {
+            targetTabs = inSecondary ? secondaryTabs : primaryTabs
+        } else {
+            targetTabs = tabs
+        }
+
+        guard !targetTabs.isEmpty else { return }
         let targetId: UUID?
         if index == 9 {
-            targetId = tabs.last?.id
+            targetId = targetTabs.last?.id
         } else {
             let zeroIndex = index - 1
-            guard zeroIndex >= 0, zeroIndex < tabs.count else { return }
-            targetId = tabs[zeroIndex].id
+            guard zeroIndex >= 0, zeroIndex < targetTabs.count else { return }
+            targetId = targetTabs[zeroIndex].id
         }
-        if let id = targetId {
+        guard let id = targetId else { return }
+        if inSecondary {
+            selectSecondaryTab(id)
+        } else {
             selectTab(id)
         }
     }

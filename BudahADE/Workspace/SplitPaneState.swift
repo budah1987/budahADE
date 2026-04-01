@@ -109,6 +109,100 @@ struct SplitDropOverlay: View {
     }
 }
 
+// MARK: - Pane Move Drop Overlay
+
+/// Overlay shown in split mode: dragging a tab over one half moves it to that pane.
+struct PaneMoveDropOverlay: View {
+    let orientation: SplitOrientation
+    let onDrop: (PanePosition, String) -> Void
+    @State private var activePane: PanePosition?
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                paneTint(.primary, geo: geo)
+                paneTint(.secondary, geo: geo)
+
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onDrop(
+                        of: [UTType.text],
+                        delegate: PaneMoveDropDelegate(
+                            size: geo.size,
+                            orientation: orientation,
+                            activePane: $activePane,
+                            onDrop: onDrop
+                        )
+                    )
+            }
+        }
+        .allowsHitTesting(true)
+    }
+
+    @ViewBuilder
+    private func paneTint(_ pane: PanePosition, geo: GeometryProxy) -> some View {
+        let isActive = activePane == pane
+        let frame = paneFrame(pane, geo: geo)
+        Rectangle()
+            .fill(isActive ? Theme.accent.opacity(0.12) : Color.clear)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(Theme.accent.opacity(isActive ? 0.6 : 0), lineWidth: 2)
+                    .padding(4)
+            )
+            .frame(width: frame.width, height: frame.height)
+            .position(x: frame.midX, y: frame.midY)
+            .allowsHitTesting(false)
+    }
+
+    private func paneFrame(_ pane: PanePosition, geo: GeometryProxy) -> CGRect {
+        let w = geo.size.width, h = geo.size.height
+        switch (orientation, pane) {
+        case (.horizontal, .primary):   return CGRect(x: 0,       y: 0, width: w * 0.5, height: h)
+        case (.horizontal, .secondary): return CGRect(x: w * 0.5, y: 0, width: w * 0.5, height: h)
+        case (.vertical,   .primary):   return CGRect(x: 0,       y: 0, width: w, height: h * 0.5)
+        case (.vertical,   .secondary): return CGRect(x: 0, y: h * 0.5, width: w, height: h * 0.5)
+        }
+    }
+}
+
+private struct PaneMoveDropDelegate: DropDelegate {
+    let size: CGSize
+    let orientation: SplitOrientation
+    @Binding var activePane: PanePosition?
+    let onDrop: (PanePosition, String) -> Void
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let pane = pane(for: info.location)
+        withAnimation(.easeInOut(duration: 0.15)) { activePane = pane }
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(.easeInOut(duration: 0.15)) { activePane = nil }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let pane = pane(for: info.location) ?? .primary
+        if let tabId = currentlyDraggingTabId {
+            DispatchQueue.main.async { onDrop(pane, tabId.uuidString) }
+        } else {
+            info.itemProviders(for: [UTType.text]).first?.loadObject(ofClass: String.self) { str, _ in
+                if let str { DispatchQueue.main.async { onDrop(pane, str) } }
+            }
+        }
+        withAnimation(.easeInOut(duration: 0.15)) { activePane = nil }
+        return true
+    }
+
+    private func pane(for location: CGPoint) -> PanePosition? {
+        switch orientation {
+        case .horizontal: return location.x < size.width  * 0.5 ? .primary : .secondary
+        case .vertical:   return location.y < size.height * 0.5 ? .primary : .secondary
+        }
+    }
+}
+
 // MARK: - Split Drop Delegate
 
 private struct SplitDropDelegate: DropDelegate {
