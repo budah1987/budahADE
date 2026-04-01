@@ -154,13 +154,47 @@ The 56-file canvas system is powerful but disconnected. Deferred.
 - [ ] `handleApprove()` fires `onApproveToBuild` with correct count
 - [ ] `enterBuildMode()` creates `builderPanel` only when spec exists
 
-#### Still needed (from Phase 2)
+#### Still needed (from Phase 2.A)
 - [ ] `DevServerDetector` project detection (vite/next/npm/Django/Go/Rust)
 - [ ] `PortAllocator` windowing + skip-in-use + release
 - [ ] `SplitPaneState` split/merge/focus logic
 - [ ] Browser tab session persistence round-trip
-- [ ] `URLDetector` pattern matching (Phase 2.B)
-- [ ] Page content extraction (Phase 2.D)
+
+#### Phase 2.B — URLDetector (new)
+- [ ] `detect(in:)` returns `http://localhost:3000` from full URL in text
+- [ ] `detect(in:)` returns `https://example.com/path` — non-localhost still caught by scheme pattern
+- [ ] `detect(in:)` returns `http://localhost:3001` from bare `localhost:3001` in text
+- [ ] `detect(in:)` does NOT match `"use port 3000 for this"` (no `localhost:` prefix)
+- [ ] `detect(in:)` returns multiple URLs when text contains several distinct localhost addresses
+- [ ] `detect(in:)` deduplicates — same URL appearing twice returns one entry
+- [ ] `detect(in:)` ignores single-digit ports (e.g. `localhost:8` — too short)
+- [ ] `detect(in:)` handles `127.0.0.1:PORT` with scheme
+
+#### Phase 2.B — DevServerManager (updated)
+- [ ] `detectedURLs` starts empty; `parseForURLs` appends new URLs only (no duplicates)
+- [ ] `detectedURL` computed var returns `detectedURLs.first` (backwards compat)
+- [ ] `onStdoutChunk` closure is called once per stdout chunk on main actor
+- [ ] Starting a non-stdout port-injection server sets `detectedURLs` immediately via `detectedURL = URL(string:...)`
+
+#### Phase 2.B — SmartReloader (new)
+- [ ] `startWatching` returns without crashing on a valid directory path
+- [ ] `stopWatching` is safe to call when not watching (no crash)
+- [ ] `handleStdoutChunk("compiled successfully")` triggers `onReloadNeeded` synchronously
+- [ ] `handleStdoutChunk("ready in 240ms")` triggers `onReloadNeeded`
+- [ ] `handleStdoutChunk("built in 1.2s")` triggers `onReloadNeeded`
+- [ ] `handleStdoutChunk("webpack compiled")` triggers `onReloadNeeded`
+- [ ] `handleStdoutChunk("hmr update")` triggers `onReloadNeeded`
+- [ ] `handleStdoutChunk("some unrelated output")` does NOT trigger `onReloadNeeded`
+- [ ] Build-complete signal cancels the 3-second fallback timer (not called twice)
+- [ ] `deinit` stops and releases the FSEventStream (no crash on dealloc)
+
+#### Phase 2.B — BrowserPanelView (updated)
+- [ ] `detectedURLs` of 0 or 1 → no picker shown in chrome
+- [ ] `detectedURLs` of 2+ → picker button appears in chrome
+- [ ] Selecting a URL from the picker navigates the web view and updates `urlText`
+
+#### Phase 2.D (not yet implemented)
+- [ ] Page content extraction (`extractPageText()` via JS eval)
 
 ---
 
