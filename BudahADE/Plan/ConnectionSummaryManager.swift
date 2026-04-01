@@ -77,7 +77,14 @@ final class ConnectionSummaryManager: ObservableObject {
 
         do {
             try process.run()
-            process.waitUntilExit()
+            let deadline = Date().addingTimeInterval(10.0)
+            while process.isRunning && Date() < deadline {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            if process.isRunning {
+                process.terminate()
+                return String(prompt.prefix(200))
+            }
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return output.isEmpty ? String(prompt.prefix(200)) : output
