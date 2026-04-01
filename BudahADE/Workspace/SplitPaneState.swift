@@ -24,12 +24,6 @@ enum PaneArrow {
     case left, right, up, down
 }
 
-// MARK: - Pane Focus Direction (legacy — removed in Task 4)
-
-enum PaneFocusDirection {
-    case next
-    case previous
-}
 
 // MARK: - Drop Zone
 

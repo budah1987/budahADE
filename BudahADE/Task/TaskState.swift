@@ -597,21 +597,6 @@ final class TaskState: ObservableObject, Identifiable {
         focusedPane = .primary
     }
 
-    func moveFocus(_ direction: PaneFocusDirection) {
-        guard splitPane != nil else { return }
-        switch direction {
-        case .next:
-            focusedPane = focusedPane == .primary ? .secondary : .primary
-        case .previous:
-            focusedPane = focusedPane == .secondary ? .primary : .secondary
-        }
-        // Focus the terminal in the newly focused pane if applicable
-        let tabId = focusedPane == .primary ? selectedTabId : splitPane?.secondarySelectedId
-        if let tabId, let idx = tabs.firstIndex(where: { $0.id == tabId }), tabs[idx].isTerminal {
-            terminals[tabId]?.focus()
-        }
-    }
-
     func focusPane(arrow: PaneArrow) {
         guard let split = splitPane else { return }
         let newFocus: PanePosition?

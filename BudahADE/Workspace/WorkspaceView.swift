@@ -215,11 +215,17 @@ struct WorkspaceView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .focusNextPane)) { _ in
-            state.activeTask?.moveFocus(.next)
+        .onReceive(NotificationCenter.default.publisher(for: .focusLeftPane)) { _ in
+            state.activeTask?.focusPane(arrow: .left)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .focusPrevPane)) { _ in
-            state.activeTask?.moveFocus(.previous)
+        .onReceive(NotificationCenter.default.publisher(for: .focusRightPane)) { _ in
+            state.activeTask?.focusPane(arrow: .right)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusTopPane)) { _ in
+            state.activeTask?.focusPane(arrow: .up)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusBottomPane)) { _ in
+            state.activeTask?.focusPane(arrow: .down)
         }
         .onReceive(NotificationCenter.default.publisher(for: .closeSplit)) { _ in
             withAnimation(.easeInOut(duration: 0.2)) {
