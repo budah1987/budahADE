@@ -6,7 +6,13 @@ import Foundation
 @MainActor
 final class DevServerManager: ObservableObject {
     @Published var isRunning: Bool = false
-    @Published var detectedURL: URL?
+    @Published var detectedURLs: [URL] = []
+
+    /// Called on main actor for each stdout chunk — used by SmartReloader.
+    var onStdoutChunk: ((String) -> Void)?
+
+    /// Convenience: first detected URL (backwards compat with TaskState).
+    var detectedURL: URL? { detectedURLs.first }
 
     let config: DevServerConfig
     let port: Int
@@ -39,12 +45,13 @@ final class DevServerManager: ObservableObject {
         proc.standardError = pipe
         self.outputPipe = pipe
 
-        // Watch stdout for localhost URLs
+        // Watch stdout for localhost URLs and relay to SmartReloader
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
             Task { @MainActor [weak self] in
-                self?.parseForURL(text)
+                self?.parseForURLs(text)
+                self?.onStdoutChunk?(text)
             }
         }
 
@@ -99,17 +106,10 @@ final class DevServerManager: ObservableObject {
 
     // MARK: - URL Detection
 
-    private static let urlPattern = try! NSRegularExpression(
-        pattern: #"https?://(?:localhost|127\.0\.0\.1):\d+"#,
-        options: []
-    )
-
-    private func parseForURL(_ text: String) {
-        let range = NSRange(text.startIndex..., in: text)
-        if let match = Self.urlPattern.firstMatch(in: text, range: range),
-           let matchRange = Range(match.range, in: text),
-           let url = URL(string: String(text[matchRange])) {
-            detectedURL = url
+    private func parseForURLs(_ text: String) {
+        let found = URLDetector.detect(in: text)
+        for url in found where !detectedURLs.contains(url) {
+            detectedURLs.append(url)
         }
     }
 }

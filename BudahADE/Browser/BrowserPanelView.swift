@@ -7,6 +7,7 @@ struct BrowserPanelView: View {
     @Bindable var state: BrowserState
     @State private var urlText: String = ""
     var assignedPort: Int?
+    var detectedURLs: [URL] = []
     var onPopOut: (() -> Void)?
 
     var body: some View {
@@ -30,6 +31,10 @@ struct BrowserPanelView: View {
             navButtons
             urlBar
 
+            if detectedURLs.count > 1 {
+                detectedURLsPicker
+            }
+
             if let port = assignedPort {
                 portBadge(port)
             }
@@ -47,6 +52,32 @@ struct BrowserPanelView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(Theme.surface2)
+    }
+
+    private var detectedURLsPicker: some View {
+        Menu {
+            ForEach(detectedURLs, id: \.absoluteString) { url in
+                Button(url.absoluteString) {
+                    state.navigate(to: url)
+                    urlText = url.absoluteString
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 9, weight: .medium))
+                Text("\(detectedURLs.count)")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            }
+            .foregroundColor(Theme.accent)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(Theme.accent.opacity(0.15))
+            .cornerRadius(3)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Detected localhost URLs")
     }
 
     private var navButtons: some View {

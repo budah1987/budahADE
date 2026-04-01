@@ -457,6 +457,7 @@ struct WorkspaceView: View {
             BrowserPanelView(
                 state: panel.state,
                 assignedPort: task.assignedPort,
+                detectedURLs: task.devServerManager?.detectedURLs ?? [],
                 onPopOut: { panel.popOut() }
             )
         }

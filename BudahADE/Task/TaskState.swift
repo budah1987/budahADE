@@ -48,6 +48,7 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var isBuilderDrawerOpen: Bool = false
     private var specWatcher: SpecWatcher?
     private var buildStatusWatcher: BuildStatusWatcher?
+    private var smartReloader: SmartReloader?
     let createdAt: Date = Date()
 
     /// Formatted elapsed time since task creation
@@ -435,6 +436,11 @@ final class TaskState: ObservableObject, Identifiable {
         browserPanels[id] = panel
         selectedTabId = id
 
+        // Wire SmartReloader to reload this panel's web view
+        if let reloader = smartReloader {
+            reloader.onReloadNeeded = { [weak panel] in panel?.state.reload() }
+        }
+
         // Sync browser page title → tab title
         observeBrowserTitle(id: id, state: panel.state)
 
@@ -669,6 +675,12 @@ final class TaskState: ObservableObject, Identifiable {
         assignedPort = port
         let manager = DevServerManager(config: config, port: port, worktreePath: worktreePath)
         devServerManager = manager
+
+        let reloader = SmartReloader()
+        smartReloader = reloader
+        manager.onStdoutChunk = { [weak reloader] chunk in reloader?.handleStdoutChunk(chunk) }
+        reloader.startWatching(worktreePath: worktreePath)
+
         manager.start()
 
         return URL(string: "http://localhost:\(port)")
@@ -676,11 +688,13 @@ final class TaskState: ObservableObject, Identifiable {
 
     func stopDevServer() {
         devServerManager?.stop()
+        smartReloader?.stopWatching()
         if let port = assignedPort {
             PortAllocator.shared.release(port: port)
         }
         assignedPort = nil
         devServerManager = nil
+        smartReloader = nil
     }
 
     func selectTabByIndex(_ index: Int) {

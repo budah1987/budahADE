@@ -59,11 +59,12 @@ _Last updated: 2026-04-01. Cross-referenced against codebase (122 Swift files)._
 - [ ] Confirm process cleanup on AppDelegate termination (orphan port sweep)
 - [ ] Manual smoke test: open browser tab in Vite project → dev server starts, localhost loads
 
-### 2.B — Intelligence Layer — NOT DONE
+### 2.B — Intelligence Layer — COMPLETE ✓
 
-- [ ] `URLDetector` — parse dev server stdout for `localhost:\d+`, auto-navigate on first detection
-- [ ] Detected URLs dropdown in browser chrome for multiple URLs
-- [ ] `SmartReloader` — FSEvents file watcher + build-complete signal → `WKWebView.reload()`
+- [x] `URLDetector` — detects `http(s)://localhost`, `127.0.0.1`, bare `localhost:PORT`; deduped multi-URL (`URLDetector.swift`)
+- [x] `DevServerManager` switched to `URLDetector`, accumulates `detectedURLs: [URL]`, exposes `onStdoutChunk` callback
+- [x] Detected URLs dropdown in `BrowserPanelView` chrome — Menu-style picker, appears when `detectedURLs.count > 1`
+- [x] `SmartReloader` — FSEvents recursive worktree watcher (300ms coalescing); build-complete patterns for vite/next/webpack/parcel/turbopack; 3-second fallback; wired via `TaskState`
 
 ### 2.C — Agent Control — NOT DONE
 
@@ -170,9 +171,10 @@ The 56-file canvas system is powerful but disconnected. Deferred.
 2. Fix Phase 4.4 (1-line fix): `HarnessMiddleware.swift:669` — `if case .error = session.status`
 3. Fix Phase 4.1: add 10s timeout to `ConnectionSummaryManager` — high-severity silent failure
 
-**Next sprint (Phase 2.B):**
-- `URLDetector` + detected-URL dropdown in browser chrome
-- `SmartReloader` FSEvents watcher
+**Next sprint (Phase 2.C — Agent Control):**
+- `BrowserHTTPServer` on `NWListener` (port 9222, header-routed by `X-Task-Id`)
+- Endpoints: `/navigate`, `/screenshot`, `/click`, `/type`, `/dom`, `/evaluate`, `/console`, `/network`, `/url`, `/reload`, `/capabilities`
+- Console + network capture via `WKScriptMessageHandler` ring buffer
 
 **Parallel (always-on hygiene):**
 - Phase 4.2: make git operations throw
