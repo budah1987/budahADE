@@ -68,7 +68,9 @@ final class DevServerManager: ObservableObject {
 
             // If port is injected (not detected from stdout), set URL immediately
             if config.portInjection != .stdout {
-                detectedURL = URL(string: "http://localhost:\(port)")
+                if let url = URL(string: "http://localhost:\(port)") {
+                    detectedURLs = [url]
+                }
             }
         } catch {
             print("[DevServerManager] Failed to start: \(error)")

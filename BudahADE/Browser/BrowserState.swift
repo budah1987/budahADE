@@ -53,7 +53,8 @@ final class BrowserState {
     private(set) var webView: WKWebView?
 
     /// Element picker — activate to enter hover+click inspect mode
-    lazy var elementPicker = ElementPicker()
+    @ObservationIgnored
+    private(set) lazy var elementPicker = ElementPicker()
 
     // MARK: - Navigation
 
