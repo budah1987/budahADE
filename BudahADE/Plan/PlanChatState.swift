@@ -138,12 +138,12 @@ final class PlanChatState: ObservableObject {
             if !session.hasVerified {
                 if let diffPrompt = SpecDiffVerification.diffPrompt(worktreePath: worktreePathCopy) {
                     session.hasVerified = true
-                    self.chatManager.send(sessionId: sessionId, prompt: diffPrompt)
+                    self.chatManager.send(sessionId: sessionId, prompt: diffPrompt, showInChat: false)
                 } else if let verifyPrompt = SelfVerification.verificationPrompt(
                     taskName: taskNameCopy, role: roleCopy, worktreePath: worktreePathCopy
                 ) {
                     session.hasVerified = true
-                    self.chatManager.send(sessionId: sessionId, prompt: verifyPrompt)
+                    self.chatManager.send(sessionId: sessionId, prompt: verifyPrompt, showInChat: false)
                 }
             }
         }

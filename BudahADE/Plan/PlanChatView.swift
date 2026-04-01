@@ -246,9 +246,13 @@ struct PlanChatView: View {
                             .id("thinking")
                         }
                     }
+
+                    // Spacer clears the gradient overlay + gives room to scroll past content
+                    Color.clear.frame(height: 64).id("scroll-spacer")
                 }
                 .padding(.horizontal, 48)
-                .padding(.vertical, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
             }
             .onChange(of: session?.messages.count) { _, _ in
                 scrollToBottom(proxy: proxy)
@@ -672,12 +676,26 @@ struct PlanChatView: View {
     }
 
     private func handleApprove() {
-        guard let lastAssistant = session?.messages.last(where: { $0.role == .assistant }),
-              !lastAssistant.content.isEmpty else { return }
-        let version = SpecVersionManager.approve(content: lastAssistant.content, in: state.worktreePath)
+        // Prefer spec content from a file the agent wrote (root-level *-spec.md etc.)
+        // over the assistant's last message, which is often just a summary.
+        let specContent: String
+        let existingSpecFiles = SpecParser.findSpecFiles(in: state.worktreePath)
+            .filter { !$0.contains(".budahade/spec.md") } // skip our own output path
+        if let agentSpecPath = existingSpecFiles.first,
+           let fileContent = try? String(contentsOfFile: agentSpecPath, encoding: .utf8),
+           !fileContent.isEmpty {
+            specContent = fileContent
+        } else if let lastAssistant = session?.messages.last(where: { $0.role == .assistant }),
+                  !lastAssistant.content.isEmpty {
+            specContent = lastAssistant.content
+        } else {
+            return
+        }
+
+        let version = SpecVersionManager.approve(content: specContent, in: state.worktreePath)
 
         // Count spec items from the approved content
-        let itemCount = lastAssistant.content.components(separatedBy: "\n")
+        let itemCount = specContent.components(separatedBy: "\n")
             .filter { $0.contains("- [ ]") || $0.contains("- [x]") || $0.contains("- [X]") }
             .count
 

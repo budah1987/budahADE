@@ -190,13 +190,13 @@ enum SelfVerification {
     /// Returns a verification prompt to send after the agent's initial completion.
     /// If a spec exists, includes unchecked items for targeted verification.
     static func verificationPrompt(taskName: String, role: AgentMode?, worktreePath: String? = nil) -> String? {
-        // Only auto-verify roles that produce artifacts (code, specs)
+        // Only auto-verify roles that produce runnable artifacts (code)
         guard let role = role else { return nil }
         switch role {
-        case .developer, .specAuthor, .claude:
+        case .developer, .claude:
             break
         default:
-            return nil  // Researcher, ideator, designer don't need artifact verification
+            return nil  // Researcher, ideator, designer, specAuthor don't need artifact verification
         }
 
         var prompt = """
