@@ -86,6 +86,10 @@ enum TmuxSessionManager {
         set -as terminal-features ",xterm-256color:clipboard"
         set -g set-clipboard on
 
+        # Propagate pane title to outer terminal (Ghostty) so agent status tracking works
+        set -g set-titles on
+        set -g set-titles-string '#{pane_title}'
+
         # Mouse OFF — let Ghostty handle selection natively (Cmd+C to copy)
         set -g mouse off
 
@@ -140,6 +144,27 @@ enum TmuxSessionManager {
         process.standardError = FileHandle.nullDevice
         try? process.run()
         process.waitUntilExit()
+    }
+
+    /// Get the current pane title for a tmux session.
+    /// Returns nil if the session doesn't exist or tmux is unavailable.
+    static func paneTitle(session: String) -> String? {
+        guard isAvailable else { return nil }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: tmuxPath)
+        process.arguments = ["display-message", "-t", session, "-p", "#{pane_title}"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            return nil
+        }
     }
 
     /// List all budahade tmux sessions.

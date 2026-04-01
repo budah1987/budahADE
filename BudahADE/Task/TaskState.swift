@@ -98,6 +98,7 @@ final class TaskState: ObservableObject, Identifiable {
         self.repoPath = repoPath
 
         observeTitleChanges()
+        startTmuxTitlePolling()
     }
 
     /// Call after the worktree directory is ready on disk.
@@ -883,7 +884,6 @@ final class TaskState: ObservableObject, Identifiable {
                     self.tabs[index].title = title
                 }
                 let newStatus = Self.parseAgentStatus(from: title)
-                print("[AgentStatus] title=\"\(title)\" → \(newStatus)")
                 let oldStatus = self.previousStatuses[surfaceId] ?? .inactive
                 self.previousStatuses[surfaceId] = newStatus
 
@@ -902,6 +902,55 @@ final class TaskState: ObservableObject, Identifiable {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// Poll tmux pane titles every ~1s. Ghostty's embedded library doesn't fire
+    /// SET_TITLE through the action callback, so we read directly from tmux.
+    private func startTmuxTitlePolling() {
+        guard TmuxSessionManager.isAvailable else { return }
+        Task { [weak self] in
+            while let self, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { break }
+                for tab in self.tabs {
+                    guard let tmuxSession = tab.tmuxSession else { continue }
+                    let title = await Task.detached(priority: .utility) {
+                        TmuxSessionManager.paneTitle(session: tmuxSession)
+                    }.value
+                    guard let title, !title.isEmpty else { continue }
+                    self.handleTitleUpdate(tabId: tab.id, title: title)
+                }
+            }
+        }
+    }
+
+    /// Process a title update (shared by both Ghostty callback and tmux polling).
+    private func handleTitleUpdate(tabId: UUID, title: String) {
+        guard let index = tabs.firstIndex(where: { $0.id == tabId }) else { return }
+
+        if tabs[index].restoredTitle != nil {
+            if Self.parseAgentStatus(from: title) != .inactive {
+                tabs[index].title = title
+                tabs[index].restoredTitle = nil
+            }
+        } else {
+            tabs[index].title = title
+        }
+        let newStatus = Self.parseAgentStatus(from: title)
+        let oldStatus = previousStatuses[tabId] ?? .inactive
+        previousStatuses[tabId] = newStatus
+
+        if newStatus == .working || newStatus == .thinking {
+            tabs[index].hadActivity = true
+        }
+
+        if (oldStatus == .working || oldStatus == .thinking) && newStatus == .inactive {
+            tabs[index].agentStatus = .completed
+        } else if tabs[index].agentStatus == .completed && newStatus == .inactive {
+            // Stay completed
+        } else {
+            tabs[index].agentStatus = newStatus
+        }
     }
 
     /// Map terminal title patterns to agent status.
