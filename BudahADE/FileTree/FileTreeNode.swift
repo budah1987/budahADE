@@ -123,21 +123,24 @@ final class FileTreeNode: Identifiable, ObservableObject, Hashable {
     ]
 
     static func scan(directory: String) -> [FileTreeNode] {
+        let resolved = URL(fileURLWithPath: directory).standardizedFileURL.path
         let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(atPath: directory) else { return [] }
-
-        var dirs: [FileTreeNode] = []
-        var files: [FileTreeNode] = []
-
-        for entry in entries.sorted() {
-            if ignoredNames.contains(entry) || entry.hasPrefix(".") { continue }
-            let fullPath = (directory as NSString).appendingPathComponent(entry)
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: fullPath, isDirectory: &isDir) else { continue }
-            let node = FileTreeNode(name: entry, path: fullPath, isDirectory: isDir.boolValue)
-            if isDir.boolValue { dirs.append(node) } else { files.append(node) }
+        do {
+            let entries = try fm.contentsOfDirectory(atPath: resolved)
+            var dirs: [FileTreeNode] = []
+            var files: [FileTreeNode] = []
+            for entry in entries.sorted() {
+                if ignoredNames.contains(entry) || entry.hasPrefix(".") { continue }
+                let fullPath = (resolved as NSString).appendingPathComponent(entry)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: fullPath, isDirectory: &isDir) else { continue }
+                let node = FileTreeNode(name: entry, path: fullPath, isDirectory: isDir.boolValue)
+                if isDir.boolValue { dirs.append(node) } else { files.append(node) }
+            }
+            return dirs + files
+        } catch {
+            print("[FileTree] scan failed for '\(resolved)': \(error)")
+            return []
         }
-
-        return dirs + files
     }
 }

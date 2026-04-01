@@ -97,15 +97,25 @@ struct BudahADEApp: App {
 
                 Divider()
 
-                Button("Focus Next Pane") {
-                    NotificationCenter.default.post(name: .focusNextPane, object: nil)
+                Button("Focus Left Pane") {
+                    NotificationCenter.default.post(name: .focusLeftPane, object: nil)
                 }
-                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .keyboardShortcut(.leftArrow, modifiers: .command)
 
-                Button("Focus Previous Pane") {
-                    NotificationCenter.default.post(name: .focusPrevPane, object: nil)
+                Button("Focus Right Pane") {
+                    NotificationCenter.default.post(name: .focusRightPane, object: nil)
                 }
-                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+
+                Button("Focus Top Pane") {
+                    NotificationCenter.default.post(name: .focusTopPane, object: nil)
+                }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+
+                Button("Focus Bottom Pane") {
+                    NotificationCenter.default.post(name: .focusBottomPane, object: nil)
+                }
+                .keyboardShortcut(.downArrow, modifiers: .command)
 
                 Button("Close Split") {
                     NotificationCenter.default.post(name: .closeSplit, object: nil)
@@ -318,8 +328,10 @@ extension Notification.Name {
     static let toggleLeftPanel = Notification.Name("budahADE.toggleLeftPanel")
     static let splitRight = Notification.Name("budahADE.splitRight")
     static let splitDown = Notification.Name("budahADE.splitDown")
-    static let focusNextPane = Notification.Name("budahADE.focusNextPane")
-    static let focusPrevPane = Notification.Name("budahADE.focusPrevPane")
+    static let focusLeftPane   = Notification.Name("budahADE.focusLeftPane")
+    static let focusRightPane  = Notification.Name("budahADE.focusRightPane")
+    static let focusTopPane    = Notification.Name("budahADE.focusTopPane")
+    static let focusBottomPane = Notification.Name("budahADE.focusBottomPane")
     static let closeSplit = Notification.Name("budahADE.closeSplit")
     static let selectTabByIndex = Notification.Name("budahADE.selectTabByIndex")
     static let toggleWorkspaceSwitcher = Notification.Name("budahADE.toggleWorkspaceSwitcher")
@@ -334,4 +346,6 @@ extension Notification.Name {
     static let toggleRightPanel = Notification.Name("budahADE.toggleRightPanel")
     static let toggleBrowser = Notification.Name("budahADE.toggleBrowser")
     static let focusInput = Notification.Name("budahADE.focusInput")
+    static let tabDragBegan = Notification.Name("budahADE.tabDragBegan")
+    static let tabDragEnded = Notification.Name("budahADE.tabDragEnded")
 }

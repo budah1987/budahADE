@@ -23,8 +23,12 @@ final class FileWatcher: ObservableObject {
     func start() {
         stop()
 
-        fileDescriptor = open(path, O_EVTONLY)
-        guard fileDescriptor >= 0 else { return }
+        let resolved = URL(fileURLWithPath: path).standardizedFileURL.path
+        fileDescriptor = open(resolved, O_EVTONLY)
+        guard fileDescriptor >= 0 else {
+            print("[FileWatcher] open() failed for '\(resolved)'")
+            return
+        }
 
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fileDescriptor,

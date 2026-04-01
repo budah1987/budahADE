@@ -3,9 +3,11 @@ import UniformTypeIdentifiers
 
 // MARK: - Split Pane State
 
-/// Tracks which tab is shown in the secondary pane and the split direction.
+/// Tracks which tabs belong to the secondary pane and the split direction.
+/// The secondary pane owns a subset of the task's tabs; the rest belong to the primary pane.
 struct SplitPaneState: Equatable {
-    var secondaryTabId: UUID
+    var secondaryTabIds: [UUID]
+    var secondarySelectedId: UUID?
     var orientation: SplitOrientation
 }
 
@@ -16,12 +18,12 @@ enum PanePosition: Equatable {
     case secondary
 }
 
-// MARK: - Pane Focus Direction
+// MARK: - Pane Arrow
 
-enum PaneFocusDirection {
-    case next
-    case previous
+enum PaneArrow {
+    case left, right, up, down
 }
+
 
 // MARK: - Drop Zone
 
@@ -48,6 +50,9 @@ enum DropZone: Equatable {
 // MARK: - Split Drop Overlay
 
 /// Overlay that shows drop zone highlights when a tab is dragged over the content area.
+/// Uses a single full-coverage DropDelegate so the zone is determined from the drop
+/// location rather than relying on four competing .onDrop views — which is unreliable
+/// when WKWebView or other NSViews are in the hierarchy.
 struct SplitDropOverlay: View {
     let onDrop: (DropZone, String) -> Void
     @State private var activeZone: DropZone?
@@ -55,18 +60,33 @@ struct SplitDropOverlay: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                dropZone(.left, frame: leftFrame(geo))
-                dropZone(.right, frame: rightFrame(geo))
-                dropZone(.top, frame: topFrame(geo))
-                dropZone(.bottom, frame: bottomFrame(geo))
+                // Visual-only zone indicators (non-interactive)
+                zoneHighlight(.left,   geo: geo)
+                zoneHighlight(.right,  geo: geo)
+                zoneHighlight(.top,    geo: geo)
+                zoneHighlight(.bottom, geo: geo)
+
+                // Single full-coverage drop target — zone computed from cursor position
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onDrop(
+                        of: [UTType.text],
+                        delegate: SplitDropDelegate(
+                            size: geo.size,
+                            activeZone: $activeZone,
+                            onDrop: onDrop
+                        )
+                    )
             }
         }
         .allowsHitTesting(true)
     }
 
-    private func dropZone(_ zone: DropZone, frame: CGRect) -> some View {
+    @ViewBuilder
+    private func zoneHighlight(_ zone: DropZone, geo: GeometryProxy) -> some View {
         let isActive = activeZone == zone
-        return Rectangle()
+        let frame = highlightFrame(zone, geo: geo)
+        Rectangle()
             .fill(isActive ? Theme.accent.opacity(0.12) : Color.clear)
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
@@ -75,42 +95,161 @@ struct SplitDropOverlay: View {
             )
             .frame(width: frame.width, height: frame.height)
             .position(x: frame.midX, y: frame.midY)
-            .onDrop(of: [UTType.text], isTargeted: Binding(
-                get: { activeZone == zone },
-                set: { targeted in
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        if targeted { activeZone = zone }
-                        else if activeZone == zone { activeZone = nil }
-                    }
-                }
-            )) { providers in
-                guard let provider = providers.first else { return false }
-                provider.loadObject(ofClass: String.self) { tabIdString, _ in
-                    if let tabIdString {
-                        DispatchQueue.main.async {
-                            onDrop(zone, tabIdString)
-                        }
-                    }
-                }
-                return true
+            .allowsHitTesting(false)
+    }
+
+    private func highlightFrame(_ zone: DropZone, geo: GeometryProxy) -> CGRect {
+        let w = geo.size.width, h = geo.size.height
+        switch zone {
+        case .left:   return CGRect(x: 0,       y: 0,       width: w * 0.3, height: h)
+        case .right:  return CGRect(x: w * 0.7,  y: 0,       width: w * 0.3, height: h)
+        case .top:    return CGRect(x: w * 0.3,  y: 0,       width: w * 0.4, height: h * 0.3)
+        case .bottom: return CGRect(x: w * 0.3,  y: h * 0.7, width: w * 0.4, height: h * 0.3)
+        }
+    }
+}
+
+// MARK: - Pane Move Drop Overlay
+
+/// Overlay shown in split mode: dragging a tab over one half moves it to that pane.
+struct PaneMoveDropOverlay: View {
+    let orientation: SplitOrientation
+    let onDrop: (PanePosition, String) -> Void
+    @State private var activePane: PanePosition?
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                paneTint(.primary, geo: geo)
+                paneTint(.secondary, geo: geo)
+
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onDrop(
+                        of: [UTType.text],
+                        delegate: PaneMoveDropDelegate(
+                            size: geo.size,
+                            orientation: orientation,
+                            activePane: $activePane,
+                            onDrop: onDrop
+                        )
+                    )
             }
+        }
+        .allowsHitTesting(true)
     }
 
-    // MARK: - Zone Frames
-
-    private func leftFrame(_ geo: GeometryProxy) -> CGRect {
-        CGRect(x: 0, y: 0, width: geo.size.width * 0.3, height: geo.size.height)
+    @ViewBuilder
+    private func paneTint(_ pane: PanePosition, geo: GeometryProxy) -> some View {
+        let isActive = activePane == pane
+        let frame = paneFrame(pane, geo: geo)
+        Rectangle()
+            .fill(isActive ? Theme.accent.opacity(0.12) : Color.clear)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(Theme.accent.opacity(isActive ? 0.6 : 0), lineWidth: 2)
+                    .padding(4)
+            )
+            .frame(width: frame.width, height: frame.height)
+            .position(x: frame.midX, y: frame.midY)
+            .allowsHitTesting(false)
     }
 
-    private func rightFrame(_ geo: GeometryProxy) -> CGRect {
-        CGRect(x: geo.size.width * 0.7, y: 0, width: geo.size.width * 0.3, height: geo.size.height)
+    private func paneFrame(_ pane: PanePosition, geo: GeometryProxy) -> CGRect {
+        let w = geo.size.width, h = geo.size.height
+        switch (orientation, pane) {
+        case (.horizontal, .primary):   return CGRect(x: 0,       y: 0, width: w * 0.5, height: h)
+        case (.horizontal, .secondary): return CGRect(x: w * 0.5, y: 0, width: w * 0.5, height: h)
+        case (.vertical,   .primary):   return CGRect(x: 0,       y: 0, width: w, height: h * 0.5)
+        case (.vertical,   .secondary): return CGRect(x: 0, y: h * 0.5, width: w, height: h * 0.5)
+        }
+    }
+}
+
+private struct PaneMoveDropDelegate: DropDelegate {
+    let size: CGSize
+    let orientation: SplitOrientation
+    @Binding var activePane: PanePosition?
+    let onDrop: (PanePosition, String) -> Void
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let pane = pane(for: info.location)
+        withAnimation(.easeInOut(duration: 0.15)) { activePane = pane }
+        return DropProposal(operation: .move)
     }
 
-    private func topFrame(_ geo: GeometryProxy) -> CGRect {
-        CGRect(x: geo.size.width * 0.3, y: 0, width: geo.size.width * 0.4, height: geo.size.height * 0.3)
+    func dropExited(info: DropInfo) {
+        withAnimation(.easeInOut(duration: 0.15)) { activePane = nil }
     }
 
-    private func bottomFrame(_ geo: GeometryProxy) -> CGRect {
-        CGRect(x: geo.size.width * 0.3, y: geo.size.height * 0.7, width: geo.size.width * 0.4, height: geo.size.height * 0.3)
+    func performDrop(info: DropInfo) -> Bool {
+        let pane = pane(for: info.location) ?? .primary
+        if let tabId = currentlyDraggingTabId {
+            DispatchQueue.main.async { onDrop(pane, tabId.uuidString) }
+        } else {
+            info.itemProviders(for: [UTType.text]).first?.loadObject(ofClass: String.self) { str, _ in
+                if let str { DispatchQueue.main.async { onDrop(pane, str) } }
+            }
+        }
+        withAnimation(.easeInOut(duration: 0.15)) { activePane = nil }
+        return true
+    }
+
+    private func pane(for location: CGPoint) -> PanePosition? {
+        switch orientation {
+        case .horizontal: return location.x < size.width  * 0.5 ? .primary : .secondary
+        case .vertical:   return location.y < size.height * 0.5 ? .primary : .secondary
+        }
+    }
+}
+
+// MARK: - Split Drop Delegate
+
+private struct SplitDropDelegate: DropDelegate {
+    let size: CGSize
+    @Binding var activeZone: DropZone?
+    let onDrop: (DropZone, String) -> Void
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let zone = zone(for: info.location)
+        withAnimation(.easeInOut(duration: 0.15)) { activeZone = zone }
+        return DropProposal(operation: zone != nil ? .move : .forbidden)
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(.easeInOut(duration: 0.15)) { activeZone = nil }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let zone = zone(for: info.location) else {
+            withAnimation(.easeInOut(duration: 0.15)) { activeZone = nil }
+            return false
+        }
+        // Prefer the tracked drag ID — NSDraggingSession items are unreliable
+        // through SwiftUI's NSItemProvider bridging (loadObject may return nil).
+        if let tabId = currentlyDraggingTabId {
+            DispatchQueue.main.async { onDrop(zone, tabId.uuidString) }
+        } else {
+            // Fallback: parse from pasteboard (works for SwiftUI-native drags)
+            info.itemProviders(for: [UTType.text]).first?.loadObject(ofClass: String.self) { str, _ in
+                if let str {
+                    DispatchQueue.main.async { onDrop(zone, str) }
+                }
+            }
+        }
+        withAnimation(.easeInOut(duration: 0.15)) { activeZone = nil }
+        return true
+    }
+
+    /// Map cursor position to a drop zone.
+    /// Left/right take priority (full height strips); top/bottom occupy the centre column.
+    private func zone(for location: CGPoint) -> DropZone? {
+        let x = location.x / size.width
+        let y = location.y / size.height
+        if x < 0.3 { return .left }
+        if x > 0.7 { return .right }
+        if y < 0.3 { return .top }
+        if y > 0.7 { return .bottom }
+        return nil
     }
 }
