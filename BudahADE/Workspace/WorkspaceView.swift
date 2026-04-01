@@ -279,18 +279,21 @@ struct WorkspaceView: View {
     private var terminalArea: some View {
         VStack(spacing: 0) {
             if let task = state.activeTask {
-                TerminalTabBar(
-                    selectedTabID: Binding(
-                        get: { task.selectedTabId ?? UUID() },
-                        set: { task.selectTab($0) }
-                    ),
-                    tabs: task.tabs,
-                    renameTarget: renameTarget,
-                    onSelectTab: { task.selectTab($0) },
-                    onCloseTab: { requestCloseTab(.build($0)) },
-                    onNewTab: { task.createTab() },
-                    onNewBrowserTab: { task.createBrowserTab() }
-                )
+                // Single tab bar — only shown when NOT split (split mode embeds tab bars per-pane)
+                if task.splitPane == nil {
+                    TerminalTabBar(
+                        selectedTabID: Binding(
+                            get: { task.selectedTabId ?? UUID() },
+                            set: { task.selectTab($0) }
+                        ),
+                        tabs: task.tabs,
+                        renameTarget: renameTarget,
+                        onSelectTab: { task.selectTab($0) },
+                        onCloseTab: { requestCloseTab(.build($0)) },
+                        onNewTab: { task.createTab() },
+                        onNewBrowserTab: { task.createBrowserTab() }
+                    )
+                }
 
                 // Inline spec strip (only when spec exists)
                 if task.specState.hasSpec {
@@ -315,14 +318,45 @@ struct WorkspaceView: View {
             ZStack(alignment: .top) {
                 // Tab content panels (terminal + browser) — single or split
                 if let task = state.activeTask, let split = task.splitPane {
+                    // Split mode: each pane owns its own tab bar + content
                     PaneLayout(orientation: split.orientation) {
-                        tabContentView(for: task, tabId: task.selectedTabId)
-                            .overlay(paneFocusBorder(focused: task.focusedPane == .primary))
-                            .onTapGesture { task.focusedPane = .primary }
+                        VStack(spacing: 0) {
+                            TerminalTabBar(
+                                selectedTabID: Binding(
+                                    get: { task.selectedTabId ?? UUID() },
+                                    set: { task.selectTab($0) }
+                                ),
+                                tabs: task.primaryTabs,
+                                renameTarget: renameTarget,
+                                onSelectTab: { task.selectTab($0) },
+                                onCloseTab: { requestCloseTab(.build($0)) },
+                                onNewTab: { task.createTab() },
+                                onNewBrowserTab: { task.createBrowserTab() }
+                            )
+                            tabContentView(for: task, tabId: task.selectedTabId)
+                                .overlay(paneFocusBorder(focused: task.focusedPane == .primary))
+                                .onTapGesture { task.focusedPane = .primary }
+                        }
+                        .overlay(paneScrim(focused: task.focusedPane == .primary))
                     } second: {
-                        tabContentView(for: task, tabId: split.secondaryTabId)
-                            .overlay(paneFocusBorder(focused: task.focusedPane == .secondary))
-                            .onTapGesture { task.focusedPane = .secondary }
+                        VStack(spacing: 0) {
+                            TerminalTabBar(
+                                selectedTabID: Binding(
+                                    get: { split.secondarySelectedId ?? UUID() },
+                                    set: { task.selectSecondaryTab($0) }
+                                ),
+                                tabs: task.secondaryTabs,
+                                renameTarget: renameTarget,
+                                onSelectTab: { task.selectSecondaryTab($0) },
+                                onCloseTab: { requestCloseTab(.build($0)) },
+                                onNewTab: { task.createTabInSecondaryPane() },
+                                onNewBrowserTab: { task.createBrowserTabInSecondaryPane() }
+                            )
+                            tabContentView(for: task, tabId: split.secondarySelectedId)
+                                .overlay(paneFocusBorder(focused: task.focusedPane == .secondary))
+                                .onTapGesture { task.focusedPane = .secondary }
+                        }
+                        .overlay(paneScrim(focused: task.focusedPane == .secondary))
                     }
                 } else {
                     ZStack {
@@ -350,7 +384,7 @@ struct WorkspaceView: View {
                     }
                 }
 
-                // Drop zone overlay for tab splitting (always present, invisible until drag targets)
+                // Drop zone overlay — only when not already split
                 if let task = state.activeTask, task.splitPane == nil {
                     SplitDropOverlay { zone, tabIdString in
                         if let tabId = UUID(uuidString: tabIdString) {
@@ -408,6 +442,13 @@ struct WorkspaceView: View {
         RoundedRectangle(cornerRadius: 2)
             .strokeBorder(focused ? Theme.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
             .allowsHitTesting(false)
+    }
+
+    private func paneScrim(focused: Bool) -> some View {
+        Color.black
+            .opacity(focused ? 0 : 0.25)
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.15), value: focused)
     }
 
     // MARK: - Rename Palette
