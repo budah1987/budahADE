@@ -32,10 +32,19 @@ private struct PulsingDot: ViewModifier {
 struct BuilderChatView: View {
     @Bindable var session: BuilderSession
     var specTitle: String = "Spec"
+    /// Raw spec markdown — shown in conversation during ready state
+    var specContent: String? = nil
+    /// Spec file path — used to persist edits
+    var specFilePath: String? = nil
+
     @State private var thinkingStartDate: Date?
     @State private var scrollTarget: UUID?
     @State private var confirmTriggered = false
     @State private var confirmedMessageIds: Set<UUID> = []
+    /// Local copy of spec markdown (editable)
+    @State private var specMarkdown: String = ""
+    /// Show spec sheet (post-build-start "View Spec" or Edit Spec button)
+    @State private var showSpecSheet: Bool = false
 
     // Step panel state
     @State private var stepPanelState: StepPanelDisplayState = .hidden
@@ -49,7 +58,7 @@ struct BuilderChatView: View {
     var onLaunchAgent: (() -> Void)?
     /// Callback to navigate back to Plan mode
     var onBackToPlan: (() -> Void)?
-    /// Callback to open spec in edit mode
+    /// Callback to open spec in edit mode (if nil, handled internally via sheet)
     var onEditSpec: (() -> Void)?
 
     private var isRunning: Bool {
@@ -100,6 +109,53 @@ struct BuilderChatView: View {
                 .padding(.top, 48)
                 .padding(.trailing, 14)
             }
+        }
+        .onAppear {
+            if let content = specContent, !content.isEmpty {
+                specMarkdown = content
+            }
+        }
+        .onChange(of: specContent) { _, newContent in
+            if let content = newContent, !content.isEmpty, specMarkdown.isEmpty {
+                specMarkdown = content
+            }
+        }
+        .sheet(isPresented: $showSpecSheet) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text(specTitle)
+                        .font(Theme.label(14))
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer()
+                    Button("Done") { showSpecSheet = false }
+                        .font(Theme.label(12))
+                        .foregroundStyle(Theme.builder)
+                        .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(Theme.surface2)
+
+                Divider().opacity(0.3)
+
+                if !specMarkdown.isEmpty {
+                    ScrollView {
+                        EditableMarkdownRenderer(content: $specMarkdown, onDone: {
+                            showSpecSheet = false
+                            saveSpec()
+                        })
+                        .padding(20)
+                    }
+                } else {
+                    Spacer()
+                    Text("No spec loaded")
+                        .font(Theme.body(13))
+                        .foregroundStyle(Theme.textMuted)
+                    Spacer()
+                }
+            }
+            .frame(width: 680, height: 560)
+            .background(Theme.contentBg)
         }
         .sheet(item: selectedStepBinding) { wrapper in
             if session.steps.indices.contains(wrapper.index) {
@@ -223,12 +279,8 @@ struct BuilderChatView: View {
                 }
                 BuilderInputBar(
                     session: session,
+                    agentSession: agentSession,
                     onSend: sendMessage,
-                    onStart: startBuild,
-                    onPause: pauseBuild,
-                    onResume: resumeBuild,
-                    onCancel: cancelBuild,
-                    onRetry: retryFailed,
                     onReviewDiff: reviewDiff,
                     onCommit: commitChanges
                 )
@@ -257,22 +309,23 @@ struct BuilderChatView: View {
                 .buttonStyle(.plain)
             }
 
-            if let onEditSpec {
-                Button(action: onEditSpec) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 10))
-                        Text("Edit Spec")
-                            .font(Theme.label(12))
-                    }
-                    .foregroundStyle(Theme.textSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Theme.surface3)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            // Edit Spec — always visible; handled internally when onEditSpec is nil
+            Button {
+                if let onEditSpec { onEditSpec() } else { showSpecSheet = true }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 10))
+                    Text("Edit Spec")
+                        .font(Theme.label(12))
                 }
-                .buttonStyle(.plain)
+                .foregroundStyle(Theme.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Theme.surface3)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
+            .buttonStyle(.plain)
 
             Spacer()
 
@@ -284,7 +337,7 @@ struct BuilderChatView: View {
                         .font(Theme.label(12))
                     Text("⌘↵")
                         .font(Theme.caption(11))
-                        .opacity(0.6)
+                        .opacity(0.5)
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 14)
@@ -296,9 +349,17 @@ struct BuilderChatView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
+        .background(
+            ZStack {
+                Theme.surface2.opacity(0.88)
+                Color.white.opacity(0.03)
+            }
+        )
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.borderSubtle.opacity(0.6)).frame(height: 0.5)
+        }
         .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+            Rectangle().fill(Theme.borderSubtle.opacity(0.4)).frame(height: 0.5)
         }
     }
 
@@ -321,8 +382,13 @@ struct BuilderChatView: View {
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
                     Spacer()
+                    // View Spec button — opens spec sheet
+                    Button("View Spec") { showSpecSheet = true }
+                        .font(Theme.label(11))
+                        .foregroundStyle(Theme.textSecondary)
+                        .buttonStyle(.plain)
                     SpecProgressBar(steps: session.steps, size: .mini)
-                        .frame(width: 120)
+                        .frame(width: 100)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -375,12 +441,14 @@ struct BuilderChatView: View {
                 .foregroundStyle(Theme.textMuted)
                 .lineLimit(1)
 
-            // Progress bar
-            SpecProgressBar(steps: session.steps, size: .mini)
-                .frame(maxWidth: .infinity)
-                .onTapGesture(count: 1) { index in
-                    // Allow tapping a segment to open that step's modal
+            // Progress bar — tap a segment to open that step's modal
+            SpecProgressBar(steps: session.steps, size: .mini, onSegmentTap: { index in
+                selectedStepIndex = index
+                if stepPanelState == .collapsed {
+                    withAnimation(.easeInOut(duration: 0.2)) { stepPanelState = .expanded }
                 }
+            })
+            .frame(maxWidth: .infinity)
 
             // Expand/collapse toggle
             Button {
@@ -467,11 +535,18 @@ struct BuilderChatView: View {
                     .foregroundStyle(Theme.builder)
             }
 
-            // Per-step pause/cancel on active row
-            if isActive && session.buildState == .building {
-                HStack(spacing: 2) {
-                    miniActionButton("pause.fill") { builderAgent?.pause() }
-                    miniActionButton("xmark") { builderAgent?.cancel() }
+            // Per-step pause/resume/cancel on active row
+            if isActive {
+                if session.buildState == .building {
+                    HStack(spacing: 2) {
+                        miniActionButton("pause.fill") { pauseBuild() }
+                        miniActionButton("xmark") { cancelBuild() }
+                    }
+                } else if session.buildState == .paused {
+                    HStack(spacing: 2) {
+                        miniActionButton("play.fill") { resumeBuild() }
+                        miniActionButton("xmark") { cancelBuild() }
+                    }
                 }
             }
 
@@ -563,9 +638,13 @@ struct BuilderChatView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     if session.messages.isEmpty && session.buildState == .ready {
-                        readyEmptyState
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 80)
+                        if !specMarkdown.isEmpty {
+                            specDocumentView
+                        } else {
+                            readyEmptyState
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 80)
+                        }
                     }
 
                     // Error banner
@@ -671,6 +750,27 @@ struct BuilderChatView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Spec Document (ready state)
+
+    private var specDocumentView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Click any block to edit")
+                .font(Theme.caption(11))
+                .foregroundStyle(Theme.textMuted)
+                .padding(.horizontal, 4)
+
+            EditableMarkdownRenderer(content: $specMarkdown, onDone: {
+                saveSpec()
+            })
+        }
+        .padding(.bottom, 24)
+    }
+
+    private func saveSpec() {
+        guard let path = specFilePath, !specMarkdown.isEmpty else { return }
+        try? specMarkdown.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
     // MARK: - Ready State Empty
@@ -787,7 +887,6 @@ struct BuilderChatView: View {
 
     private func pauseBuild() {
         builderAgent?.pause()
-        session.buildState = .paused
     }
 
     private func resumeBuild() {

@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Changes Toolbar
 
-/// Anchored to bottom of SpecSidebarPanel.
+/// Attached to the builder content area.
 /// Shows unstaged file count + diff stats. Tap opens git panel.
 struct ChangesToolbar: View {
     let worktreePath: String

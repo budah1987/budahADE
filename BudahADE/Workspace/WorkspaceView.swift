@@ -111,6 +111,19 @@ struct WorkspaceView: View {
                                     onNewTab: { showRoleModal = true }
                                 )
 
+                                // Task-scoped SpecBar — visible in plan mode when a build exists
+                                if let builderSession = task.builderSession {
+                                    SpecBar(
+                                        session: builderSession,
+                                        specTitle: task.specState.activeSpec?.title ?? "Spec",
+                                        isBuilderTabActive: false,
+                                        onTap: {
+                                            task.enterBuildMode()
+                                            task.showBuilderChat = true
+                                        }
+                                    )
+                                }
+
                                 if let planChat = task.activePlanChat,
                                    let selectedId = task.selectedPlanTabId {
                                     PlanChatView(
@@ -406,11 +419,13 @@ struct WorkspaceView: View {
                 BuilderChatView(
                     session: builderSession,
                     specTitle: task.specState.activeSpec?.title ?? "Spec",
+                    specContent: task.specState.activeSpec?.rawContent,
+                    specFilePath: task.specState.activeSpec?.filePath,
                     agentSession: task.builderAgent?.agentSession,
                     builderAgent: task.builderAgent,
                     onLaunchAgent: { launchBuilderAgent(task: task) },
                     onBackToPlan: { task.enterPlanMode() },
-                    onEditSpec: nil
+                    onEditSpec: nil  // nil → handled internally (opens spec sheet)
                 )
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
