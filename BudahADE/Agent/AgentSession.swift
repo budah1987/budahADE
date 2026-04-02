@@ -200,6 +200,8 @@ final class AgentSession: ObservableObject, Identifiable {
         messages.append(message)
         currentStreamingText = ""
         optionsDismissed = false
+        confirmDismissed = false
+        questionSeriesDismissed = false
     }
 
     func handleContentDelta(_ text: String) {
@@ -398,6 +400,268 @@ final class AgentSession: ObservableObject, Identifiable {
 
     /// Whether option buttons have been dismissed (reset on new assistant message)
     @Published var optionsDismissed: Bool = false
+    /// Whether the confirmation button has been dismissed (reset on new assistant message)
+    @Published var confirmDismissed: Bool = false
+
+    /// Detects if the last assistant message is asking for a simple yes/no confirmation
+    /// (not a multi-option question). Returns the question text if detected.
+    // MARK: - Question Series Detection
+
+    struct DetectedQuestionItem: Identifiable {
+        let id: Int
+        let question: String        // Bold question text
+        let context: String          // Regular text with suggested answers
+        let suggestions: [String]    // Parsed answer suggestions from context
+    }
+
+    /// Detects a numbered series of questions (e.g. "Key Questions" list).
+    /// Pattern: `1. **Bold question?** Regular text with Or alternatives`
+    func detectQuestionSeries(in text: String) -> [DetectedQuestionItem]? {
+        let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+
+        // Pattern: "1. **Question text?** Description text"
+        let pattern = try! NSRegularExpression(
+            pattern: #"^(\d+)[.)]\s+\*{2}(.+?)\*{2}\s*(.*)$"#
+        )
+
+        var items: [DetectedQuestionItem] = []
+
+        for line in lines {
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+            guard let match = pattern.firstMatch(in: line, range: range),
+                  let questionRange = Range(match.range(at: 2), in: line) else { continue }
+
+            let question = String(line[questionRange]).trimmingCharacters(in: .whitespaces)
+            let context: String
+            if let contextRange = Range(match.range(at: 3), in: line) {
+                context = String(line[contextRange]).trimmingCharacters(in: .whitespaces)
+            } else {
+                context = ""
+            }
+
+            // Parse suggestions: split by " or " and "? Or " patterns
+            let suggestions = parseAnswerSuggestions(from: context)
+
+            items.append(DetectedQuestionItem(
+                id: items.count,
+                question: question,
+                context: context,
+                suggestions: suggestions
+            ))
+        }
+
+        // Need at least 2 questions to be a "series"
+        guard items.count >= 2 else { return nil }
+        return items
+    }
+
+    /// Parse answer suggestions from regular text by splitting on "or" boundaries.
+    private func parseAnswerSuggestions(from text: String) -> [String] {
+        guard !text.isEmpty else { return [] }
+
+        // Split on " or " / "? Or " / ", or "
+        let segments = text
+            .replacingOccurrences(of: "? Or ", with: "|||")
+            .replacingOccurrences(of: "? or ", with: "|||")
+            .replacingOccurrences(of: ", or ", with: "|||")
+            .replacingOccurrences(of: " or ", with: "|||")
+            .components(separatedBy: "|||")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { segment -> String in
+                // Clean up: remove trailing "?" and leading connectors
+                var s = segment
+                while s.hasSuffix("?") { s = String(s.dropLast()).trimmingCharacters(in: .whitespaces) }
+                // Remove leading "do you", "does she", etc. for cleaner option text
+                let prefixes = ["do you also want ", "are you ", "is she ", "does she "]
+                for prefix in prefixes {
+                    if s.lowercased().hasPrefix(prefix) {
+                        s = String(s.dropFirst(prefix.count))
+                        break
+                    }
+                }
+                return s
+            }
+            .filter { !$0.isEmpty && $0.count > 3 && $0.count < 200 }
+
+        // Cap at 4 suggestions per question
+        return Array(segments.prefix(4))
+    }
+
+    /// Whether the message has been dismissed from the question stepper
+    @Published var questionSeriesDismissed: Bool = false
+
+    // MARK: - Interactive Marker Parsing
+
+    enum InteractiveBlock {
+        case questions([MarkerQuestionItem])
+        case choice(options: [String])
+        case confirm
+
+        /// Convert `.choice` to `[DetectedOption]` for OptionButtonsSheet
+        var asDetectedOptions: [DetectedOption]? {
+            guard case .choice(let options) = self, !options.isEmpty else { return nil }
+            return options.enumerated().map { idx, text in
+                let parts = text.components(separatedBy: " — ")
+                return DetectedOption(
+                    id: idx,
+                    label: "\(idx + 1)",
+                    text: parts[0].trimmingCharacters(in: .whitespaces),
+                    description: parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+                )
+            }
+        }
+
+        /// Convert `.questions` to `[DetectedQuestionItem]` for QuestionStepperSheet
+        var asDetectedQuestions: [DetectedQuestionItem]? {
+            guard case .questions(let items) = self, !items.isEmpty else { return nil }
+            return items.enumerated().map { idx, item in
+                DetectedQuestionItem(
+                    id: idx,
+                    question: item.question,
+                    context: "",
+                    suggestions: item.options
+                )
+            }
+        }
+    }
+
+    struct MarkerQuestionItem {
+        let question: String
+        let options: [String]
+    }
+
+    // Regex patterns for interactive markers
+    private static let interactiveOpenPattern = /<!-- INTERACTIVE:(questions|choice|confirm) -->/
+    private static let interactiveClosePattern = /<!-- \/INTERACTIVE -->/
+    private static let optionMarkerPattern = /<!-- OPTION:(.+?) -->/
+    private static let boldLinePattern = /\*\*(.+?)\*\*/
+
+    /// Parse interactive markers from agent response text.
+    /// Returns an array of blocks (usually 0 or 1, but a message may contain multiple).
+    func parseInteractiveMarkers(in text: String) -> [InteractiveBlock] {
+        var blocks: [InteractiveBlock] = []
+        let lines = text.components(separatedBy: "\n")
+
+        var i = 0
+        while i < lines.count {
+            let line = lines[i].trimmingCharacters(in: .whitespaces)
+
+            // Look for opening marker
+            if let match = line.firstMatch(of: Self.interactiveOpenPattern) {
+                let type = String(match.1)
+
+                // Collect lines until closing marker
+                var blockLines: [String] = []
+                i += 1
+                while i < lines.count {
+                    let inner = lines[i].trimmingCharacters(in: .whitespaces)
+                    if inner.contains("<!-- /INTERACTIVE -->") { break }
+                    blockLines.append(inner)
+                    i += 1
+                }
+
+                switch type {
+                case "confirm":
+                    blocks.append(.confirm)
+                case "choice":
+                    let options = blockLines.compactMap { l -> String? in
+                        guard let m = l.firstMatch(of: Self.optionMarkerPattern) else { return nil }
+                        return String(m.1)
+                    }
+                    if !options.isEmpty {
+                        blocks.append(.choice(options: options))
+                    }
+                case "questions":
+                    var items: [MarkerQuestionItem] = []
+                    var currentQuestion: String?
+                    var currentOptions: [String] = []
+
+                    for bl in blockLines {
+                        if let qMatch = bl.firstMatch(of: Self.boldLinePattern) {
+                            // Save previous question group
+                            if let q = currentQuestion {
+                                items.append(MarkerQuestionItem(question: q, options: currentOptions))
+                            }
+                            currentQuestion = String(qMatch.1)
+                            currentOptions = []
+                        } else if let oMatch = bl.firstMatch(of: Self.optionMarkerPattern) {
+                            currentOptions.append(String(oMatch.1))
+                        }
+                    }
+                    // Save last question group
+                    if let q = currentQuestion {
+                        items.append(MarkerQuestionItem(question: q, options: currentOptions))
+                    }
+                    if !items.isEmpty {
+                        blocks.append(.questions(items))
+                    }
+                default:
+                    break
+                }
+            }
+            i += 1
+        }
+
+        return blocks
+    }
+
+    /// Strip all interactive markers from text for clean display/storage.
+    static func stripInteractiveMarkers(from text: String) -> String {
+        var result = text
+        // Remove INTERACTIVE open/close and OPTION markers
+        let patterns: [Regex<AnyRegexOutput>] = [
+            try! Regex(#"<!-- INTERACTIVE:\w+ -->"#),
+            try! Regex(#"<!-- /INTERACTIVE -->"#),
+            try! Regex(#"<!-- OPTION:.+? -->"#),
+        ]
+        for pattern in patterns {
+            result = result.replacing(pattern, with: "")
+        }
+        // Clean up extra blank lines left by removal
+        while result.contains("\n\n\n") {
+            result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+        }
+        return result
+    }
+
+    func detectConfirmation(in text: String) -> String? {
+        let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        let nonEmpty = lines.filter { !$0.isEmpty }
+        guard !nonEmpty.isEmpty else { return nil }
+
+        // Find the last line that ends with "?"
+        guard let lastQuestion = nonEmpty.last(where: { $0.hasSuffix("?") }) else {
+            // Also check for "if yes" / "if so" patterns without a question mark
+            let tail = nonEmpty.suffix(3).joined(separator: " ").lowercased()
+            let implicitConfirm = ["if yes", "if so", "ready to proceed", "ready to move on"]
+            guard implicitConfirm.contains(where: { tail.contains($0) }) else { return nil }
+            return nonEmpty.suffix(2).joined(separator: " ")
+        }
+
+        let q = lastQuestion.lowercased()
+            .replacingOccurrences(of: "**", with: "")
+            .replacingOccurrences(of: "*", with: "")
+
+        // Exclude questions that ask the user to CHOOSE between options
+        // These are multi-choice and should get the option modal instead
+        let choicePatterns = [
+            "which.*prefer", "which.*choose", "which.*option", "which.*approach",
+            "what approach", "what option", "what would you prefer",
+            "how would you like to",
+        ]
+        for pattern in choicePatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               regex.firstMatch(in: q, range: NSRange(q.startIndex..<q.endIndex, in: q)) != nil {
+                return nil
+            }
+        }
+
+        // Exclude messages with a question series — those get the stepper modal
+        if detectQuestionSeries(in: text) != nil { return nil }
+
+        // Any remaining question ending in "?" is a confirmation/yes-no question
+        return nonEmpty.suffix(2).joined(separator: " ")
+    }
 
     struct DetectedOption: Identifiable {
         let id: Int
@@ -424,10 +688,13 @@ final class AgentSession: ObservableObject, Identifiable {
             return nil
         }
 
-        // Find option lines — numbered, lettered, or bulleted
+        // Confirmation questions trump option detection — if the tail matches
+        // a confirm pattern, the AI is asking for validation, not a choice.
+        if detectConfirmation(in: text) != nil { return nil }
+
+        // Find option lines — numbered, lettered, or explicit option headings
         let numberedPattern = try! NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.+)$"#)
         let letteredPattern = try! NSRegularExpression(pattern: #"^([A-Za-z])[.)]\s+(.+)$"#)
-        let bulletPattern = try! NSRegularExpression(pattern: #"^[-•·‣›]\s+\*{0,2}(.+?)\*{0,2}\s*(—.*)?$"#)
         // Bullet + lettered: "• **A) Label** — desc" or "· A) Label" etc.
         let bulletLetteredPattern = try! NSRegularExpression(pattern: #"^[-•·‣›]\s+\*{0,2}([A-Za-z])[.)]\s*(.+?)\*{0,2}\s*(—.*)?$"#)
         // "Option 1:" / "Option A:" / "**Option B:**" heading format
@@ -497,15 +764,6 @@ final class AgentSession: ObservableObject, Identifiable {
                 options.append(DetectedOption(
                     id: options.count,
                     label: String(line[labelRange]),
-                    text: rawText,
-                    description: ""
-                ))
-            } else if let match = bulletPattern.firstMatch(in: line, range: range),
-                      let textRange = Range(match.range(at: 1), in: line) {
-                let rawText = String(line[textRange]).replacingOccurrences(of: "**", with: "")
-                options.append(DetectedOption(
-                    id: options.count,
-                    label: "\(options.count + 1)",
                     text: rawText,
                     description: ""
                 ))

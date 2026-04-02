@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Horizontal row of fixed-width blocks — one per spec item.
 /// Colors: dim (pending), pulsing accent (active), green (done), red (blocked).
-/// Sits between the SpecPanelView header and checklist.
+/// Sits between the spec progress header and task checklist.
 struct SpecBlockGraphView: View {
     @ObservedObject var specState: SpecState
     @ObservedObject var buildStatus: BuildStatusState

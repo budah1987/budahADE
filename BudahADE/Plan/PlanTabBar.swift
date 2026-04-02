@@ -17,6 +17,7 @@ struct PlanTabBar: View {
                         id: tab.id,
                         title: tab.title,
                         isSelected: tab.id == selectedTabID,
+                        tabType: tab.tabType,
                         agentState: tab.agentState,
                         onSelect: { onSelectTab(tab.id) },
                         onClose: { onCloseTab(tab.id) }

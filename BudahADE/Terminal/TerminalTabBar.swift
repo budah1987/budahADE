@@ -35,6 +35,7 @@ enum TabAgentState: Equatable {
 enum TabType: Equatable {
     case terminal
     case browser(url: URL?)
+    case builder
 }
 
 // MARK: - Tab Model
@@ -127,6 +128,10 @@ struct ConversationTab: View {
         if case .browser = tabType { return true } else { return false }
     }
 
+    private var isBuilder: Bool {
+        if case .builder = tabType { return true } else { return false }
+    }
+
     var body: some View {
         HStack(spacing: 6) {
             Button(action: onClose) {
@@ -136,7 +141,11 @@ struct ConversationTab: View {
             }
             .buttonStyle(.plain)
 
-            if isBrowser {
+            if isBuilder {
+                Circle()
+                    .fill(Theme.builder)
+                    .frame(width: 7, height: 7)
+            } else if isBrowser {
                 Image(systemName: "globe")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(isSelected ? Theme.accent : Theme.textMuted)

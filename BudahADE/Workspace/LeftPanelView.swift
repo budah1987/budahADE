@@ -38,7 +38,10 @@ struct LeftPanelView: View {
                         FileTreeView(projectPath: worktreePath)
                     case .spec:
                         if let task = state.activeTask {
-                            SpecPanelView(specState: task.specState, buildStatus: task.buildStatus)
+                            SpecFileBrowserView(
+                                specState: task.specState,
+                                worktreePath: task.worktreePath
+                            )
                         }
                     }
                 }

@@ -66,6 +66,33 @@ struct TaskRailView: View {
 
             Spacer(minLength: 0)
 
+            // Plan Archive button — only when there are archived conversations
+            if let task = workspace.activeTask, !task.archivedPlanTabs.isEmpty {
+                Button {
+                    task.showPlanArchive = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bubble.left.and.text.bubble.right")
+                            .font(.system(size: 10, weight: .medium))
+                        Text("Plan Archive")
+                            .font(Theme.label(12))
+                        Spacer()
+                        Text("\(task.archivedPlanTabs.count)")
+                            .font(Theme.caption(10))
+                            .foregroundColor(Theme.textMuted)
+                    }
+                    .foregroundColor(Theme.textMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Theme.border).frame(height: 1)
+                }
+            }
+
             // Task Archive button
             Button {
                 workspace.showTaskArchive = true
@@ -119,6 +146,21 @@ struct TaskRailView: View {
             }
             .background(Theme.appBackground)
         }
+        .sheet(isPresented: planArchiveBinding) {
+            if let task = workspace.activeTask {
+                PlanArchiveView(archivedTabs: task.archivedPlanTabs) { index in
+                    task.archivedPlanTabs.remove(at: index)
+                }
+                .background(Theme.appBackground)
+            }
+        }
+    }
+
+    private var planArchiveBinding: Binding<Bool> {
+        Binding(
+            get: { workspace.activeTask?.showPlanArchive ?? false },
+            set: { newValue in workspace.activeTask?.showPlanArchive = newValue }
+        )
     }
 }
 
@@ -176,7 +218,20 @@ private struct TaskCardView: View {
                 }
                 .padding(.leading, 12)
 
-                // Row 3: Status summary + elapsed time
+                // Row 3: Build progress (when builder is active)
+                if let builderSession = task.builderSession {
+                    VStack(alignment: .leading, spacing: 3) {
+                        SpecProgressBar(steps: builderSession.steps, size: .mini)
+                        HStack(spacing: 4) {
+                            Text(buildStatusText(builderSession))
+                                .font(Theme.caption(9))
+                                .foregroundStyle(buildStatusColor(builderSession))
+                        }
+                    }
+                    .padding(.leading, 12)
+                }
+
+                // Row 4: Status summary + elapsed time
                 statusSummaryRow
                     .padding(.leading, 12)
             }
@@ -311,6 +366,26 @@ private struct TaskCardView: View {
         case .thinking:  return "active"
         case .working:   return "working"
         case .completed: return "done"
+        }
+    }
+
+    private func buildStatusText(_ session: BuilderSession) -> String {
+        switch session.buildState {
+        case .ready:    return "Ready"
+        case .building: return "Building \(session.completedCount + 1)/\(session.totalCount)"
+        case .paused:   return "Paused"
+        case .done:     return "Done"
+        case .failed:   return "Failed at step \((session.activeStepIndex ?? 0) + 1)"
+        }
+    }
+
+    private func buildStatusColor(_ session: BuilderSession) -> Color {
+        switch session.buildState {
+        case .ready:    return Theme.textMuted
+        case .building: return Theme.builder
+        case .paused:   return Theme.warning
+        case .done:     return Theme.success
+        case .failed:   return Theme.error
         }
     }
 }

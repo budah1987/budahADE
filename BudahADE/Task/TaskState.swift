@@ -39,6 +39,8 @@ final class TaskState: ObservableObject, Identifiable {
     @Published var planChats: [UUID: PlanChatState] = [:]
     @Published var planTabs: [PlanTabInfo] = []
     @Published var selectedPlanTabId: UUID?
+    @Published var archivedPlanTabs: [ArchivedPlanTab] = []
+    @Published var showPlanArchive: Bool = false
     let specState = SpecState()
     let buildStatus = BuildStatusState()
     /// Dev server for this task (lazy — created on first browser tab)
@@ -47,6 +49,10 @@ final class TaskState: ObservableObject, Identifiable {
     /// Dedicated builder terminal — lives outside the tab bar, shown in spec strip drawer
     @Published var builderPanel: TerminalPanel?
     @Published var isBuilderDrawerOpen: Bool = false
+    /// Builder GUI session — replaces raw terminal builder
+    @Published var builderSession: BuilderSession?
+    @Published var showBuilderChat: Bool = false
+    @Published var builderAgent: BuilderAgent?
     private var specWatcher: SpecWatcher?
     private var buildStatusWatcher: BuildStatusWatcher?
     private var smartReloader: SmartReloader?
@@ -125,6 +131,7 @@ final class TaskState: ObservableObject, Identifiable {
     }
 
     func enterBuildMode() {
+        print("[enterBuildMode] Starting — builderSession: \(builderSession != nil), hasSpec: \(specState.hasSpec)")
         mode = .build
 
         // Synchronous spec discovery — ensures we detect spec files that were
@@ -137,16 +144,34 @@ final class TaskState: ObservableObject, Identifiable {
             }
         }
 
-        // Launch builder in dedicated panel (not in tab bar)
-        if builderPanel == nil && specState.hasSpec {
-            launchBuilder()
+        // Create GUI builder session when a spec exists but no builder yet
+        if builderSession == nil && specState.hasSpec {
+            let specPath = specState.activeSpec?.filePath
+                ?? (worktreePath as NSString).appendingPathComponent(".budahade/spec.md")
+            if let spec = SpecParser.parse(fileAt: specPath) {
+                createBuilderSession(from: spec)
+            } else {
+                // Fallback: create builder with single step
+                let section = SpecSection(
+                    id: "build", title: "Build", level: 2,
+                    content: "", tasks: [SpecTask(id: 0, title: "Implement spec", isCompleted: false, sectionId: "build")],
+                    lineRange: 0..<1
+                )
+                let fallback = SpecParseResult(
+                    title: "Build", sections: [section],
+                    rawContent: "", filePath: specPath
+                )
+                createBuilderSession(from: fallback)
+            }
         }
 
-        // Create a regular CLI tab if none exist
-        if tabs.isEmpty {
-            createTab()
-        } else {
-            focusActiveTerminal()
+        // Only create terminal tabs when NOT using the GUI builder
+        if builderSession == nil {
+            if tabs.isEmpty {
+                createTab()
+            } else {
+                focusActiveTerminal()
+            }
         }
 
         // Start build status watcher if we have a spec
@@ -242,10 +267,43 @@ final class TaskState: ObservableObject, Identifiable {
         return tabId
     }
 
+    /// Create builder session from a parsed spec (no tab — builder lives below the tab bar)
+    func createBuilderSession(from spec: SpecParseResult, contextSummary: String = "") {
+        let session = BuilderSession.from(spec: spec, contextSummary: contextSummary)
+        builderSession = session
+
+        // Create the builder agent coordinator
+        let chatManager = CLISubprocessManager()
+        let agent = BuilderAgent(builderSession: session, chatManager: chatManager)
+        builderAgent = agent
+
+        // Show the builder chat
+        showBuilderChat = true
+    }
+
     func closePlanTab(_ id: UUID) {
         guard let index = planTabs.firstIndex(where: { $0.id == id }) else { return }
 
-        planChats[id]?.cancel()
+        let tab = planTabs[index]
+
+        // Archive the conversation if it had messages
+        if let chatState = planChats[id] {
+            let messageCount = chatState.plannerSession?.messages.count ?? 0
+            if messageCount > 0 {
+                let lastMessage = chatState.plannerSession?.messages.last
+                let preview = lastMessage?.content.prefix(120).trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let archived = ArchivedPlanTab(
+                    title: tab.title,
+                    role: tab.role,
+                    messageCount: messageCount,
+                    preview: String(preview),
+                    archivedAt: Date()
+                )
+                archivedPlanTabs.insert(archived, at: 0)
+            }
+            chatState.cancel()
+        }
+
         planChats.removeValue(forKey: id)
         planTabs.remove(at: index)
 
@@ -256,8 +314,6 @@ final class TaskState: ObservableObject, Identifiable {
                 selectedPlanTabId = nil
             }
         }
-
-        // If last tab closed, leave empty — role selection modal will appear in WorkspaceView
     }
 
     func selectPlanTab(_ id: UUID) {

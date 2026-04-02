@@ -1,5 +1,16 @@
 import Foundation
 
+// MARK: - Archived Plan Tab
+
+struct ArchivedPlanTab: Identifiable {
+    let id: UUID = UUID()
+    let title: String
+    let role: AgentMode
+    let messageCount: Int
+    let preview: String
+    let archivedAt: Date
+}
+
 // MARK: - Plan Tab Status
 
 enum PlanTabStatus: Equatable {
@@ -16,12 +27,14 @@ struct PlanTabInfo: Identifiable, Equatable {
     var title: String
     var status: PlanTabStatus
     let role: AgentMode
+    var isBuilder: Bool
 
-    init(id: UUID = UUID(), title: String = "Plan", status: PlanTabStatus = .idle, role: AgentMode = .researcher) {
+    init(id: UUID = UUID(), title: String = "Plan", status: PlanTabStatus = .idle, role: AgentMode = .researcher, isBuilder: Bool = false) {
         self.id = id
         self.title = title
         self.status = status
         self.role = role
+        self.isBuilder = isBuilder
     }
 
     /// Map to TabAgentState for reuse with ConversationTab rendering
@@ -32,5 +45,10 @@ struct PlanTabInfo: Identifiable, Equatable {
         case .streaming:  return .working
         case .done:       return .completed
         }
+    }
+
+    /// Tab type for ConversationTab rendering
+    var tabType: TabType {
+        isBuilder ? .builder : .terminal
     }
 }

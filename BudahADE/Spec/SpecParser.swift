@@ -282,6 +282,63 @@ extension SpecParser {
         return sections
     }
 
+    /// Update a task's title at the given index in the content string
+    static func updateTaskTitle(in content: String, at taskIndex: Int, newTitle: String) -> String {
+        let lines = content.components(separatedBy: .newlines)
+        var newLines = lines
+        var counter = 0
+        for (i, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("- [x] ") || trimmed.hasPrefix("- [X] ") {
+                if counter == taskIndex {
+                    let prefix = trimmed.hasPrefix("- [x] ") ? "- [x] " : "- [X] "
+                    newLines[i] = prefix + newTitle
+                    break
+                }
+                counter += 1
+            } else if trimmed.hasPrefix("- [ ] ") {
+                if counter == taskIndex {
+                    newLines[i] = "- [ ] " + newTitle
+                    break
+                }
+                counter += 1
+            }
+        }
+        return newLines.joined(separator: "\n")
+    }
+
+    /// Update a spec file on disk with a modified task title
+    static func updateTaskInFile(at path: String, taskIndex: Int, newTitle: String) -> Bool {
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
+        let updated = updateTaskTitle(in: content, at: taskIndex, newTitle: newTitle)
+        do {
+            try updated.write(toFile: path, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Write build step changes back to the spec file.
+    /// Updates task titles for modified steps.
+    static func persistBuildSteps(_ steps: [BuildStep], to specPath: String) -> Bool {
+        guard var content = try? String(contentsOfFile: specPath, encoding: .utf8) else { return false }
+
+        // Update each step's title if it has been modified
+        // We match by index since BuildStep IDs map to SpecTask indices
+        for step in steps {
+            guard let taskIndex = Int(step.id) else { continue }
+            content = updateTaskTitle(in: content, at: taskIndex, newTitle: step.title)
+        }
+
+        do {
+            try content.write(toFile: specPath, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Toggle a checkbox at the given task index in the content string
     static func toggleCheckbox(in content: String, at taskIndex: Int) -> String {
         let lines = content.components(separatedBy: .newlines)

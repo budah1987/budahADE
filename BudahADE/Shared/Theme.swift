@@ -31,6 +31,7 @@ enum Theme {
     // MARK: - Accent & Status
 
     static let accent  = Color(hex: 0xc4785c)   // terra cotta — use sparingly
+    static let builder = Color(hex: 0x9d7dd8)   // purple — builder mode accent
     static let success = Color(hex: 0x5a9a6b)
     static let warning = Color(hex: 0xc4a85c)
     static let error   = Color(hex: 0xc45c5c)
@@ -60,6 +61,7 @@ enum Theme {
     static let nsTextSecondary = NSColor(hex: 0x999999)
     static let nsTextMuted     = NSColor(hex: 0x555555)
     static let nsAccent        = NSColor(hex: 0xc4785c)
+    static let nsBuilder       = NSColor(hex: 0x9d7dd8)
 
     // MARK: - Layout
 

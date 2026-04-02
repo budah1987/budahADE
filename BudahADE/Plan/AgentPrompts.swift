@@ -50,13 +50,15 @@ enum AgentPrompts {
         branchName: String,
         worktreePath: String,
         specFilePath: String,
-        specProgress: (completed: Int, total: Int)
+        specProgress: (completed: Int, total: Int),
+        contextSummary: String = ""
     ) -> String {
         let prompt = builderPrompt(
             taskName: taskName,
             branchName: branchName,
             specFilePath: specFilePath,
-            specProgress: specProgress
+            specProgress: specProgress,
+            contextSummary: contextSummary
         )
 
         let dir = (worktreePath as NSString).appendingPathComponent(".budahade")
@@ -84,11 +86,13 @@ enum AgentPrompts {
 
         let specBlock = specInstructions(filePath: specFilePath, progress: specProgress)
         let verificationBlock = SelfVerification.verificationGuidance(for: agent)
+        let interactiveBlock = interactiveMarkerInstructions()
 
         switch agent {
         case .claude:
             return """
             \(context)
+            \(interactiveBlock)
             \(verificationBlock)
             \(specBlock)
             """
@@ -97,6 +101,7 @@ enum AgentPrompts {
             return """
             \(context)
             You are a Research Expert. Produce structured research reports with clear analysis, sources, and conclusions. Investigate thoroughly but present findings cleanly — use headings, bullet points, and citations. When fed files or data, synthesize into actionable insights. When asked to look at the codebase, use Read/Glob/Grep as needed.
+            \(interactiveBlock)
             \(specBlock)
             """
 
@@ -104,6 +109,7 @@ enum AgentPrompts {
             return """
             \(context)
             You are an Ideation Partner and strategic thinker. Help the user get ideas out of their head. Ask incisive questions. Challenge assumptions. Propose 2-3 options with trade-offs. Read project files for context when relevant — understand the codebase and project state to give informed ideas. Focus on ideas and direction, not implementation details.
+            \(interactiveBlock)
             \(specBlock)
             """
 
@@ -111,6 +117,7 @@ enum AgentPrompts {
             return """
             \(context)
             You are a Senior Architect & Developer. Assess feasibility, suggest architecture, identify risks and dependencies. When asked, write code that is simple, efficient, and follows existing codebase patterns — code that would impress a human engineer. Reference file paths and line numbers. Think about performance, maintainability, and incremental delivery.
+            \(interactiveBlock)
             \(verificationBlock)
             \(specBlock)
             """
@@ -119,6 +126,7 @@ enum AgentPrompts {
             return """
             \(context)
             You are a UI/UX Designer. Focus on user experience, component structure, interaction patterns, visual hierarchy, and accessibility. When analyzing code, evaluate from the user's perspective — what's intuitive, what's confusing, what's missing. Present design decisions as options with trade-offs. Be opinionated — recommend the better option and explain why.
+            \(interactiveBlock)
             \(specBlock)
             """
 
@@ -136,6 +144,7 @@ enum AgentPrompts {
 
             Spec format: Problem statement, goals, architecture, components, data flow, edge cases, implementation checklist.
             Be concise. Every sentence should earn its place.
+            \(interactiveBlock)
             \(verificationBlock)
             \(specBlock)
             """
@@ -159,12 +168,22 @@ enum AgentPrompts {
     }
 
     /// Execution-focused prompt for builder agents
-    private static func builderPrompt(
+    static func builderPrompt(
         taskName: String,
         branchName: String,
         specFilePath: String,
-        specProgress: (completed: Int, total: Int)
+        specProgress: (completed: Int, total: Int),
+        contextSummary: String = ""
     ) -> String {
+        let contextBlock = contextSummary.isEmpty ? "" : """
+
+        ## Context from Planning
+        The planning conversation produced these key decisions and constraints:
+        \(contextSummary)
+        Follow these decisions — do not re-derive approaches that were already settled.
+
+        """
+
         return """
         You are a Builder executing task "\(taskName)" on branch "\(branchName)".
         Your job is to implement the spec, one task at a time.
@@ -176,6 +195,15 @@ enum AgentPrompts {
         Then proceed to the next unchecked item.
         Do not skip items. Do not reorder items. If you are blocked on a task, say so.
         Current progress: \(specProgress.completed)/\(specProgress.total) tasks complete.
+        \(contextBlock)
+        ## Step Progress Markers
+        Emit these HTML comment markers so the IDE can track your progress:
+        - `<!-- STEP_START:N -->` — before starting work on step index N (0-based)
+        - `<!-- STEP_DONE:N -->` — when step N is complete
+        - `<!-- STEP_FAIL:N -->` — if step N fails
+        - `<!-- SUBTASK:N.M:done -->` — when sub-task M of step N completes
+        - `<!-- BUILD_COMPLETE -->` — when all steps are done
+        These markers are invisible to the user but critical for progress tracking.
 
         ## Status Reporting
         After starting each task, update `.budahade/build-status.json` with your current status:
@@ -210,6 +238,38 @@ enum AgentPrompts {
         When you have a substantive finding, conclusion, or recommendation, also write it to
         `.budahade/agent-output/\(panelId.uuidString).md` as structured markdown.
         This allows your output to be collected into the spec document.
+        """
+    }
+
+    // MARK: - Interactive Marker Instructions
+
+    private static func interactiveMarkerInstructions() -> String {
+        """
+
+        ## Interactive Markers
+        When asking the user questions, offering choices, or requesting confirmation, include hidden HTML comment markers so the IDE can show interactive UI. These markers are invisible in rendered markdown.
+
+        For a series of questions (multi-step):
+        <!-- INTERACTIVE:questions -->
+        **Question text here?**
+        <!-- OPTION:First suggested answer -->
+        <!-- OPTION:Second suggested answer -->
+        **Another question?**
+        <!-- OPTION:Option A -->
+        <!-- OPTION:Option B -->
+        <!-- /INTERACTIVE -->
+
+        For a single choice from options:
+        <!-- INTERACTIVE:choice -->
+        <!-- OPTION:Option A — short description -->
+        <!-- OPTION:Option B — short description -->
+        <!-- /INTERACTIVE -->
+
+        For a simple yes/no confirmation:
+        <!-- INTERACTIVE:confirm -->
+        <!-- /INTERACTIVE -->
+
+        Always include these markers when presenting structured questions or choices. Write normal markdown around them.
         """
     }
 

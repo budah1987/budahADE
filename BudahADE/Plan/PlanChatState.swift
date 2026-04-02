@@ -39,11 +39,50 @@ final class PlanChatState: ObservableObject {
     @Published var pendingSpec: String?
     @Published var editingMessageId: UUID?
     @Published var handedOffContext: [(role: AgentMode, content: String)] = []
+
+    /// Tracks which spec-ready signals have already been dismissed
+    @Published var dismissedSpecSignals: Set<String> = []
+
+    /// Reactive spec-ready detection — same pattern as option/confirmation detection.
+    /// Just checks "what did the agent say?" without status gates or latching.
+    /// Returns a signal ID (for dismissal tracking) or nil if no spec is ready.
+    var specReadySignalId: String? {
+        guard let session = plannerSession,
+              session.status != .streaming,
+              session.status != .connecting else { return nil }
+
+        // Signal 1: Agent wrote a spec file to disk
+        for entry in session.activityFeed.reversed() {
+            guard case .toolWrite(let filePath) = entry.kind,
+                  entry.status == .completed else { continue }
+            let lower = (filePath as NSString).lastPathComponent.lowercased()
+            if lower.contains("spec") || lower.contains("plan") {
+                let signalId = "write:\(entry.id)"
+                if !dismissedSpecSignals.contains(signalId) { return signalId }
+            }
+        }
+
+        // Signal 2: Recent assistant messages have spec content or declare completion.
+        // Check last few (not just the very last) because verification/confirmation
+        // responses can push the spec message down.
+        let recentAssistant = session.messages
+            .filter { $0.role == .assistant && !$0.content.isEmpty }
+            .suffix(5)
+        for msg in recentAssistant.reversed() {
+            if looksLikeSpec(msg.content) || looksLikeSpecCompletion(msg.content) {
+                let signalId = "msg:\(msg.id)"
+                if !dismissedSpecSignals.contains(signalId) { return signalId }
+            }
+        }
+
+        return nil
+    }
     /// When true, messages are routed through the multi-model pipeline
     /// (Plan with Opus → Implement with Sonnet → Review with Opus)
     @Published var pipelineMode: Bool = false
     /// Active pipeline instance (non-nil while a pipeline is running)
     @Published var activePipeline: MultiModelPipeline?
+    @Published var turnMarkers: [ChatTurnMarker] = []
     private var pipelineCancellable: AnyCancellable?
     private var sessionCancellable: AnyCancellable?
     private var persistenceTask: Task<Void, Never>?
@@ -201,6 +240,12 @@ final class PlanChatState: ObservableObject {
             conversationState = .chatting
         }
         chatManager.send(sessionId: session.id, prompt: text, model: selectedModel)
+
+        // Track user turn for scrubber
+        if let lastUserMsg = session.messages.last(where: { $0.role == .user }) {
+            turnMarkers.append(ChatTurnMarker.from(lastUserMsg))
+        }
+
         persistConversation()
     }
 
@@ -329,6 +374,58 @@ final class PlanChatState: ObservableObject {
         conversationState = .idle
     }
 
+    // MARK: - Context Summary for Builder
+
+    /// Generate a concise summary of key decisions from this plan conversation.
+    /// Used to bridge context from plan → builder agent.
+    func generateContextSummary() -> String {
+        guard let session = plannerSession else { return "" }
+
+        // Extract assistant messages that likely contain decisions
+        let assistantMessages = session.messages
+            .filter { $0.role == .assistant && !$0.content.isEmpty }
+            .suffix(10) // Last 10 assistant messages — most relevant
+
+        guard !assistantMessages.isEmpty else { return "" }
+
+        // Build a condensed summary from conversation highlights
+        var summary: [String] = []
+        summary.append("- Role: \(role.displayName)")
+        summary.append("- Task: \(taskName) on branch \(branchName)")
+
+        // Include key messages (decisions tend to be in longer assistant messages)
+        for msg in assistantMessages {
+            let lines = msg.content.components(separatedBy: .newlines)
+            // Look for decision-like patterns: bullet points, "we decided", headings
+            let keyLines = lines.filter { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                return trimmed.hasPrefix("- ") ||
+                       trimmed.hasPrefix("## ") ||
+                       trimmed.hasPrefix("### ") ||
+                       trimmed.lowercased().contains("decision") ||
+                       trimmed.lowercased().contains("approach") ||
+                       trimmed.lowercased().contains("constraint") ||
+                       trimmed.lowercased().contains("important")
+            }
+            summary.append(contentsOf: keyLines.prefix(5))
+        }
+
+        // Cap at ~500 words
+        let joined = summary.joined(separator: "\n")
+        if joined.count > 2000 {
+            return String(joined.prefix(2000)) + "\n[truncated]"
+        }
+        return joined
+    }
+
+    /// Generate context summary asynchronously by asking the plan agent to summarize.
+    /// Falls back to local extraction if the agent is unavailable.
+    func generateContextSummaryAsync() async -> String {
+        // For now, use local extraction. Phase L+ could send a hidden prompt
+        // to the plan agent for a richer summary.
+        return generateContextSummary()
+    }
+
     // MARK: - Hand Off
 
     /// Receives handed-off content from another tab.
@@ -370,11 +467,51 @@ final class PlanChatState: ObservableObject {
             lowered.contains("## plan") ||
             lowered.contains("## implementation plan") ||
             lowered.contains("## design") ||
-            lowered.contains("## architecture")
+            lowered.contains("## architecture") ||
+            lowered.contains("## overview") ||
+            lowered.contains("## goals") ||
+            lowered.contains("## requirements") ||
+            lowered.contains("## components")
 
-        let hasList = content.contains("\n- ") || content.contains("\n1. ") || content.contains("\n* ")
+        let hasList = content.contains("\n- ") || content.contains("\n1. ") ||
+            content.contains("\n* ") || content.contains("\n· ") ||
+            content.contains("\n• ") || content.contains("\n→ ")
 
         return hasSpecHeading && hasList
+    }
+
+    /// Detects spec-completion phrases: the agent says "the spec is ready" with structured content.
+    /// Catches cases where the agent doesn't use markdown headings but clearly declares completion.
+    func looksLikeSpecCompletion(_ content: String) -> Bool {
+        let lowered = content.lowercased()
+        let completionPhrases = [
+            "spec is complete",
+            "specification is complete",
+            "spec is ready",
+            "specification is ready",
+            "ready for implementation",
+            "ready to implement",
+            "ready to build",
+            "ready to start building",
+            "complete and approved",
+            "approved and complete",
+            "finalized the spec",
+            "spec has been finalized",
+            "here is the complete spec",
+            "here's the complete spec",
+            "here is the final spec",
+            "here's the final spec",
+        ]
+        let hasCompletion = completionPhrases.contains { lowered.contains($0) }
+        guard hasCompletion else { return false }
+
+        // Must also have some structure (lists or multiple paragraphs)
+        let hasList = content.contains("\n- ") || content.contains("\n1. ") ||
+            content.contains("\n* ") || content.contains("\n· ") ||
+            content.contains("\n• ") || content.contains("\n→ ")
+        let hasMultipleParagraphs = content.components(separatedBy: "\n\n").count >= 3
+
+        return hasList || hasMultipleParagraphs
     }
 
     // MARK: - Planner Prompt

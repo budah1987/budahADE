@@ -119,6 +119,10 @@ struct WorkspaceView: View {
                                         onHandOff: { targetId in
                                             task.handOff(from: selectedId, to: targetId)
                                         },
+                                        onCreateAndHandOff: { role in
+                                            let newTabId = task.createPlanTab(role: role)
+                                            task.handOff(from: selectedId, to: newTabId)
+                                        },
                                         onApproveToBuild: { itemCount in
                                             startBuildTransition(task: task, itemCount: itemCount)
                                         }
@@ -271,26 +275,72 @@ struct WorkspaceView: View {
 
     // MARK: - Build Transition
 
+    // MARK: - Builder Agent Launch
+
+    private func launchBuilderAgent(task: TaskState) {
+        guard let agent = task.builderAgent, let session = task.builderSession else { return }
+
+        let specPath = task.specState.activeSpec?.filePath
+            ?? (task.worktreePath as NSString).appendingPathComponent(".budahade/spec.md")
+
+        agent.launch(
+            worktreePath: task.worktreePath,
+            specFilePath: specPath,
+            specProgress: (completed: session.completedCount, total: session.totalCount),
+            taskName: task.name,
+            branchName: task.branchName
+        )
+    }
+
     private func startBuildTransition(task: TaskState, itemCount: Int) {
+        print("[BuildTransition] Starting — \(itemCount) items, worktree: \(task.worktreePath)")
         let transition = BuildTransitionState()
         buildTransition = transition
 
         // Step 1: Writing spec.md… (already done by handleApprove)
         transition.step = .writingSpec
 
-        // Step 2: Launching builder agent…
+        // Generate context summary from the active plan conversation
+        let contextSummary = task.activePlanChat?.generateContextSummary() ?? ""
+
+        // Step 2: Create builder tab with parsed spec
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            print("[BuildTransition] Step 2 — parsing spec")
             transition.step = .launchingBuilder
+
+            // Parse the approved spec and create builder session
+            let specPath = (task.worktreePath as NSString).appendingPathComponent(".budahade/spec.md")
+            if let spec = SpecParser.parse(fileAt: specPath) {
+                print("[BuildTransition] Spec parsed: \(spec.tasks.count) tasks, creating builder tab")
+                task.createBuilderSession(from: spec, contextSummary: contextSummary)
+                print("[BuildTransition] Builder tab created, session: \(task.builderSession != nil)")
+            } else {
+                // Fallback: create builder with a single "Implement spec" step
+                print("[BuildTransition] ⚠️ Could not parse spec at \(specPath), creating fallback builder")
+                let section = SpecSection(
+                    id: "build", title: "Build", level: 2,
+                    content: "", tasks: [SpecTask(id: 0, title: "Implement spec", isCompleted: false, sectionId: "build")],
+                    lineRange: 0..<1
+                )
+                let fallback = SpecParseResult(
+                    title: "Build", sections: [section],
+                    rawContent: "", filePath: specPath
+                )
+                task.createBuilderSession(from: fallback, contextSummary: contextSummary)
+            }
         }
 
-        // Step 3: Switching to Build mode…
+        // Step 3: Switch to build mode and show builder chat
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            print("[BuildTransition] Step 3 — switching to build mode + showing builder")
             transition.step = .switchingMode
             task.enterBuildMode()
+            task.showBuilderChat = true
         }
 
         // Dismiss overlay
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            print("[BuildTransition] Dismissing overlay")
             withAnimation(.easeOut(duration: 0.3)) {
                 buildTransition = nil
             }
@@ -318,8 +368,19 @@ struct WorkspaceView: View {
                     )
                 }
 
-                // Inline spec strip (only when spec exists)
-                if task.specState.hasSpec {
+                // Builder SpecBar or legacy spec strip — below terminal tabs
+                if let builderSession = task.builderSession {
+                    SpecBar(
+                        session: builderSession,
+                        specTitle: task.specState.activeSpec?.title ?? "Spec",
+                        isBuilderTabActive: task.showBuilderChat,
+                        onTap: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                task.showBuilderChat.toggle()
+                            }
+                        }
+                    )
+                } else if task.specState.hasSpec {
                     SpecStripView(
                         specState: task.specState,
                         buildStatus: task.buildStatus,
@@ -338,6 +399,23 @@ struct WorkspaceView: View {
                 }
             }
 
+            // Builder chat (toggles via SpecBar click)
+            if let task = state.activeTask,
+               task.showBuilderChat,
+               let builderSession = task.builderSession {
+                BuilderChatView(
+                    session: builderSession,
+                    specTitle: task.specState.activeSpec?.title ?? "Spec",
+                    agentSession: task.builderAgent?.agentSession,
+                    builderAgent: task.builderAgent,
+                    onLaunchAgent: { launchBuilderAgent(task: task) },
+                    onBackToPlan: { task.enterPlanMode() },
+                    onEditSpec: nil
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if state.activeTask?.showBuilderChat != true {
             ZStack(alignment: .top) {
                 // Tab content panels (terminal + browser) — single or split
                 if let task = state.activeTask, let split = task.splitPane {
@@ -443,6 +521,7 @@ struct WorkspaceView: View {
             }
             .background(Theme.contentBg)
             .animation(.easeInOut(duration: 0.25), value: state.activeTask?.isBuilderDrawerOpen)
+            } // end if !showBuilderChat
         }
     }
 
