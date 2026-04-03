@@ -6,60 +6,95 @@ import SwiftUI
 /// Shared across plan and builder wrappers.
 ///
 /// - Markers represent user messages only
-/// - Hover shows full message preview tooltip
+/// - Hover reveals message preview tooltip to the left
 /// - Click scrolls to that message via the provided callback
-/// - Active marker (nearest to current scroll position) is highlighted
+/// - Active marker is highlighted, others dim on hover
+/// - Container: semi-transparent glassmorphic strip
 struct ChatTurnScrubber: View {
     let markers: [ChatTurnMarker]
     var activeMessageId: UUID? = nil
     var stepColorProvider: ((Int?) -> Color)? = nil
     var onMarkerTap: ((UUID) -> Void)? = nil
 
+    @State private var hoveredMarkerId: UUID? = nil
+
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 3) {
             ForEach(markers) { marker in
+                let isActive = marker.messageId == activeMessageId
+                let isHovered = marker.messageId == hoveredMarkerId
+                let baseColor = stepColorProvider?(marker.stepIndex) ?? Color.white
+                let anyHovered = hoveredMarkerId != nil
+                let dimmed = anyHovered && !isHovered && !isActive
+
                 MarkerDash(
-                    marker: marker,
-                    isActive: marker.messageId == activeMessageId,
-                    color: stepColorProvider?(marker.stepIndex) ?? Theme.Colors.textTertiary
+                    isActive: isActive,
+                    isHovered: isHovered,
+                    dimmed: dimmed,
+                    color: baseColor
                 )
+                .onHover { hovering in
+                    withAnimation(.easeOut(duration: 0.12)) {
+                        hoveredMarkerId = hovering ? marker.messageId : nil
+                    }
+                }
                 .onTapGesture {
                     onMarkerTap?(marker.messageId)
                 }
+                .popover(isPresented: Binding(
+                    get: { hoveredMarkerId == marker.messageId },
+                    set: { if !$0 { hoveredMarkerId = nil } }
+                ), arrowEdge: .leading) {
+                    Text(marker.fullText.prefix(150) + (marker.fullText.count > 150 ? "..." : ""))
+                        .font(.custom("Geist-Regular", size: 11))
+                        .foregroundStyle(Color.white)
+                        .padding(12)
+                        .frame(width: 200, alignment: .leading)
+                        .background(Color(hex: 0x1c1f25).opacity(0.5))
+                        .background(.ultraThinMaterial)
+                }
             }
-            Spacer(minLength: 0)
         }
-        .frame(width: 20)
         .padding(.vertical, 8)
+        .padding(.horizontal, 6)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(hex: 0x1c1f25).opacity(0.5))
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
     }
 }
 
 // MARK: - Marker Dash
 
 private struct MarkerDash: View {
-    let marker: ChatTurnMarker
     let isActive: Bool
+    let isHovered: Bool
+    let dimmed: Bool
     let color: Color
 
-    @State private var isHovering = false
-
     var body: some View {
-        Rectangle()
-            .fill(isActive ? Theme.Colors.textPrimary : color)
-            .frame(width: isActive ? 12 : 8, height: isActive ? 3 : 2)
-            .frame(width: 20, height: 16)
+        RoundedRectangle(cornerRadius: 1)
+            .fill(Color.white.opacity(dashOpacity))
+            .frame(width: 12, height: 2)
+            .frame(width: 16, height: 14)
+            .shadow(color: isHovered ? color.opacity(0.6) : .clear, radius: 4)
             .contentShape(Rectangle())
-            .onHover { hovering in
-                isHovering = hovering
-            }
-            .popover(isPresented: $isHovering, arrowEdge: .leading) {
-                Text(marker.fullText.prefix(100) + (marker.fullText.count > 100 ? "..." : ""))
-                    .font(Theme.body(11))
-                    .foregroundStyle(Theme.Colors.textPrimary)
-                    .padding(8)
-                    .frame(maxWidth: 240, alignment: .leading)
-                    .background(Theme.Colors.surface)
-            }
+    }
+
+    private var dashOpacity: Double {
+        if isActive { return 0.95 }
+        if isHovered { return 0.9 }
+        if dimmed { return 0.2 }
+        return 0.5
     }
 }
 

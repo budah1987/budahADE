@@ -37,6 +37,14 @@ enum AgentModel: String, CaseIterable, Identifiable, Codable {
         case .opus:     return 200_000
         }
     }
+
+    /// Whether this model supports fast thinking (via /fast toggle)
+    var supportsFastThinking: Bool {
+        switch self {
+        case .opus: return true
+        default:    return false
+        }
+    }
 }
 
 // MARK: - ActivityFeedEntry

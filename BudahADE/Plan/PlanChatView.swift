@@ -34,6 +34,12 @@ struct PlanChatView: View {
     @State private var slashCommandSelected = false
     @State private var scrollToMessage: UUID?
 
+    // New input bar states
+    @State private var fastThinkingEnabled = false
+    @State private var planModeEnabled = false
+    @State private var showContextMemoryOverlay = false
+    @State private var attachHovering = false
+
     /// Whether the slash command popover should be visible
     private var showSlashPopover: Bool {
         inputText.hasPrefix("/") && !isRunning && !slashCommandSelected
@@ -119,7 +125,7 @@ struct PlanChatView: View {
             .padding(.top, 8)
             .padding(.bottom, 4)
 
-            // Messages + turn scrubber
+            // Messages + turn scrubber (right edge, vertical)
             ZStack(alignment: .trailing) {
                 messageList
                     .overlay(alignment: .bottom) {
@@ -140,7 +146,7 @@ struct PlanChatView: View {
                         }
                     )
                     .padding(.top, 8)
-                    .padding(.trailing, 14)
+                    .padding(.trailing, 22)
                 }
             }
 
@@ -347,7 +353,15 @@ struct PlanChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    if session == nil || (session?.messages.isEmpty == true && !isRunning) {
+                    // Show handed-off context banner
+                    if !state.handedOffContext.isEmpty && (session == nil || session?.messages.isEmpty == true) {
+                        ForEach(Array(state.handedOffContext.enumerated()), id: \.offset) { _, item in
+                            HandOffBanner(roleName: item.role.displayName, content: item.content)
+                        }
+                        .padding(.top, 16)
+                    }
+
+                    if session == nil || (session?.messages.isEmpty == true && !isRunning && state.handedOffContext.isEmpty) {
                         emptyState
                             .frame(maxWidth: .infinity)
                             .padding(.top, 80)
@@ -539,6 +553,29 @@ struct PlanChatView: View {
 
     // MARK: - Input Area
 
+    /// Whether the input has any text (drives opacity state)
+    private var hasInput: Bool {
+        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Token usage fraction for the context memory ring
+    private var tokenFraction: Double {
+        guard let session, session.totalTokens > 0 else { return 0 }
+        return min(Double(session.totalTokens) / Double(state.selectedModel.contextWindowTokens), 1.0)
+    }
+
+    /// Formatted token count string (e.g. "45.2k / 200k")
+    private var tokenLabel: String {
+        guard let session else { return "0 / \(formatTokenCount(state.selectedModel.contextWindowTokens))" }
+        return "\(formatTokenCount(session.totalTokens)) / \(formatTokenCount(state.selectedModel.contextWindowTokens))"
+    }
+
+    private func formatTokenCount(_ count: Int) -> String {
+        if count >= 1_000_000 { return String(format: "%.0fM", Double(count) / 1_000_000) }
+        if count >= 1_000 { return String(format: "%.1fk", Double(count) / 1_000) }
+        return "\(count)"
+    }
+
     private var inputArea: some View {
         VStack(spacing: 0) {
             // Slash command popover — floats above input
@@ -589,22 +626,11 @@ struct PlanChatView: View {
                     .padding(.vertical, 6)
             }
 
-            // Model selector row
-            HStack(spacing: 4) {
-                if state.pipelineMode {
-                    // Pipeline mode: show indicator instead of model picker
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.Colors.accent)
-                        Text("pipeline")
-                            .font(Theme.code(14))
-                            .foregroundColor(Theme.Colors.accent)
-                    }
-                    .onTapGesture {
-                        state.pipelineMode = false
-                    }
-                } else {
+            // ── Two-bar input container ──
+            VStack(spacing: 0) {
+                // ── TOP BAR: actions ──
+                HStack(spacing: 10) {
+                    // Model selector
                     Button {
                         withAnimation(.easeOut(duration: 0.15)) {
                             showModelMenu.toggle()
@@ -612,177 +638,278 @@ struct PlanChatView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(state.selectedModel.displayName.lowercased())
-                                .font(Theme.code(14))
+                                .font(Theme.code(12))
                                 .foregroundColor(Color(hex: 0x938d8d))
-                            Image(systemName: "chevron.up.chevron.down")
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(Color(hex: 0x938d8d))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+
+                    // Fast Thinking toggle (only for models that support it)
+                    if state.selectedModel.supportsFastThinking {
+                        Button {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                fastThinkingEnabled.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "bolt.fill")
+                                    .font(.system(size: 9))
+                                Text("Fast")
+                                    .font(Theme.label(11))
+                            }
+                            .foregroundColor(fastThinkingEnabled ? .white : Color(hex: 0x938d8d).opacity(0.6))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(fastThinkingEnabled ? Color.white.opacity(0.10) : Color.white.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(fastThinkingEnabled ? Color.white.opacity(0.15) : Color.clear, lineWidth: 0.5)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .help("Toggle fast thinking (⌥T)")
+                    }
+
+                    // Plan Mode toggle
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            planModeEnabled.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.text")
                                 .font(.system(size: 9))
+                            Text("Plan")
+                                .font(Theme.label(11))
+                        }
+                        .foregroundColor(planModeEnabled ? .white : Color(hex: 0x938d8d).opacity(0.6))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(planModeEnabled ? Color.white.opacity(0.10) : Color.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(planModeEnabled ? Color.white.opacity(0.15) : Color.clear, lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Toggle plan mode (⇧⇥)")
+
+                    Spacer()
+
+                    // Context Memory dial
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            showContextMemoryOverlay.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            // Circular progress ring
+                            ZStack {
+                                Circle()
+                                    .stroke(Color(hex: 0x555555).opacity(0.4), lineWidth: 2)
+                                    .frame(width: 16, height: 16)
+                                Circle()
+                                    .trim(from: 0, to: tokenFraction)
+                                    .stroke(Color.white.opacity(0.85), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                    .frame(width: 16, height: 16)
+                                    .rotationEffect(.degrees(-90))
+                            }
+                            Text(tokenLabel)
+                                .font(Theme.code(10))
                                 .foregroundColor(Color(hex: 0x938d8d))
                         }
                     }
                     .buttonStyle(.plain)
+                    .help("Context memory")
                 }
-
-                Spacer()
-
-                // Pipeline toggle
-                Button {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        state.pipelineMode.toggle()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    ZStack {
+                        GlassBackground(material: .hudWindow, cornerRadius: 0)
+                        Color(hex: 0x2a2a2e).opacity(0.5)
                     }
-                } label: {
-                    Image(systemName: state.pipelineMode ? "arrow.triangle.branch" : "arrow.triangle.branch")
-                        .font(.system(size: 11))
-                        .foregroundColor(state.pipelineMode ? Theme.Colors.accent : Color(hex: 0x938d8d).opacity(0.5))
-                }
-                .buttonStyle(.plain)
-                .help(state.pipelineMode ? "Pipeline mode ON" : "Pipeline mode OFF")
+                )
 
-                // Token count
-                if let pipeline = state.activePipeline, pipeline.totalTokens > 0 {
-                    Text(pipeline.formattedTokenCount)
-                        .font(Theme.caption(10))
-                        .foregroundColor(Color(hex: 0x938d8d))
-                } else if let session, session.totalTokens > 0 {
-                    Text(session.formattedTokenCount)
-                        .font(Theme.caption(10))
-                        .foregroundColor(Color(hex: 0x938d8d))
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 4)
-            .overlay(alignment: .topLeading) {
-                if showModelMenu {
-                    PlanModelSelectorMenu(selectedModel: $state.selectedModel, isShowing: $showModelMenu)
-                        .padding(.top, 30)
-                        .padding(.leading, 14)
-                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
-                }
-            }
-            .zIndex(showModelMenu ? 100 : 0)
-
-            // Text input
-            VStack(spacing: 0) {
-                ZStack(alignment: .topLeading) {
-                    if inputText.isEmpty {
-                        Text("What do you want to build?")
-                            .font(.system(size: 14))
-                            .foregroundColor(Theme.Colors.textTertiary)
-                            .padding(.top, 2)
-                            .allowsHitTesting(false)
-                    }
-                    // Ghost text — shows autocomplete suggestion
-                    if let ghost = ghostCompletion {
-                        Text(ghost)
-                            .font(.system(size: 14))
-                            .foregroundColor(Theme.Colors.textSecondary.opacity(0.5))
-                            .padding(.top, 2)
-                            .allowsHitTesting(false)
-                    }
-                    TextEditor(text: $inputText)
-                        .font(.system(size: 14))
-                        .foregroundColor(.white)
-                        .frame(height: min(max(inputTextHeight + 10, 36), 200))
-                        .scrollContentBackground(.hidden)
-                        .background(Color.clear)
-                        .focused($inputFocused)
-                        .background(
-                            Text(inputText.isEmpty ? "A" : inputText)
+                // ── BOTTOM BAR: text input + actions ──
+                VStack(spacing: 0) {
+                    ZStack(alignment: .topLeading) {
+                        if inputText.isEmpty {
+                            Text("BeepBoopBeep...")
                                 .font(.system(size: 14))
-                                .lineLimit(nil)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .opacity(0)
-                                .background(GeometryReader { textGeo in
-                                    Color.clear.preference(
-                                        key: InputHeightKey.self,
-                                        value: textGeo.size.height
-                                    )
-                                })
-                        )
-                        .onPreferenceChange(InputHeightKey.self) { h in
-                            if h > 0 { inputTextHeight = h }
+                                .foregroundColor(.white.opacity(0.4))
+                                .padding(.top, 2)
+                                .allowsHitTesting(false)
                         }
-                        .onKeyPress(.return, phases: .down) { press in
-                            guard !press.modifiers.contains(.shift) else { return .ignored }
-                            // If slash popover is showing, select the command and dismiss
-                            if showSlashPopover && !allCommands.isEmpty {
+                        // Ghost text — shows autocomplete suggestion
+                        if let ghost = ghostCompletion {
+                            Text(ghost)
+                                .font(.system(size: 14))
+                                .foregroundColor(Theme.Colors.textSecondary.opacity(0.5))
+                                .padding(.top, 2)
+                                .allowsHitTesting(false)
+                        }
+                        TextEditor(text: $inputText)
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(hasInput ? 1.0 : 0.4))
+                            .frame(height: min(max(inputTextHeight + 10, 36), 200))
+                            .scrollContentBackground(.hidden)
+                            .background(Color.clear)
+                            .focused($inputFocused)
+                            .background(
+                                Text(inputText.isEmpty ? "A" : inputText)
+                                    .font(.system(size: 14))
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .opacity(0)
+                                    .background(GeometryReader { textGeo in
+                                        Color.clear.preference(
+                                            key: InputHeightKey.self,
+                                            value: textGeo.size.height
+                                        )
+                                    })
+                            )
+                            .onPreferenceChange(InputHeightKey.self) { h in
+                                if h > 0 { inputTextHeight = h }
+                            }
+                            .onKeyPress(.return, phases: .down) { press in
+                                guard !press.modifiers.contains(.shift) else { return .ignored }
+                                if showSlashPopover && !allCommands.isEmpty {
+                                    let idx = min(slashPopoverIndex, allCommands.count - 1)
+                                    inputText = "/\(allCommands[idx]) "
+                                    slashCommandSelected = true
+                                    return .handled
+                                }
+                                sendMessage()
+                                return .handled
+                            }
+                            .onKeyPress(.tab, phases: .down) { press in
+                                // Shift+Tab toggles plan mode
+                                if press.modifiers.contains(.shift) {
+                                    withAnimation(.easeOut(duration: 0.15)) {
+                                        planModeEnabled.toggle()
+                                    }
+                                    return .handled
+                                }
+                                guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
                                 let idx = min(slashPopoverIndex, allCommands.count - 1)
                                 inputText = "/\(allCommands[idx]) "
                                 slashCommandSelected = true
                                 return .handled
                             }
-                            sendMessage()
-                            return .handled
-                        }
-                        .onKeyPress(.tab, phases: .down) { _ in
-                            // Tab auto-completes the selected command and dismisses
-                            guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
-                            let idx = min(slashPopoverIndex, allCommands.count - 1)
-                            inputText = "/\(allCommands[idx]) "
-                            slashCommandSelected = true
-                            return .handled
-                        }
-                        .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
-                            guard press.modifiers.contains(.command) else { return .ignored }
-                            if pasteImageFromClipboard() { return .handled }
-                            return .ignored
-                        }
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 4)
-
-                // Action row
-                HStack(spacing: 8) {
-                    Button { showFilePicker = true } label: {
-                        Image(systemName: "paperclip")
-                            .font(.system(size: 13))
-                            .foregroundColor(Color(hex: 0x938d8d))
+                            .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
+                                guard press.modifiers.contains(.command) else { return .ignored }
+                                if pasteImageFromClipboard() { return .handled }
+                                return .ignored
+                            }
+                            .onKeyPress(characters: CharacterSet(charactersIn: "t"), phases: .down) { press in
+                                // Opt+T toggles fast thinking
+                                guard press.modifiers.contains(.option),
+                                      state.selectedModel.supportsFastThinking else { return .ignored }
+                                withAnimation(.easeOut(duration: 0.15)) {
+                                    fastThinkingEnabled.toggle()
+                                }
+                                return .handled
+                            }
                     }
-                    .buttonStyle(.plain)
-                    .help("Attach image")
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 4)
 
-                    Spacer()
-
-                    if isRunning {
-                        Button {
-                            state.cancel()
-                        } label: {
-                            Image(systemName: "stop.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.red.opacity(0.7))
+                    // Action row
+                    HStack(spacing: 8) {
+                        // Attach button (+ icon with hover state)
+                        Button { showFilePicker = true } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(attachHovering ? .white : Color(hex: 0x938d8d))
+                                .frame(width: 24, height: 24)
+                                .background(attachHovering ? Color.white.opacity(0.08) : Color.clear)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
-                    } else {
-                        Button(action: sendMessage) {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(canSend ? Theme.Colors.accent : Theme.Colors.textTertiary)
+                        .onHover { hovering in attachHovering = hovering }
+                        .help("Attach file")
+
+                        Spacer()
+
+                        if isRunning {
+                            Button {
+                                state.cancel()
+                            } label: {
+                                Image(systemName: "stop.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.red.opacity(0.7))
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button(action: sendMessage) {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(hasInput ? .white : .white.opacity(0.4))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!canSend)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(!canSend)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 10)
+                .background(Color(hex: 0x33343A))
             }
-            .background(Color(hex: 0x6e6e6e).opacity(0.15))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color(hex: 0x9b8989).opacity(0.45), lineWidth: 0.75)
+                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
             )
+            // Model selector opens ABOVE the input container
+            .overlay(alignment: .topLeading) {
+                if showModelMenu {
+                    PlanModelSelectorMenu(selectedModel: $state.selectedModel, isShowing: $showModelMenu)
+                        .offset(x: 12, y: -8)
+                        .fixedSize()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .bottomLeading)))
+                }
+            }
+            // Context memory overlay opens ABOVE the input container
+            .overlay(alignment: .topTrailing) {
+                if showContextMemoryOverlay {
+                    ContextMemoryOverlay(
+                        session: session,
+                        model: state.selectedModel,
+                        onDismiss: { showContextMemoryOverlay = false }
+                    )
+                    .offset(x: -12, y: -8)
+                    .fixedSize()
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .bottomTrailing)))
+                }
+            }
+            .zIndex(showModelMenu || showContextMemoryOverlay ? 100 : 0)
             .onTapGesture {
                 if showModelMenu {
                     withAnimation(.easeOut(duration: 0.15)) {
                         showModelMenu = false
                     }
                 }
+                if showContextMemoryOverlay {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        showContextMemoryOverlay = false
+                    }
+                }
             }
         }
-        .frame(maxWidth: 720)
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 16)
         .padding(.bottom, 16)
         .background(Color.clear)
         .onDrop(of: ["public.image", "public.file-url"], isTargeted: nil) { providers in
@@ -807,7 +934,6 @@ struct PlanChatView: View {
         .onAppear { installKeyMonitor() }
         .onDisappear { removeKeyMonitor() }
         .onChange(of: inputText) { oldValue, newValue in
-            // Reset selection flag if user edits the text (not just from our auto-fill)
             if newValue.count < oldValue.count || !newValue.hasPrefix("/") {
                 slashCommandSelected = false
             }
@@ -826,7 +952,27 @@ struct PlanChatView: View {
 
     private func installKeyMonitor() {
         let ss = slashState
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            // Shift+Tab toggles plan mode (keyCode 48 = Tab)
+            if event.keyCode == 48 && event.modifierFlags.contains(.shift) {
+                DispatchQueue.main.async {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        self.planModeEnabled.toggle()
+                    }
+                }
+                return nil
+            }
+
+            // Opt+T toggles fast thinking
+            if event.keyCode == 17 && event.modifierFlags.contains(.option) && state.selectedModel.supportsFastThinking {
+                DispatchQueue.main.async {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        self.fastThinkingEnabled.toggle()
+                    }
+                }
+                return nil
+            }
+
             guard ss.isVisible else { return event }
 
             switch Int(event.keyCode) {
@@ -1017,6 +1163,11 @@ struct PlanChatView: View {
         pendingImagePath = nil
 
         state.sendMessage(prompt)
+
+        // Restore focus to input after send
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            inputFocused = true
+        }
     }
 
     @discardableResult
@@ -2234,128 +2385,119 @@ private struct SpecCompleteSheet: View {
     let onContinue: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Accent bar
-            Rectangle()
-                .fill(Theme.Colors.statusWorking.opacity(0.6))
-                .frame(height: 2)
-
-            VStack(spacing: 10) {
-                // Header
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.Colors.statusDone)
-                    Text("Spec complete")
-                        .font(Theme.label(14))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                    Spacer()
-                    Button {
-                        onContinue()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Theme.Colors.textTertiary)
-                    }
-                    .buttonStyle(.plain)
+        VStack(spacing: 0) {
+            // Header row
+            HStack {
+                Text("Spec Complete")
+                    .font(.custom("Geist-SemiBold", size: 13))
+                    .foregroundColor(.white.opacity(0.85))
+                Spacer()
+                Button { onContinue() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Color(hex: 0x938d8d))
                 }
-
-                Rectangle().fill(Color.white.opacity(0.06)).frame(height: 0.5)
-
-                // Actions
-                HStack(spacing: 8) {
-                    // Continue — secondary
-                    Button(action: onContinue) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 10))
-                            Text("Continue")
-                                .font(Theme.label(12))
-                        }
-                        .foregroundColor(Theme.Colors.textSecondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Theme.Colors.surfaceElevated)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-
-                    // Hand off — always visible
-                    Menu {
-                        if siblingTabs.isEmpty {
-                            // No siblings — offer to create a new agent tab
-                            Section("Create new agent") {
-                                ForEach(AgentMode.allCases) { mode in
-                                    Button {
-                                        onCreateAndHandOff?(mode)
-                                    } label: {
-                                        Label(mode.displayName, systemImage: mode.iconName)
-                                    }
-                                }
-                            }
-                        } else {
-                            // Existing siblings — pick one
-                            ForEach(siblingTabs) { tab in
-                                Button {
-                                    onHandOff?(tab.id)
-                                } label: {
-                                    Label(tab.title, systemImage: tab.role.iconName)
-                                }
-                            }
-                            Divider()
-                            // Also offer to create a new tab
-                            Section("New agent") {
-                                ForEach(AgentMode.allCases) { mode in
-                                    Button {
-                                        onCreateAndHandOff?(mode)
-                                    } label: {
-                                        Label(mode.displayName, systemImage: mode.iconName)
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.triangle.branch")
-                                .font(.system(size: 10))
-                            Text("Hand off")
-                                .font(Theme.label(12))
-                        }
-                        .foregroundColor(Theme.Colors.textSecondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Theme.Colors.surfaceElevated)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-
-                    Spacer()
-
-                    // Approve & Build — primary
-                    Button(action: onApproveAndBuild) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "hammer.fill")
-                                .font(.system(size: 11))
-                            Text("Approve & Build")
-                                .font(Theme.label(13))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Theme.Colors.statusWorking)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                // Hint
-                Text("Esc to continue  ·  ⌘↵ to approve")
-                    .font(Theme.caption(10))
-                    .foregroundStyle(Theme.Colors.textTertiary)
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.bottom, 8)
+
+            // Action row
+            HStack(spacing: 16) {
+                // Continue Iterating — secondary
+                Button(action: onContinue) {
+                    Text("Continue Iterating")
+                        .font(.custom("Geist-Medium", size: 12))
+                        .foregroundColor(Color(hex: 0x888888))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Color(hex: 0x1e1e1e))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                // Hand off — dropdown
+                Menu {
+                    if siblingTabs.isEmpty {
+                        Section("Create new agent") {
+                            ForEach(AgentMode.allCases) { mode in
+                                Button {
+                                    onCreateAndHandOff?(mode)
+                                } label: {
+                                    Label(mode.displayName, systemImage: mode.iconName)
+                                }
+                            }
+                        }
+                    } else {
+                        ForEach(siblingTabs) { tab in
+                            Button {
+                                onHandOff?(tab.id)
+                            } label: {
+                                Label(tab.title, systemImage: tab.role.iconName)
+                            }
+                        }
+                        Divider()
+                        Section("New agent") {
+                            ForEach(AgentMode.allCases) { mode in
+                                Button {
+                                    onCreateAndHandOff?(mode)
+                                } label: {
+                                    Label(mode.displayName, systemImage: mode.iconName)
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 10))
+                        Text("Hand-Off")
+                            .font(.custom("Geist-Medium", size: 12))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8))
+                    }
+                    .foregroundColor(Color(hex: 0x888888))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Color(hex: 0x1e1e1e))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
+                }
+
+                Spacer()
+
+                // Start Build — primary (white bg, dark text)
+                Button(action: onApproveAndBuild) {
+                    HStack(spacing: 6) {
+                        Text("Start Build")
+                            .font(.custom("Geist-SemiBold", size: 9))
+                            .foregroundColor(Color(red: 30/255, green: 30/255, blue: 30/255).opacity(0.8))
+                        Text("⌘↵")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(red: 30/255, green: 30/255, blue: 30/255).opacity(0.8))
+                    }
+                    .padding(.horizontal, 18)
+                    .frame(height: 30)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .background(Theme.Colors.sidebarBackground)
+        .padding(16)
+        .frame(width: 601)
+        .background(Color(hex: 0x1c1f25))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
         .onKeyPress(.escape) {
             onContinue()
             return .handled
@@ -2365,5 +2507,151 @@ private struct SpecCompleteSheet: View {
             onApproveAndBuild()
             return .handled
         }
+    }
+}
+
+// MARK: - Context Memory Overlay
+
+private struct ContextMemoryOverlay: View {
+    let session: AgentSession?
+    let model: AgentModel
+    var onDismiss: (() -> Void)? = nil
+
+    private var totalTokens: Int { session?.totalTokens ?? 0 }
+    private var inputTokens: Int { session?.totalInputTokens ?? 0 }
+    private var outputTokens: Int { session?.totalOutputTokens ?? 0 }
+    private var contextWindow: Int { model.contextWindowTokens }
+    private var utilization: Double { session?.contextUtilization ?? 0 }
+
+    private func fmt(_ count: Int) -> String {
+        if count >= 1_000_000 { return String(format: "%.1fM", Double(count) / 1_000_000) }
+        if count >= 1_000 { return String(format: "%.1fk", Double(count) / 1_000) }
+        return "\(count)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack {
+                Text("Context")
+                    .font(Theme.label(13))
+                    .foregroundColor(Theme.Colors.textPrimary)
+                Spacer()
+                Text("\(fmt(totalTokens))/\(fmt(contextWindow))")
+                    .font(Theme.code(12))
+                    .foregroundColor(Color(hex: 0x938d8d))
+            }
+
+            // Progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color(hex: 0x555555).opacity(0.4))
+                        .frame(height: 6)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(0.85))
+                        .frame(width: geo.size.width * utilization, height: 6)
+                }
+            }
+            .frame(height: 6)
+
+            // Breakdown bars
+            VStack(spacing: 6) {
+                tokenRow(label: "Input tokens", count: inputTokens, fraction: Double(inputTokens) / max(Double(totalTokens), 1))
+                tokenRow(label: "Output tokens", count: outputTokens, fraction: Double(outputTokens) / max(Double(totalTokens), 1))
+                if let session {
+                    tokenRow(label: "Messages", count: session.messages.count, fraction: nil)
+                }
+            }
+        }
+        .padding(14)
+        .frame(width: 240)
+        .background(
+            ZStack {
+                GlassBackground(material: .popover, cornerRadius: 10)
+                Color(hex: 0x1b1b1e).opacity(0.9)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.5), radius: 16)
+    }
+
+    @ViewBuilder
+    private func tokenRow(label: String, count: Int, fraction: Double?) -> some View {
+        HStack {
+            Text(label)
+                .font(Theme.body(11))
+                .foregroundColor(Color(hex: 0x938d8d))
+            Spacer()
+            if let fraction {
+                Text(String(format: "%.1f%%", fraction * 100))
+                    .font(Theme.code(11))
+                    .foregroundColor(Color(hex: 0x938d8d))
+            } else {
+                Text("\(count)")
+                    .font(Theme.code(11))
+                    .foregroundColor(Color(hex: 0x938d8d))
+            }
+        }
+    }
+}
+
+// MARK: - Hand-Off Banner
+
+private struct HandOffBanner: View {
+    let roleName: String
+    let content: String
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.Colors.accent)
+                Text("Handed off from \(roleName)")
+                    .font(Theme.label(12))
+                    .foregroundColor(Theme.Colors.textPrimary)
+                Spacer()
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color(hex: 0x938d8d))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if isExpanded {
+                Text(content.prefix(500) + (content.count > 500 ? "..." : ""))
+                    .font(Theme.body(12))
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .lineLimit(nil)
+            } else {
+                Text(content.prefix(120) + (content.count > 120 ? "..." : ""))
+                    .font(Theme.body(12))
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Theme.Colors.accent.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Theme.Colors.accent.opacity(0.2), lineWidth: 0.5)
+                )
+        )
+        .padding(.horizontal, 16)
     }
 }

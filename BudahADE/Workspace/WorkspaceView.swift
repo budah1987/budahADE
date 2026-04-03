@@ -92,6 +92,7 @@ struct WorkspaceView: View {
             VStack(spacing: 0) {
                 // ── APP BAR (full width: dropdown + resource meter) ──
                 AppBar(workspace: state)
+                    .zIndex(50)
 
                 // ── BODY: sidebar + content ──
                 HStack(spacing: 0) {

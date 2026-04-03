@@ -239,6 +239,9 @@ final class PlanChatState: ObservableObject {
         if conversationState == .idle {
             conversationState = .chatting
         }
+        // Reset adaptive turn limit — user explicitly wants to continue
+        session.isVerifiedComplete = false
+        session.hasVerified = false
         chatManager.send(sessionId: session.id, prompt: text, model: selectedModel)
 
         // Track user turn for scrubber
