@@ -29,7 +29,6 @@ struct PlanTabBar: View {
                 NewAgentTabButton(action: onNewTab)
                     .padding(.trailing, 8)
             }
-            .padding(.horizontal, 6)
             .padding(.top, 6)
         }
     }
