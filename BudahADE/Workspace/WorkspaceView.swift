@@ -103,19 +103,20 @@ struct WorkspaceView: View {
                                 }
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             } else {
-                                // Plan agent zone: tabs + chat in one dark inset
-                                VStack(spacing: 0) {
-                                    PlanTabBar(
-                                        selectedTabID: Binding(
-                                            get: { task.selectedPlanTabId ?? UUID() },
-                                            set: { task.selectPlanTab($0) }
-                                        ),
-                                        tabs: task.planTabs,
-                                        onSelectTab: { task.selectPlanTab($0) },
-                                        onCloseTab: { requestCloseTab(.plan($0)) },
-                                        onNewTab: { showRoleModal = true }
-                                    )
+                                // Plan: tabs on chrome, chat in dark inset
+                                PlanTabBar(
+                                    selectedTabID: Binding(
+                                        get: { task.selectedPlanTabId ?? UUID() },
+                                        set: { task.selectPlanTab($0) }
+                                    ),
+                                    tabs: task.planTabs,
+                                    onSelectTab: { task.selectPlanTab($0) },
+                                    onCloseTab: { requestCloseTab(.plan($0)) },
+                                    onNewTab: { showRoleModal = true }
+                                )
+                                .padding(.horizontal, Theme.Spacing.lg)
 
+                                Group {
                                     if let planChat = task.activePlanChat,
                                        let selectedId = task.selectedPlanTabId {
                                         PlanChatView(
@@ -160,16 +161,18 @@ struct WorkspaceView: View {
                                 .transition(.move(edge: .leading).combined(with: .opacity))
                             }
 
-                            // Agent zone: tabs + content in one dark rounded inset
+                            // Tabs on chrome, agent content in dark rounded inset
                             VStack(spacing: 0) {
                                 buildModeTabBar
+                                    .padding(.horizontal, Theme.Spacing.lg)
+
                                 agentContentArea
+                                    .background(Theme.Colors.appBackground)
+                                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                                    .padding(.top, Theme.Spacing.sm)
+                                    .padding(.bottom, Theme.Spacing.lg)
+                                    .padding(.horizontal, Theme.Spacing.lg)
                             }
-                            .background(Theme.Colors.appBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-                            .padding(.top, Theme.Spacing.sm)
-                            .padding(.bottom, Theme.Spacing.lg)
-                            .padding(.horizontal, Theme.Spacing.lg)
 
                             if state.rightPanelVisible, let task = state.activeTask {
                                 GitSidebarView(task: task, projectPath: state.projectPath)
