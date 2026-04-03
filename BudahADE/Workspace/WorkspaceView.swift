@@ -387,7 +387,8 @@ struct WorkspaceView: View {
                         },
                         onCloseTab: { requestCloseTab(.build($0)) },
                         onNewTab: { task.createTab() },
-                        onNewBrowserTab: { task.createBrowserTab() }
+                        onNewBrowserTab: { task.createBrowserTab() },
+                        onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex) }
                     )
 
                     if task.builderSession != nil {
@@ -437,7 +438,8 @@ struct WorkspaceView: View {
                                 onSelectTab: { task.focusedPane = .primary; task.selectTab($0) },
                                 onCloseTab: { requestCloseTab(.build($0)) },
                                 onNewTab: { task.createTab() },
-                                onNewBrowserTab: { task.createBrowserTab() }
+                                onNewBrowserTab: { task.createBrowserTab() },
+                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex) }
                             )
                             tabContentView(for: task, tabId: task.selectedTabId)
                                 .overlay(paneFocusBorder(focused: task.focusedPane == .primary))
@@ -456,7 +458,8 @@ struct WorkspaceView: View {
                                 onSelectTab: { task.focusedPane = .secondary; task.selectSecondaryTab($0) },
                                 onCloseTab: { requestCloseTab(.build($0)) },
                                 onNewTab: { task.createTabInSecondaryPane() },
-                                onNewBrowserTab: { task.createBrowserTabInSecondaryPane() }
+                                onNewBrowserTab: { task.createBrowserTabInSecondaryPane() },
+                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex) }
                             )
                             tabContentView(for: task, tabId: split.secondarySelectedId)
                                 .overlay(paneFocusBorder(focused: task.focusedPane == .secondary))

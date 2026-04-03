@@ -640,6 +640,40 @@ final class TaskState: ObservableObject, Identifiable {
         return tabs.filter { secondaryIds.contains($0.id) }
     }
 
+    func reorderTab(_ tabId: UUID, toIndex newIndex: Int) {
+        guard splitPane == nil else {
+            // Split mode: figure out which pane and reorder within that subset
+            let isSecondary = splitPane?.secondaryTabIds.contains(tabId) ?? false
+            var paneTabs = isSecondary ? secondaryTabs : primaryTabs
+            guard let oldIndex = paneTabs.firstIndex(where: { $0.id == tabId }) else { return }
+            let clamped = min(max(newIndex, 0), paneTabs.count)
+            guard oldIndex != clamped else { return }
+            let tab = paneTabs.remove(at: oldIndex)
+            let insertAt = clamped > oldIndex ? clamped - 1 : clamped
+            paneTabs.insert(tab, at: min(insertAt, paneTabs.count))
+            // Rebuild full array: replace pane tabs in their new order
+            let paneIds = Set(paneTabs.map(\.id))
+            var rebuilt: [TabInfo] = []
+            var pi = 0
+            for t in tabs {
+                if paneIds.contains(t.id) {
+                    rebuilt.append(paneTabs[pi])
+                    pi += 1
+                } else {
+                    rebuilt.append(t)
+                }
+            }
+            tabs = rebuilt
+            return
+        }
+        // Unsplit mode: simple array reorder
+        guard let oldIndex = tabs.firstIndex(where: { $0.id == tabId }) else { return }
+        guard oldIndex != newIndex, newIndex >= 0, newIndex <= tabs.count else { return }
+        let tab = tabs.remove(at: oldIndex)
+        let insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex
+        tabs.insert(tab, at: min(insertAt, tabs.count))
+    }
+
     func splitTab(_ tabId: UUID, to zone: DropZone) {
         guard tabs.contains(where: { $0.id == tabId }) else { return }
         if zone.isFirst {
