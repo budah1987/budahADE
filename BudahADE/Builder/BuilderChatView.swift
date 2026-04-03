@@ -50,6 +50,10 @@ struct BuilderChatView: View {
     @State private var stepPanelState: StepPanelDisplayState = .hidden
     @State private var selectedStepIndex: Int? = nil
 
+    // Input bar state (owned here, passed as binding to ChatInputBar)
+    @State private var builderInputText: String = ""
+    @State private var builderSelectedModel: AgentModel = .sonnet
+
     /// The underlying agent session driving the builder
     var agentSession: AgentSession?
     /// Builder agent coordinator (optional — nil until build starts)
@@ -279,12 +283,53 @@ struct BuilderChatView: View {
                 if session.buildState == .ready {
                     readyStateActionBar
                 }
-                BuilderInputBar(
-                    session: session,
-                    agentSession: agentSession,
+                ChatInputBar(
+                    inputText: $builderInputText,
+                    selectedModel: $builderSelectedModel,
+                    session: agentSession,
+                    isRunning: isRunning,
                     onSend: sendMessage,
-                    onReviewDiff: reviewDiff,
-                    onCommit: commitChanges
+                    placeholder: "Talk to the builder…",
+                    aboveInput: {
+                        // Done state: Review Diff + Commit buttons
+                        if session.buildState == .done {
+                            HStack(spacing: 8) {
+                                Spacer()
+                                Button(action: reviewDiff) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "doc.text.magnifyingglass")
+                                            .font(.system(size: 10))
+                                        Text("Review Diff")
+                                            .font(Theme.label(12))
+                                    }
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Theme.Colors.surfaceElevated)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                }
+                                .buttonStyle(.plain)
+
+                                Button(action: commitChanges) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "checkmark.circle")
+                                            .font(.system(size: 10))
+                                        Text("Commit")
+                                            .font(Theme.label(12))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Theme.Colors.statusDone)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                        }
+                    },
+                    topBarExtras: { EmptyView() }
                 )
             }
         }

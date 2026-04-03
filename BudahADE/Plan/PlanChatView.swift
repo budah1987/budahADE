@@ -18,27 +18,16 @@ struct PlanChatView: View {
     var onApproveToBuild: ((Int) -> Void)? = nil
 
     @State private var inputText: String = ""
-    @State private var pendingImage: NSImage?
-    @State private var pendingImagePath: String?
-    @State private var showFilePicker = false
-    @State private var showModelMenu: Bool = false
-    @State private var inputTextHeight: CGFloat = 36
     @State private var thinkingStartDate: Date?
     @State private var slashPopoverIndex: Int = 0
     @State private var keyMonitor: Any?
     @StateObject private var slashState = SlashPopoverState()
-    @FocusState private var inputFocused: Bool
     @State private var confirmTriggered = false
     @State private var confirmedMessageIds: Set<UUID> = []
-
     @State private var slashCommandSelected = false
     @State private var scrollToMessage: UUID?
-
-    // New input bar states
     @State private var fastThinkingEnabled = false
     @State private var planModeEnabled = false
-    @State private var showContextMemoryOverlay = false
-    @State private var attachHovering = false
 
     /// Whether the slash command popover should be visible
     private var showSlashPopover: Bool {
@@ -103,12 +92,7 @@ struct PlanChatView: View {
         state.specReadySignalId != nil
     }
 
-    private struct InputHeightKey: PreferenceKey {
-        static var defaultValue: CGFloat = 0
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-            value = max(value, nextValue())
-        }
-    }
+    // InputHeightKey moved to Shared/ChatInputBar.swift
 
     var body: some View {
         VStack(spacing: 0) {
@@ -332,19 +316,7 @@ struct PlanChatView: View {
             }
             return .handled
         }
-        .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
-            guard press.modifiers.contains(.control) else { return .ignored }
-            if pasteImageFromClipboard() { return .handled }
-            return .ignored
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .focusInput)) { _ in
-            inputFocused = true
-        }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                inputFocused = true
-            }
-        }
+        // Ctrl+V paste and focus now handled by ChatInputBar
     }
 
     // MARK: - Message List
@@ -553,384 +525,118 @@ struct PlanChatView: View {
 
     // MARK: - Input Area
 
-    /// Whether the input has any text (drives opacity state)
-    private var hasInput: Bool {
-        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    /// Token usage fraction for the context memory ring
-    private var tokenFraction: Double {
-        guard let session, session.totalTokens > 0 else { return 0 }
-        return min(Double(session.totalTokens) / Double(state.selectedModel.contextWindowTokens), 1.0)
-    }
-
-    /// Formatted token count string (e.g. "45.2k / 200k")
-    private var tokenLabel: String {
-        guard let session else { return "0 / \(formatTokenCount(state.selectedModel.contextWindowTokens))" }
-        return "\(formatTokenCount(session.totalTokens)) / \(formatTokenCount(state.selectedModel.contextWindowTokens))"
-    }
-
-    private func formatTokenCount(_ count: Int) -> String {
-        if count >= 1_000_000 { return String(format: "%.0fM", Double(count) / 1_000_000) }
-        if count >= 1_000 { return String(format: "%.1fk", Double(count) / 1_000) }
-        return "\(count)"
-    }
+    // hasInput, tokenFraction, tokenLabel, formatTokenCount moved to ChatInputBar
 
     private var inputArea: some View {
-        VStack(spacing: 0) {
-            // Slash command popover — floats above input
-            if showSlashPopover && !allCommands.isEmpty {
-                SlashCommandPopover(
-                    commands: allCommands,
-                    filter: "",
-                    onSelect: { command in
-                        inputText = "/\(command) "
-                    },
-                    onDismiss: {
-                        inputText = ""
-                    },
-                    selectedIndex: $slashPopoverIndex
-                )
-                .padding(.horizontal, 14)
-                .padding(.bottom, 4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-
-            // Pending image preview
-            if let img = pendingImage {
-                HStack {
-                    Image(nsImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    Button {
-                        pendingImage = nil
-                        pendingImagePath = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(Theme.Colors.textTertiary)
+        ChatInputBar(
+            inputText: $inputText,
+            selectedModel: $state.selectedModel,
+            session: session,
+            isRunning: isRunning,
+            onSend: { prompt in state.sendMessage(prompt) },
+            onCancel: { state.cancel() },
+            saveImage: { data in state.saveImage(data: data) },
+            ghostText: ghostCompletion,
+            onReturnKey: { press in
+                guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
+                let idx = min(slashPopoverIndex, allCommands.count - 1)
+                inputText = "/\(allCommands[idx]) "
+                slashCommandSelected = true
+                return .handled
+            },
+            onTabKey: { press in
+                if press.modifiers.contains(.shift) {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        planModeEnabled.toggle()
                     }
-                    .buttonStyle(.plain)
-                    Spacer()
+                    return .handled
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-            }
-
-            // Pipeline stage indicator
-            if let pipeline = state.activePipeline {
-                PipelineStageBar(pipeline: pipeline)
+                guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
+                let idx = min(slashPopoverIndex, allCommands.count - 1)
+                inputText = "/\(allCommands[idx]) "
+                slashCommandSelected = true
+                return .handled
+            },
+            aboveInput: {
+                // Slash command popover — floats above input
+                if showSlashPopover && !allCommands.isEmpty {
+                    SlashCommandPopover(
+                        commands: allCommands,
+                        filter: "",
+                        onSelect: { command in
+                            inputText = "/\(command) "
+                        },
+                        onDismiss: {
+                            inputText = ""
+                        },
+                        selectedIndex: $slashPopoverIndex
+                    )
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-            }
+                    .padding(.bottom, 4)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
 
-            // ── Two-bar input container ──
-            VStack(spacing: 0) {
-                // ── TOP BAR: actions ──
-                HStack(spacing: 10) {
-                    // Model selector
+                // Pipeline stage indicator
+                if let pipeline = state.activePipeline {
+                    PipelineStageBar(pipeline: pipeline)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                }
+            },
+            topBarExtras: {
+                // Fast Thinking toggle (only for models that support it)
+                if state.selectedModel.supportsFastThinking {
                     Button {
                         withAnimation(.easeOut(duration: 0.15)) {
-                            showModelMenu.toggle()
+                            fastThinkingEnabled.toggle()
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text(state.selectedModel.displayName.lowercased())
-                                .font(Theme.code(12))
-                                .foregroundColor(Color(hex: 0x938d8d))
-                            Image(systemName: "chevron.up")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(Color(hex: 0x938d8d))
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.04))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-
-                    // Fast Thinking toggle (only for models that support it)
-                    if state.selectedModel.supportsFastThinking {
-                        Button {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                fastThinkingEnabled.toggle()
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "bolt.fill")
-                                    .font(.system(size: 9))
-                                Text("Fast")
-                                    .font(Theme.label(11))
-                            }
-                            .foregroundColor(fastThinkingEnabled ? .white : Color(hex: 0x938d8d).opacity(0.6))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(fastThinkingEnabled ? Color.white.opacity(0.10) : Color.white.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .strokeBorder(fastThinkingEnabled ? Color.white.opacity(0.15) : Color.clear, lineWidth: 0.5)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .help("Toggle fast thinking (⌥T)")
-                    }
-
-                    // Plan Mode toggle
-                    Button {
-                        withAnimation(.easeOut(duration: 0.15)) {
-                            planModeEnabled.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "doc.text")
+                            Image(systemName: "bolt.fill")
                                 .font(.system(size: 9))
-                            Text("Plan")
+                            Text("Fast")
                                 .font(Theme.label(11))
                         }
-                        .foregroundColor(planModeEnabled ? .white : Color(hex: 0x938d8d).opacity(0.6))
+                        .foregroundColor(fastThinkingEnabled ? .white : Color(hex: 0x938d8d).opacity(0.6))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(planModeEnabled ? Color.white.opacity(0.10) : Color.white.opacity(0.04))
+                        .background(fastThinkingEnabled ? Color.white.opacity(0.10) : Color.white.opacity(0.04))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(planModeEnabled ? Color.white.opacity(0.15) : Color.clear, lineWidth: 0.5)
+                                .strokeBorder(fastThinkingEnabled ? Color.white.opacity(0.15) : Color.clear, lineWidth: 0.5)
                         )
                     }
                     .buttonStyle(.plain)
-                    .help("Toggle plan mode (⇧⇥)")
-
-                    Spacer()
-
-                    // Context Memory dial
-                    Button {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            showContextMemoryOverlay.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            // Circular progress ring
-                            ZStack {
-                                Circle()
-                                    .stroke(Color(hex: 0x555555).opacity(0.4), lineWidth: 2)
-                                    .frame(width: 16, height: 16)
-                                Circle()
-                                    .trim(from: 0, to: tokenFraction)
-                                    .stroke(Color.white.opacity(0.85), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                    .frame(width: 16, height: 16)
-                                    .rotationEffect(.degrees(-90))
-                            }
-                            Text(tokenLabel)
-                                .font(Theme.code(10))
-                                .foregroundColor(Color(hex: 0x938d8d))
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .help("Context memory")
+                    .help("Toggle fast thinking (⌥T)")
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    ZStack {
-                        GlassBackground(material: .hudWindow, cornerRadius: 0)
-                        Color(hex: 0x2a2a2e).opacity(0.5)
+
+                // Plan Mode toggle
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        planModeEnabled.toggle()
                     }
-                )
-
-                // ── BOTTOM BAR: text input + actions ──
-                VStack(spacing: 0) {
-                    ZStack(alignment: .topLeading) {
-                        if inputText.isEmpty {
-                            Text("BeepBoopBeep...")
-                                .font(.system(size: 14))
-                                .foregroundColor(.white.opacity(0.4))
-                                .padding(.top, 2)
-                                .allowsHitTesting(false)
-                        }
-                        // Ghost text — shows autocomplete suggestion
-                        if let ghost = ghostCompletion {
-                            Text(ghost)
-                                .font(.system(size: 14))
-                                .foregroundColor(Theme.Colors.textSecondary.opacity(0.5))
-                                .padding(.top, 2)
-                                .allowsHitTesting(false)
-                        }
-                        TextEditor(text: $inputText)
-                            .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(hasInput ? 1.0 : 0.4))
-                            .frame(height: min(max(inputTextHeight + 10, 36), 200))
-                            .scrollContentBackground(.hidden)
-                            .background(Color.clear)
-                            .focused($inputFocused)
-                            .background(
-                                Text(inputText.isEmpty ? "A" : inputText)
-                                    .font(.system(size: 14))
-                                    .lineLimit(nil)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .opacity(0)
-                                    .background(GeometryReader { textGeo in
-                                        Color.clear.preference(
-                                            key: InputHeightKey.self,
-                                            value: textGeo.size.height
-                                        )
-                                    })
-                            )
-                            .onPreferenceChange(InputHeightKey.self) { h in
-                                if h > 0 { inputTextHeight = h }
-                            }
-                            .onKeyPress(.return, phases: .down) { press in
-                                guard !press.modifiers.contains(.shift) else { return .ignored }
-                                if showSlashPopover && !allCommands.isEmpty {
-                                    let idx = min(slashPopoverIndex, allCommands.count - 1)
-                                    inputText = "/\(allCommands[idx]) "
-                                    slashCommandSelected = true
-                                    return .handled
-                                }
-                                sendMessage()
-                                return .handled
-                            }
-                            .onKeyPress(.tab, phases: .down) { press in
-                                // Shift+Tab toggles plan mode
-                                if press.modifiers.contains(.shift) {
-                                    withAnimation(.easeOut(duration: 0.15)) {
-                                        planModeEnabled.toggle()
-                                    }
-                                    return .handled
-                                }
-                                guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
-                                let idx = min(slashPopoverIndex, allCommands.count - 1)
-                                inputText = "/\(allCommands[idx]) "
-                                slashCommandSelected = true
-                                return .handled
-                            }
-                            .onKeyPress(characters: CharacterSet(charactersIn: "v"), phases: .down) { press in
-                                guard press.modifiers.contains(.command) else { return .ignored }
-                                if pasteImageFromClipboard() { return .handled }
-                                return .ignored
-                            }
-                            .onKeyPress(characters: CharacterSet(charactersIn: "t"), phases: .down) { press in
-                                // Opt+T toggles fast thinking
-                                guard press.modifiers.contains(.option),
-                                      state.selectedModel.supportsFastThinking else { return .ignored }
-                                withAnimation(.easeOut(duration: 0.15)) {
-                                    fastThinkingEnabled.toggle()
-                                }
-                                return .handled
-                            }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 9))
+                        Text("Plan")
+                            .font(Theme.label(11))
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 4)
-
-                    // Action row
-                    HStack(spacing: 8) {
-                        // Attach button (+ icon with hover state)
-                        Button { showFilePicker = true } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(attachHovering ? .white : Color(hex: 0x938d8d))
-                                .frame(width: 24, height: 24)
-                                .background(attachHovering ? Color.white.opacity(0.08) : Color.clear)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
-                        .onHover { hovering in attachHovering = hovering }
-                        .help("Attach file")
-
-                        Spacer()
-
-                        if isRunning {
-                            Button {
-                                state.cancel()
-                            } label: {
-                                Image(systemName: "stop.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.red.opacity(0.7))
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            Button(action: sendMessage) {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(hasInput ? .white : .white.opacity(0.4))
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(!canSend)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 10)
-                }
-                .background(Color(hex: 0x33343A))
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
-            )
-            // Model selector opens ABOVE the input container
-            .overlay(alignment: .topLeading) {
-                if showModelMenu {
-                    PlanModelSelectorMenu(selectedModel: $state.selectedModel, isShowing: $showModelMenu)
-                        .offset(x: 12, y: -8)
-                        .fixedSize()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .bottomLeading)))
-                }
-            }
-            // Context memory overlay opens ABOVE the input container
-            .overlay(alignment: .topTrailing) {
-                if showContextMemoryOverlay {
-                    ContextMemoryOverlay(
-                        session: session,
-                        model: state.selectedModel,
-                        onDismiss: { showContextMemoryOverlay = false }
+                    .foregroundColor(planModeEnabled ? .white : Color(hex: 0x938d8d).opacity(0.6))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(planModeEnabled ? Color.white.opacity(0.10) : Color.white.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(planModeEnabled ? Color.white.opacity(0.15) : Color.clear, lineWidth: 0.5)
                     )
-                    .offset(x: -12, y: -8)
-                    .fixedSize()
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .bottomTrailing)))
                 }
+                .buttonStyle(.plain)
+                .help("Toggle plan mode (⇧⇥)")
             }
-            .zIndex(showModelMenu || showContextMemoryOverlay ? 100 : 0)
-            .onTapGesture {
-                if showModelMenu {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        showModelMenu = false
-                    }
-                }
-                if showContextMemoryOverlay {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        showContextMemoryOverlay = false
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
-        .background(Color.clear)
-        .onDrop(of: ["public.image", "public.file-url"], isTargeted: nil) { providers in
-            handleDrop(providers: providers)
-        }
-        .fileImporter(
-            isPresented: $showFilePicker,
-            allowedContentTypes: [.png, .jpeg, .tiff, .image],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case .success(let urls) = result,
-                  let url = urls.first,
-                  url.startAccessingSecurityScopedResource() else { return }
-            defer { url.stopAccessingSecurityScopedResource() }
-            guard let data = try? Data(contentsOf: url),
-                  let image = NSImage(data: data) else { return }
-            if let path = state.saveImage(data: data) {
-                pendingImage = image
-                pendingImagePath = path
-            }
-        }
+        )
         .onAppear { installKeyMonitor() }
         .onDisappear { removeKeyMonitor() }
         .onChange(of: inputText) { oldValue, newValue in
@@ -1094,10 +800,7 @@ struct PlanChatView: View {
         state.persistConversation()
     }
 
-    private var canSend: Bool {
-        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || pendingImagePath != nil
-    }
+    // canSend moved to ChatInputBar
 
     private func handleApprove() {
         // Prefer spec content from a file the agent wrote (root-level *-spec.md etc.)
@@ -1144,72 +847,7 @@ struct PlanChatView: View {
         state.selectedModel = all[(idx + 1) % all.count]
     }
 
-    private func sendMessage() {
-        let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard canSend else { return }
-
-        var prompt = trimmed
-
-        if let imagePath = pendingImagePath {
-            if prompt.isEmpty {
-                prompt = "[Image: \(imagePath)]"
-            } else {
-                prompt += "\n[Image: \(imagePath)]"
-            }
-        }
-
-        inputText = ""
-        pendingImage = nil
-        pendingImagePath = nil
-
-        state.sendMessage(prompt)
-
-        // Restore focus to input after send
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            inputFocused = true
-        }
-    }
-
-    @discardableResult
-    private func pasteImageFromClipboard() -> Bool {
-        let pb = NSPasteboard.general
-        guard let imageData = pb.data(forType: .png)
-                ?? pb.data(forType: .tiff) else { return false }
-        guard let image = NSImage(data: imageData) else { return false }
-        let pngData: Data
-        if let png = pb.data(forType: .png) {
-            pngData = png
-        } else if let tiffRep = NSBitmapImageRep(data: imageData),
-                  let converted = tiffRep.representation(using: .png, properties: [:]) {
-            pngData = converted
-        } else {
-            return false
-        }
-        if let path = state.saveImage(data: pngData) {
-            pendingImage = image
-            pendingImagePath = path
-            return true
-        }
-        return false
-    }
-
-    private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier("public.image") {
-                provider.loadDataRepresentation(forTypeIdentifier: "public.image") { data, _ in
-                    guard let data, let image = NSImage(data: data) else { return }
-                    DispatchQueue.main.async {
-                        if let path = state.saveImage(data: data) {
-                            pendingImage = image
-                            pendingImagePath = path
-                        }
-                    }
-                }
-                return true
-            }
-        }
-        return false
-    }
+    // sendMessage, pasteImageFromClipboard, handleDrop moved to ChatInputBar
 }
 
 // MARK: - Plan Message Bubble
@@ -2245,55 +1883,7 @@ struct ConfirmButton: View {
     }
 }
 
-// MARK: - Plan Model Selector Menu
-
-private struct PlanModelSelectorMenu: View {
-    @Binding var selectedModel: AgentModel
-    @Binding var isShowing: Bool
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(AgentModel.allCases) { model in
-                Button {
-                    selectedModel = model
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        isShowing = false
-                    }
-                } label: {
-                    HStack {
-                        Text(model.displayName)
-                            .font(Theme.body(13))
-                            .foregroundColor(model == selectedModel ? .white : Color(hex: 0x938d8d))
-                        Spacer()
-                        if model == selectedModel {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(model == selectedModel ? Color.white.opacity(0.06) : Color.clear)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .background(
-            ZStack {
-                GlassBackground(material: .popover, cornerRadius: 8)
-                Color(hex: 0x1b1b1e).opacity(0.85)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
-        )
-        .frame(width: 180)
-        .shadow(color: .black.opacity(0.4), radius: 12)
-    }
-}
+// PlanModelSelectorMenu moved to Shared/ChatInputBar.swift as ModelSelectorMenu
 
 // MARK: - Pipeline Stage Bar
 
@@ -2510,96 +2100,7 @@ private struct SpecCompleteSheet: View {
     }
 }
 
-// MARK: - Context Memory Overlay
-
-private struct ContextMemoryOverlay: View {
-    let session: AgentSession?
-    let model: AgentModel
-    var onDismiss: (() -> Void)? = nil
-
-    private var totalTokens: Int { session?.totalTokens ?? 0 }
-    private var inputTokens: Int { session?.totalInputTokens ?? 0 }
-    private var outputTokens: Int { session?.totalOutputTokens ?? 0 }
-    private var contextWindow: Int { model.contextWindowTokens }
-    private var utilization: Double { session?.contextUtilization ?? 0 }
-
-    private func fmt(_ count: Int) -> String {
-        if count >= 1_000_000 { return String(format: "%.1fM", Double(count) / 1_000_000) }
-        if count >= 1_000 { return String(format: "%.1fk", Double(count) / 1_000) }
-        return "\(count)"
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Header
-            HStack {
-                Text("Context")
-                    .font(Theme.label(13))
-                    .foregroundColor(Theme.Colors.textPrimary)
-                Spacer()
-                Text("\(fmt(totalTokens))/\(fmt(contextWindow))")
-                    .font(Theme.code(12))
-                    .foregroundColor(Color(hex: 0x938d8d))
-            }
-
-            // Progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(hex: 0x555555).opacity(0.4))
-                        .frame(height: 6)
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.white.opacity(0.85))
-                        .frame(width: geo.size.width * utilization, height: 6)
-                }
-            }
-            .frame(height: 6)
-
-            // Breakdown bars
-            VStack(spacing: 6) {
-                tokenRow(label: "Input tokens", count: inputTokens, fraction: Double(inputTokens) / max(Double(totalTokens), 1))
-                tokenRow(label: "Output tokens", count: outputTokens, fraction: Double(outputTokens) / max(Double(totalTokens), 1))
-                if let session {
-                    tokenRow(label: "Messages", count: session.messages.count, fraction: nil)
-                }
-            }
-        }
-        .padding(14)
-        .frame(width: 240)
-        .background(
-            ZStack {
-                GlassBackground(material: .popover, cornerRadius: 10)
-                Color(hex: 0x1b1b1e).opacity(0.9)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.5), radius: 16)
-    }
-
-    @ViewBuilder
-    private func tokenRow(label: String, count: Int, fraction: Double?) -> some View {
-        HStack {
-            Text(label)
-                .font(Theme.body(11))
-                .foregroundColor(Color(hex: 0x938d8d))
-            Spacer()
-            if let fraction {
-                Text(String(format: "%.1f%%", fraction * 100))
-                    .font(Theme.code(11))
-                    .foregroundColor(Color(hex: 0x938d8d))
-            } else {
-                Text("\(count)")
-                    .font(Theme.code(11))
-                    .foregroundColor(Color(hex: 0x938d8d))
-            }
-        }
-    }
-}
+// ContextMemoryOverlay moved to Shared/ChatInputBar.swift
 
 // MARK: - Hand-Off Banner
 

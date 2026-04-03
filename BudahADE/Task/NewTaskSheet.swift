@@ -432,18 +432,26 @@ struct NewTaskSheet: View {
         guard isValid else { return }
         isCreating = true
         let name = taskName.trimmingCharacters(in: .whitespaces)
-        workspace.createTask(name: name, branchName: fullBranchName, baseBranch: baseBranch)
+        let savedSpecPath = specFilePath
+        let shouldPlan = startWithPlan
+        let branch = fullBranchName
+        let base = baseBranch
 
-        if let task = workspace.activeTask {
-            if let specPath = specFilePath {
-                // Copy spec to .budahade/spec.md and go straight to Build
-                copySpecToWorktree(specPath, task: task)
-                task.enterBuildMode()
-            } else if startWithPlan {
-                task.enterPlanMode()
+        Task {
+            // Await worktree creation so the directory exists on disk
+            await workspace.createTask(name: name, branchName: branch, baseBranch: base)
+
+            if let task = workspace.activeTask {
+                if let specPath = savedSpecPath {
+                    // Copy spec to .budahade/spec.md and go straight to Build
+                    copySpecToWorktree(specPath, task: task)
+                    task.enterBuildMode()
+                } else if shouldPlan {
+                    task.enterPlanMode()
+                }
             }
+            workspace.showNewTaskSheet = false
         }
-        workspace.showNewTaskSheet = false
     }
 
     private func copySpecToWorktree(_ sourcePath: String, task: TaskState) {

@@ -51,7 +51,9 @@ final class WorkspaceState: ObservableObject, Identifiable {
 
     // MARK: - Task Management
 
-    func createTask(name: String, branchName: String, baseBranch: String = "main") {
+    /// Creates a new task with a git worktree. Awaits worktree creation so callers
+    /// can safely write to the worktree path after this returns.
+    func createTask(name: String, branchName: String, baseBranch: String = "main") async {
         let worktreePath = GitWorktreeManager.worktreeDirectory(
             repoPath: projectPath,
             branchName: branchName
@@ -80,20 +82,18 @@ final class WorkspaceState: ObservableObject, Identifiable {
         tasks.append(task)
         activeTaskId = task.id
 
-        // Create worktree, then start terminal once directory is ready
-        Task {
-            do {
-                try await GitWorktreeManager.createWorktree(
-                    repoPath: projectPath,
-                    branchName: branchName,
-                    baseBranch: baseBranch
-                )
-            } catch {
-                print("Worktree creation failed: \(error.localizedDescription)")
-            }
-            // Start terminal even if worktree failed — falls back to worktreePath
-            task.startTerminal()
+        // Await worktree creation so the directory exists before callers use it
+        do {
+            try await GitWorktreeManager.createWorktree(
+                repoPath: projectPath,
+                branchName: branchName,
+                baseBranch: baseBranch
+            )
+        } catch {
+            print("Worktree creation failed: \(error.localizedDescription)")
         }
+        // Start terminal once directory is ready
+        task.startTerminal()
     }
 
     /// Restore a task from saved state (no worktree creation — already exists)

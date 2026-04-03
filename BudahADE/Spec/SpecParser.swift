@@ -70,7 +70,16 @@ enum SpecParser {
 
         func flushSection(endLine: Int) {
             guard let sTitle = currentSectionTitle else { return }
-            let sectionId = slugify(sTitle)
+            // Deduplicate section IDs — same pattern as parseMarkdownSections
+            var sectionId = slugify(sTitle)
+            let existingIds = sections.map(\.id)
+            if existingIds.contains(sectionId) {
+                var suffix = 2
+                while existingIds.contains("\(sectionId)-\(suffix)") {
+                    suffix += 1
+                }
+                sectionId = "\(sectionId)-\(suffix)"
+            }
             let content = currentSectionLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
             sections.append(SpecSection(
                 id: sectionId,

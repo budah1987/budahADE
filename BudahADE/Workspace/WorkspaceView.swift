@@ -329,19 +329,20 @@ struct WorkspaceView: View {
         // Generate context summary from the active plan conversation
         let contextSummary = task.activePlanChat?.generateContextSummary() ?? ""
 
-        // Step 2: Create builder tab with parsed spec
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+        Task { @MainActor in
+            // Brief pause for the overlay animation
+            try? await Task.sleep(nanoseconds: 700_000_000)
+
+            // Step 2: Create builder session with parsed spec
             print("[BuildTransition] Step 2 — parsing spec")
             transition.step = .launchingBuilder
 
-            // Parse the approved spec and create builder session
             let specPath = (task.worktreePath as NSString).appendingPathComponent(".budahade/spec.md")
             if let spec = SpecParser.parse(fileAt: specPath) {
                 print("[BuildTransition] Spec parsed: \(spec.tasks.count) tasks, creating builder tab")
                 task.createBuilderSession(from: spec, contextSummary: contextSummary)
                 print("[BuildTransition] Builder tab created, session: \(task.builderSession != nil)")
             } else {
-                // Fallback: create builder with a single "Implement spec" step
                 print("[BuildTransition] ⚠️ Could not parse spec at \(specPath), creating fallback builder")
                 let section = SpecSection(
                     id: "build", title: "Build", level: 2,
@@ -354,18 +355,20 @@ struct WorkspaceView: View {
                 )
                 task.createBuilderSession(from: fallback, contextSummary: contextSummary)
             }
-        }
 
-        // Step 3: Switch to build mode and show builder chat
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+
+            // Step 3: Switch to build mode — set mode directly since we already
+            // have a builder session. Calling enterBuildMode() would re-scan for
+            // specs and potentially create a duplicate session.
             print("[BuildTransition] Step 3 — switching to build mode + showing builder")
             transition.step = .switchingMode
-            task.enterBuildMode()
+            task.mode = .build
             task.showBuilderChat = true
-        }
 
-        // Dismiss overlay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+
+            // Dismiss overlay
             print("[BuildTransition] Dismissing overlay")
             withAnimation(.easeOut(duration: 0.3)) {
                 buildTransition = nil
