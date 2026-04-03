@@ -16,11 +16,6 @@ struct AppBar: View {
             }
             .frame(width: Theme.Layout.sidebarWidth)
 
-            // Sidebar border continuation
-            Rectangle()
-                .fill(Theme.Colors.borderLight)
-                .frame(width: 1)
-
             Spacer(minLength: 0)
 
             // Right: resource meter placeholder
