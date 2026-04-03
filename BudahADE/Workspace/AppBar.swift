@@ -2,6 +2,9 @@ import SwiftUI
 
 /// Full-width app bar: traffic lights area, project dropdown, conversation tabs, resource meter.
 /// Sits above both sidebar and content zone at 36px height.
+///
+/// Layout: [sidebar-width zone | content-width zone]
+/// The left zone matches sidebar width so tabs align with content area.
 struct AppBar: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var workspace: WorkspaceState
@@ -12,34 +15,42 @@ struct AppBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left: traffic light spacer + project dropdown
+            // Left zone: traffic lights + project dropdown (matches sidebar width)
             HStack(spacing: 0) {
                 // Space for macOS traffic lights (close/minimize/maximize)
                 Color.clear.frame(width: 68)
 
                 WorkspaceDropdown()
+
+                Spacer(minLength: 0)
             }
+            .frame(width: Theme.Layout.sidebarWidth)
 
-            // Center: conversation tabs
-            tabsSection
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Sidebar border continuation
+            Rectangle()
+                .fill(Theme.Colors.borderLight)
+                .frame(width: 1)
 
-            // Right: resource meter placeholder
-            ResourceMeterPlaceholder()
-                .padding(.trailing, Theme.Spacing.lg)
+            // Content zone: conversation tabs (non-builder only) + resource meter
+            HStack(spacing: 0) {
+                conversationTabs
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                ResourceMeterPlaceholder()
+                    .padding(.trailing, Theme.Spacing.lg)
+            }
         }
         .frame(height: Theme.Layout.appBarHeight)
         .background(GlassBackground())
     }
 
-    // MARK: - Tabs Section
+    // MARK: - Conversation Tabs (excludes builder tabs)
 
     @ViewBuilder
-    private var tabsSection: some View {
+    private var conversationTabs: some View {
         if let task = workspace.activeTask {
             HStack(spacing: 4) {
                 if task.mode == .plan {
-                    // Plan mode tabs
                     ForEach(task.planTabs) { tab in
                         ConversationTab(
                             id: tab.id,
@@ -53,8 +64,8 @@ struct AppBar: View {
                         )
                     }
                 } else {
-                    // Build mode tabs
-                    ForEach(task.tabs) { tab in
+                    // Build mode: only non-builder tabs in the app bar
+                    ForEach(task.tabs.filter { $0.tabType != .builder }) { tab in
                         ConversationTab(
                             id: tab.id,
                             title: tab.title,
@@ -68,7 +79,6 @@ struct AppBar: View {
                     }
                 }
 
-                // New tab button
                 NewTabButton(action: onNewTab)
             }
             .padding(.leading, Theme.Spacing.lg)
@@ -76,7 +86,7 @@ struct AppBar: View {
     }
 }
 
-// MARK: - New Tab Button (minimal "+" in app bar)
+// MARK: - New Tab Button
 
 private struct NewTabButton: View {
     let action: () -> Void

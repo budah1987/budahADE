@@ -34,13 +34,14 @@ struct TaskRailView: View {
                     .padding(.bottom, Theme.Spacing.lg)
             }
 
-            // Task cards
+            // Task cards (scrollable)
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: Theme.Layout.taskCardGap) {
                     ForEach(workspace.tasks) { task in
                         TaskCard(
                             task: task,
                             isActive: task.id == workspace.activeTaskId,
+                            isHovered: task.id == hoveredTaskId,
                             onSelect: {
                                 workspace.selectTask(task.id)
                                 if task.builderSession != nil {
@@ -71,11 +72,13 @@ struct TaskRailView: View {
                 .padding(.horizontal, Theme.Spacing.sm)
             }
 
+            // Builder agents section — always visible, all tasks
+            BuilderAgentsSection(workspace: workspace)
+
             Spacer(minLength: 0)
 
             // Bottom nav items
             VStack(spacing: 0) {
-                // Plan Archive (conditional)
                 if let task = workspace.activeTask, !task.archivedPlanTabs.isEmpty {
                     SidebarNavItem(
                         icon: "archivebox",
@@ -182,13 +185,11 @@ private struct NotificationSummaryBar: View {
     }
 
     private var aggregateSteps: [BuildStep] {
-        // Collect build steps from all tasks, or synthesize from task status
         var steps: [BuildStep] = []
         for task in tasks {
             if let session = task.builderSession {
                 steps.append(contentsOf: session.steps)
             } else {
-                // Represent each task as a single step
                 let state: StepState = task.status == .completed ? .done : .queued
                 steps.append(BuildStep(id: task.id.uuidString, title: task.name, state: state))
             }
@@ -205,11 +206,12 @@ private struct NotificationSummaryBar: View {
     }
 }
 
-// MARK: - Task Card
+// MARK: - Task Card (with hover state)
 
 struct TaskCard: View {
     @ObservedObject var task: TaskState
     let isActive: Bool
+    var isHovered: Bool = false
     let onSelect: () -> Void
 
     var body: some View {
@@ -245,7 +247,12 @@ struct TaskCard: View {
                 .padding(.horizontal, Theme.Spacing.md)
                 .padding(.vertical, Theme.Spacing.sm)
             }
-            .opacity(isActive ? 1 : 0.5)
+            .opacity(isActive ? 1 : (isHovered ? 0.75 : 0.5))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .fill(isHovered && !isActive ? Color.white.opacity(0.03) : Color.clear)
+            )
+            .animation(.easeOut(duration: 0.12), value: isHovered)
         }
         .buttonStyle(.plain)
     }
@@ -288,7 +295,103 @@ struct TaskCard: View {
     }
 }
 
-// MARK: - Sidebar Nav Item
+// MARK: - Builder Agents Section (always visible in sidebar)
+
+private struct BuilderAgentsSection: View {
+    @ObservedObject var workspace: WorkspaceState
+
+    /// All builder sessions across all tasks
+    private var builders: [(task: TaskState, session: BuilderSession)] {
+        workspace.tasks.compactMap { task in
+            guard let session = task.builderSession else { return nil }
+            return (task: task, session: session)
+        }
+    }
+
+    var body: some View {
+        if !builders.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                // Section header
+                Text("Builders")
+                    .font(Theme.caption(9))
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.sm)
+
+                ForEach(builders, id: \.task.id) { item in
+                    BuilderAgentRow(
+                        taskName: item.task.name,
+                        session: item.session,
+                        onTap: {
+                            workspace.selectTask(item.task.id)
+                            item.task.enterBuildMode()
+                            item.task.showBuilderChat = true
+                        }
+                    )
+                }
+            }
+            .padding(.bottom, Theme.Spacing.sm)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 1)
+            }
+        }
+    }
+}
+
+// MARK: - Builder Agent Row
+
+private struct BuilderAgentRow: View {
+    let taskName: String
+    let session: BuilderSession
+    let onTap: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Theme.Spacing.sm) {
+                // Status dot
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 6, height: 6)
+
+                // Task name
+                Text(taskName)
+                    .font(Theme.label(11))
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                // Progress fraction
+                Text("\(session.completedCount)/\(session.totalCount)")
+                    .font(Theme.code(9))
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .fill(isHovered ? Theme.Colors.hoverFill : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
+
+    private var statusColor: Color {
+        switch session.buildState {
+        case .building: return Theme.Colors.statusWorking
+        case .done:     return Theme.Colors.statusDone
+        case .failed:   return Theme.Colors.error
+        case .ready:    return Theme.Colors.statusIdle
+        case .paused:   return Theme.Colors.warning
+        }
+    }
+}
+
+// MARK: - Sidebar Nav Item (with hover state)
 
 private struct SidebarNavItem: View {
     let icon: String
@@ -296,6 +399,8 @@ private struct SidebarNavItem: View {
     var trailing: String? = nil
     var showDivider: Bool = true
     let action: () -> Void
+
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
@@ -313,13 +418,18 @@ private struct SidebarNavItem: View {
                         .font(Theme.caption(10))
                 }
             }
-            .foregroundColor(Theme.Colors.textTertiary)
+            .foregroundColor(isHovered ? Theme.Colors.textSecondary : Theme.Colors.textTertiary)
             .frame(height: Theme.Layout.navItemHeight)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Theme.Spacing.lg)
+            .background(
+                isHovered ? Theme.Colors.hoverFill : Color.clear
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.1), value: isHovered)
         .overlay(alignment: .bottom) {
             if showDivider {
                 Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 1)
