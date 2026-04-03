@@ -409,7 +409,6 @@ struct WorkspaceView: View {
                     onEditSpec: nil,
                     branchName: task.branchName
                 )
-                .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             if state.activeTask?.showBuilderChat != true {
@@ -724,9 +723,7 @@ struct BuilderTabRow: View {
     var body: some View {
         HStack(spacing: 0) {
             Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    task.showBuilderChat = true
-                }
+                task.showBuilderChat = true
             } label: {
                 HStack(spacing: 6) {
                     Circle()
@@ -773,10 +770,11 @@ struct BuilderTabRow: View {
             }
             .buttonStyle(.plain)
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
+        .frame(maxWidth: .infinity)
         .background(GlassBackground())
         .overlay(alignment: .bottom) {
             Rectangle()
