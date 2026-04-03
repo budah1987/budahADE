@@ -76,7 +76,8 @@ struct WorkspaceView: View {
 
     private var coreView: some View {
         ZStack {
-            Theme.Colors.appBackground.ignoresSafeArea()
+            // Unified app chrome background
+            Theme.Colors.sidebarBackground.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // ── APP BAR (full width: dropdown + resource meter) ──
@@ -86,16 +87,6 @@ struct WorkspaceView: View {
                 HStack(spacing: 0) {
                     // ── TASK RAIL ──
                     TaskRailView(workspace: state, renameTarget: renameTarget)
-                        .background(
-                            ZStack {
-                                GlassBackground(material: .sidebar)
-                                Theme.Colors.sidebarBackground.opacity(0.7)
-                            }
-                        )
-
-                    Rectangle()
-                        .fill(Theme.Colors.borderLight)
-                        .frame(width: 1)
 
                     // ── CONTENT ZONE ──
                     VStack(spacing: 0) {
@@ -149,7 +140,7 @@ struct WorkspaceView: View {
                             }
                         }
                     } else {
-                        // Build mode: sidebar + terminal area + git panel
+                        // Build mode: file tree + agent content (rounded inset) + git panel
                         HStack(spacing: 0) {
                             if state.leftPanelVisible {
                                 LeftPanelView(
@@ -158,20 +149,17 @@ struct WorkspaceView: View {
                                 )
                                 .id("\(state.activeTaskId?.uuidString ?? "")-\(state.activeTask?.tabs.count ?? 0)")
                                 .transition(.move(edge: .leading).combined(with: .opacity))
-                                .background(Theme.Colors.sidebarBackground)
-
-                                Rectangle()
-                                    .fill(Theme.Colors.borderLight)
-                                    .frame(width: 1)
                             }
 
+                            // Agent content area — rounded inset with darker background
                             terminalArea
+                                .background(Theme.Colors.appBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                                .padding(.vertical, Theme.Spacing.xs)
+                                .padding(.trailing, state.rightPanelVisible ? 0 : Theme.Spacing.xs)
+                                .padding(.leading, state.leftPanelVisible ? 0 : Theme.Spacing.xs)
 
                             if state.rightPanelVisible, let task = state.activeTask {
-                                Rectangle()
-                                    .fill(Theme.Colors.borderLight)
-                                    .frame(width: 1)
-
                                 GitSidebarView(task: task, projectPath: state.projectPath)
                                     .id(state.activeTaskId)
                                     .transition(.move(edge: .trailing).combined(with: .opacity))

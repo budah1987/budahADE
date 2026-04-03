@@ -23,7 +23,6 @@ struct AppBar: View {
                 .padding(.trailing, Theme.Spacing.lg)
         }
         .frame(height: Theme.Layout.appBarHeight)
-        .background(GlassBackground())
     }
 }
 
