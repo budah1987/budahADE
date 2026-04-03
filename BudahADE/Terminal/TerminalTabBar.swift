@@ -116,8 +116,6 @@ struct ConversationTab: View {
     let onSelect: () -> Void
     let onClose: () -> Void
 
-    @State private var glowBreathing: Bool = false
-
     private var isBrowser: Bool {
         if case .browser = tabType { return true } else { return false }
     }
@@ -128,13 +126,6 @@ struct ConversationTab: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundStyle(Theme.Colors.textTertiary)
-            }
-            .buttonStyle(.plain)
-
             if isBuilder {
                 Circle()
                     .fill(Theme.Colors.statusWorking)
@@ -151,7 +142,7 @@ struct ConversationTab: View {
                 .lineLimit(1)
 
             if agentState != .idle {
-                Text(agentState == .working ? "working" : "done")
+                Text(agentState == .working ? "Working" : "Done")
                     .font(Theme.caption(9))
                     .foregroundStyle(
                         agentState == .working
@@ -159,18 +150,20 @@ struct ConversationTab: View {
                             : Theme.Colors.statusDone
                     )
             }
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(Theme.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
         .frame(height: 32)
         .background(tabBackground)
-        .overlay(alignment: .bottom) {
-            // GlowBar outside clipped background so shadows can bleed
-            GlowBar(state: agentState)
-                .frame(height: 3)
-                .shadow(color: glowInnerShadow, radius: 10, y: 0)
-                .shadow(color: glowOuterShadow, radius: 20, y: 2)
-                .opacity(agentState == .idle ? 0 : 1)
-        }
+        .overlay { RotatingBorderGlow(state: agentState) }
+        .shadow(color: stateShadow, radius: 4)
+        .shadow(color: stateShadow, radius: 14)
         .fixedSize()
         .background(
             GeometryReader { geo in
@@ -184,8 +177,6 @@ struct ConversationTab: View {
             }
         )
         .overlay(TabDragClickHandler(dragId: id.uuidString, onClick: onSelect, onMiddleClick: onClose))
-        .onAppear { startBreathing() }
-        .onChange(of: agentState) { _, _ in startBreathing() }
     }
 
     // MARK: - Tab Background
@@ -204,119 +195,110 @@ struct ConversationTab: View {
                     lineWidth: 0.5
                 )
 
-            // State tint — strong wash that fills the tab body
+            // Subtle state tint
             if agentState == .working {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: 0x6366f1).opacity(glowBreathing ? 0.18 : 0.10),
-                                Color(hex: 0x8b5cf6).opacity(glowBreathing ? 0.12 : 0.06)
-                            ],
-                            startPoint: .bottom, endPoint: .top
-                        )
-                    )
+                    .fill(Color(hex: 0x6366f1).opacity(0.06))
             } else if agentState == .completed {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: 0x22c55e).opacity(0.15),
-                                Color(hex: 0x14b8a6).opacity(0.08)
-                            ],
-                            startPoint: .bottom, endPoint: .top
-                        )
-                    )
+                    .fill(Color(hex: 0x22c55e).opacity(0.05))
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 
-    // MARK: - Glow Helpers
+    // MARK: - State Shadow
 
-    private func startBreathing() {
-        if agentState == .working {
-            glowBreathing = false
-            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                glowBreathing = true
-            }
-        } else {
-            withAnimation(.easeOut(duration: 0.3)) {
-                glowBreathing = false
-            }
-        }
-    }
-
-    private var glowInnerShadow: Color {
-        switch agentState {
-        case .working:   return Color(hex: 0x6366f1).opacity(0.7)
-        case .completed: return Color(hex: 0x22c55e).opacity(0.55)
-        case .idle:      return .clear
-        }
-    }
-
-    private var glowOuterShadow: Color {
+    private var stateShadow: Color {
         switch agentState {
         case .working:   return Color(hex: 0x8b5cf6).opacity(0.4)
-        case .completed: return Color(hex: 0x14b8a6).opacity(0.3)
+        case .completed: return Color(hex: 0x22c55e).opacity(0.35)
         case .idle:      return .clear
         }
     }
 }
 
-// MARK: - Glow Bar
+// MARK: - Rotating Border Glow
 
-struct GlowBar: View {
+struct RotatingBorderGlow: View {
     let state: TabAgentState
-    @State private var opacity: Double
 
-    init(state: TabAgentState) {
-        self.state = state
-        _opacity = State(initialValue: state == .working ? 0.5 : 1.0)
-    }
+    @State private var sweepStart = Date()
+
+    private let workingCycle: Double = 9.0       // seconds per full rotation
+    private let doneSweepDuration: Double = 1.5  // seconds for single sweep
+    private let cornerRadius: CGFloat = 7
+    private let borderWidth: CGFloat = 1.5
 
     var body: some View {
-        gradient
-            .opacity(opacity)
-            .onAppear { startAnimation() }
-            .onChange(of: state) { _, _ in startAnimation() }
-            .animation(.default, value: state)
-    }
-
-    private var gradient: LinearGradient {
-        switch state {
-        case .working:
-            return LinearGradient(
-                colors: [Color(hex: 0x6366f1), Color(hex: 0x8b5cf6)],
-                startPoint: .leading, endPoint: .trailing
-            )
-        case .completed:
-            return LinearGradient(
-                colors: [Color(hex: 0x22c55e), Color(hex: 0x14b8a6)],
-                startPoint: .leading, endPoint: .trailing
-            )
-        case .idle:
-            return LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing)
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+            let angle = computeAngle(at: timeline.date)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(
+                    AngularGradient(
+                        gradient: lightGradient,
+                        center: .center,
+                        angle: .degrees(angle)
+                    ),
+                    lineWidth: borderWidth
+                )
+        }
+        .allowsHitTesting(false)
+        .onChange(of: state) { _, newState in
+            if newState == .completed { sweepStart = Date() }
         }
     }
 
-    private func startAnimation() {
+    private func computeAngle(at date: Date) -> Double {
         switch state {
         case .working:
-            opacity = 0.6
-            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                opacity = 1.0
-            }
+            let t = date.timeIntervalSinceReferenceDate
+            return (t / workingCycle).truncatingRemainder(dividingBy: 1.0) * 360
         case .completed:
-            opacity = 1.0
-            withAnimation(.easeOut(duration: 0.8).delay(0.1)) {
-                opacity = 0.7
-            }
+            let elapsed = date.timeIntervalSince(sweepStart)
+            let progress = min(elapsed / doneSweepDuration, 1.0)
+            let eased = 1 - pow(1 - progress, 3)  // ease-out cubic
+            return eased * 360
         case .idle:
-            withAnimation(.easeOut(duration: 0.4)) {
-                opacity = 0
-            }
+            let t = date.timeIntervalSinceReferenceDate
+            return (t / workingCycle).truncatingRemainder(dividingBy: 1.0) * 360
         }
+    }
+
+    private var lightGradient: Gradient {
+        let (bright, mid, dim): (Color, Color, Color) = {
+            switch state {
+            case .working:
+                return (
+                    Color(hex: 0x8b5cf6).opacity(0.85),
+                    Color(hex: 0x7c3aed).opacity(0.35),
+                    Color(hex: 0x6366f1).opacity(0.10)
+                )
+            case .completed:
+                return (
+                    Color(hex: 0x22c55e).opacity(0.85),
+                    Color(hex: 0x10b981).opacity(0.35),
+                    Color(hex: 0x14b8a6).opacity(0.10)
+                )
+            case .idle:
+                return (
+                    Color.white.opacity(0.12),
+                    Color.white.opacity(0.05),
+                    Color.white.opacity(0.02)
+                )
+            }
+        }()
+
+        return Gradient(stops: [
+            .init(color: bright, location: 0.0),
+            .init(color: mid, location: 0.12),
+            .init(color: dim, location: 0.25),
+            .init(color: .clear, location: 0.45),
+            .init(color: .clear, location: 0.55),
+            .init(color: dim, location: 0.75),
+            .init(color: mid, location: 0.88),
+            .init(color: bright, location: 1.0),
+        ])
     }
 }
 
