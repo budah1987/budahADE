@@ -13,13 +13,13 @@ struct RoleSelectionModal: View {
             // Header
             Text("Choose a role")
                 .font(Theme.label(13))
-                .foregroundStyle(Theme.textSecondary)
+                .foregroundStyle(Theme.Colors.textSecondary)
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
                 .padding(.bottom, 12)
 
             Rectangle()
-                .fill(Theme.borderSubtle)
+                .fill(Theme.Colors.borderSubtle)
                 .frame(height: 0.5)
                 .padding(.horizontal, 0)
 
@@ -44,7 +44,7 @@ struct RoleSelectionModal: View {
                 .fill(.ultraThinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Theme.border, lineWidth: 1)
+                        .strokeBorder(Theme.Colors.borderLight, lineWidth: 1)
                 )
                 .shadow(color: .black.opacity(0.45), radius: 40, y: 16)
         )
@@ -81,11 +81,11 @@ private struct RoleRow: View {
                 // Shortcut badge
                 ZStack {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Theme.surface2)
+                        .fill(Theme.Colors.surface)
                         .frame(width: 22, height: 22)
                     Text(role.roleShortcutIndex.map { "\($0)" } ?? "")
                         .font(Theme.label(11))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                 }
 
                 // Icon with role color
@@ -102,10 +102,10 @@ private struct RoleRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(role.displayName)
                         .font(Theme.label(13))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(Theme.Colors.textPrimary)
                     Text(role.description)
                         .font(Theme.caption(11))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                 }
 
                 Spacer(minLength: 0)
@@ -113,13 +113,13 @@ private struct RoleRow: View {
                 // Chevron
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Theme.textMuted.opacity(isHovered ? 0.8 : 0.3))
+                    .foregroundStyle(Theme.Colors.textTertiary.opacity(isHovered ? 0.8 : 0.3))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isHovered ? Theme.surface2.opacity(0.8) : Color.clear)
+                    .fill(isHovered ? Theme.Colors.surface.opacity(0.8) : Color.clear)
                     .padding(.horizontal, 6)
             )
             .contentShape(Rectangle())

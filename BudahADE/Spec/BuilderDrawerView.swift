@@ -18,19 +18,19 @@ struct BuilderDrawerView: View {
 
                 Text("Builder")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
 
                 if let task = buildStatus.currentTaskTitle {
                     Text(task)
                         .font(.system(size: 11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .lineLimit(1)
                 }
 
                 if let elapsed = buildStatus.elapsed {
                     Text(elapsed)
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(Theme.textMuted.opacity(0.6))
+                        .foregroundColor(Theme.Colors.textTertiary.opacity(0.6))
                 }
 
                 Spacer()
@@ -38,17 +38,17 @@ struct BuilderDrawerView: View {
                 Button(action: onClose) {
                     Image(systemName: "chevron.up")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(Theme.surface2)
+            .background(Theme.Colors.surface)
 
             Rectangle()
-                .fill(Theme.borderSubtle)
+                .fill(Theme.Colors.borderSubtle)
                 .frame(height: 0.5)
 
             // Builder terminal output
@@ -56,17 +56,17 @@ struct BuilderDrawerView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 280)
-        .background(Theme.contentBg)
+        .background(Theme.Colors.appBackground)
         .clipShape(RoundedRectangle(cornerRadius: 0))
         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
     }
 
     private var statusColor: Color {
         switch buildStatus.status {
-        case .working:   return Theme.accent
+        case .working:   return Theme.Colors.accent
         case .blocked:   return Color(hex: 0xE06C75)
-        case .completed: return Theme.success
-        case .idle:      return Theme.textMuted
+        case .completed: return Theme.Colors.statusDone
+        case .idle:      return Theme.Colors.textTertiary
         }
     }
 }

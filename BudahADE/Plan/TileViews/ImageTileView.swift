@@ -52,10 +52,10 @@ struct ImageTileView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "photo")
                             .font(.system(size: 24))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                         Text("Cannot load image")
                             .font(Theme.body(12))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }

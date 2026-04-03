@@ -41,12 +41,12 @@ struct SyntaxHighlighter {
 
     private static func color(for type: SyntaxTokenType) -> Color {
         switch type {
-        case .keyword: return Theme.accent
-        case .type:    return Theme.info
-        case .string:  return Theme.success
-        case .number:  return Theme.warning
-        case .comment: return Theme.textMuted
-        case .plain:   return Theme.textPrimary
+        case .keyword: return Theme.Colors.accent
+        case .type:    return Theme.Colors.info
+        case .string:  return Theme.Colors.statusDone
+        case .number:  return Theme.Colors.warning
+        case .comment: return Theme.Colors.textTertiary
+        case .plain:   return Theme.Colors.textPrimary
         }
     }
 

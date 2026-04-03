@@ -27,11 +27,11 @@ private struct InactiveIndicator: View {
         ZStack {
             Circle()
                 .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
-                .foregroundColor(Theme.textMuted.opacity(0.4))
+                .foregroundColor(Theme.Colors.textTertiary.opacity(0.4))
                 .frame(width: 18, height: 18)
 
             Circle()
-                .fill(Theme.textMuted.opacity(0.4))
+                .fill(Theme.Colors.textTertiary.opacity(0.4))
                 .frame(width: 4, height: 4)
         }
         .opacity(breathing ? 0.5 : 0.25)
@@ -51,13 +51,13 @@ private struct ActiveIndicator: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Theme.success, lineWidth: 1.5)
+                .stroke(Theme.Colors.statusDone, lineWidth: 1.5)
                 .scaleEffect(ringExpanding ? 1.8 : 1.0)
                 .opacity(ringExpanding ? 0.0 : 0.6)
                 .frame(width: 14, height: 14)
 
             Circle()
-                .fill(Theme.success)
+                .fill(Theme.Colors.statusDone)
                 .frame(width: 8, height: 8)
         }
         .onAppear {
@@ -121,10 +121,10 @@ private struct CompletedIndicator: View {
         ZStack {
             // Background circle
             Circle()
-                .fill(Theme.success.opacity(0.12))
+                .fill(Theme.Colors.statusDone.opacity(0.12))
                 .overlay(
                     Circle()
-                        .stroke(Theme.success, lineWidth: 1.5)
+                        .stroke(Theme.Colors.statusDone, lineWidth: 1.5)
                 )
                 .frame(width: 20, height: 20)
                 .scaleEffect(appeared ? 1.0 : 0.5)
@@ -134,7 +134,7 @@ private struct CompletedIndicator: View {
             CheckmarkShape()
                 .trim(from: 0, to: checkDrawn ? 1.0 : 0.0)
                 .stroke(
-                    Theme.success,
+                    Theme.Colors.statusDone,
                     style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round)
                 )
                 .frame(width: 10, height: 10)

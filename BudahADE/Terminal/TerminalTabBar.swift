@@ -104,7 +104,7 @@ struct TerminalTabBar: View {
             .background(GlassBackground())
 
             Rectangle()
-                .fill(Theme.borderSubtle)
+                .fill(Theme.Colors.borderSubtle)
                 .frame(height: 0.5)
         }
     }
@@ -137,23 +137,23 @@ struct ConversationTab: View {
             Button(action: onClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .medium))
-                    .foregroundStyle(Theme.textMuted)
+                    .foregroundStyle(Theme.Colors.textTertiary)
             }
             .buttonStyle(.plain)
 
             if isBuilder {
                 Circle()
-                    .fill(Theme.builder)
+                    .fill(Theme.Colors.statusWorking)
                     .frame(width: 7, height: 7)
             } else if isBrowser {
                 Image(systemName: "globe")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(isSelected ? Theme.accent : Theme.textMuted)
+                    .foregroundStyle(isSelected ? Theme.Colors.accent : Theme.Colors.textTertiary)
             }
 
             Text(title)
                 .font(Theme.label(11))
-                .foregroundStyle(isSelected ? Theme.textPrimary : Theme.textSecondary)
+                .foregroundStyle(isSelected ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
                 .lineLimit(1)
 
             if agentState != .idle {
@@ -162,7 +162,7 @@ struct ConversationTab: View {
                     .foregroundStyle(
                         agentState == .working
                             ? Color(hex: 0x818cf8)
-                            : Theme.success
+                            : Theme.Colors.statusDone
                     )
             }
         }
@@ -201,12 +201,12 @@ struct ConversationTab: View {
         ZStack {
             // Glass fill
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(isSelected ? Theme.tabSelectedGlass : Theme.tabGlassBackground)
+                .fill(isSelected ? Theme.Colors.tabSelectedGlass : Theme.Colors.tabGlassBackground)
 
             // Glass border
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(
-                    isSelected ? Theme.tabSelectedBorder : Theme.tabGlassBorder,
+                    isSelected ? Theme.Colors.tabSelectedBorder : Theme.Colors.tabGlassBorder,
                     lineWidth: 0.5
                 )
 
@@ -344,16 +344,16 @@ struct NewTabMenu: View {
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(isHovered ? Theme.textSecondary : Theme.textMuted)
+                .foregroundColor(isHovered ? Theme.Colors.textSecondary : Theme.Colors.textTertiary)
                 .frame(width: 28, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(isHovered ? Theme.tabGlassBackground : Color.clear)
+                        .fill(isHovered ? Theme.Colors.tabGlassBackground : Color.clear)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .strokeBorder(
-                            isHovered ? Theme.tabGlassBorder : Color.clear,
+                            isHovered ? Theme.Colors.tabGlassBorder : Color.clear,
                             lineWidth: 1
                         )
                 )
@@ -377,16 +377,16 @@ struct NewAgentTabButton: View {
         Button(action: action) {
             Image(systemName: "plus")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(isHovered ? Theme.textSecondary : Theme.textMuted)
+                .foregroundColor(isHovered ? Theme.Colors.textSecondary : Theme.Colors.textTertiary)
                 .frame(width: 28, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(isHovered ? Theme.tabGlassBackground : Color.clear)
+                        .fill(isHovered ? Theme.Colors.tabGlassBackground : Color.clear)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .strokeBorder(
-                            isHovered ? Theme.tabGlassBorder : Color.clear,
+                            isHovered ? Theme.Colors.tabGlassBorder : Color.clear,
                             lineWidth: 1
                         )
                 )

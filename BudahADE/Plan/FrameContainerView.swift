@@ -27,11 +27,11 @@ struct FrameContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Theme.surface1.opacity(0.3))
+                .fill(Theme.Colors.sidebarBackground.opacity(0.3))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(
-                            isDropTarget ? Theme.accent.opacity(0.6) : Theme.borderSubtle,
+                            isDropTarget ? Theme.Colors.accent.opacity(0.6) : Theme.Colors.borderSubtle,
                             lineWidth: isDropTarget ? 2 : 0.5
                         )
                 )
@@ -42,13 +42,13 @@ struct FrameContentView: View {
         HStack(spacing: 8) {
             Image(systemName: "rectangle.3.group")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
 
             if isEditingTitle {
                 TextField("Frame", text: $editTitle)
                     .textFieldStyle(.plain)
                     .font(Theme.label(14))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .onSubmit {
                         canvas.renameElement(element.id, to: editTitle)
                         isEditingTitle = false
@@ -56,7 +56,7 @@ struct FrameContentView: View {
             } else {
                 Text(element.title.isEmpty ? "Frame" : element.title)
                     .font(Theme.label(14))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .onTapGesture(count: 2) {
                         editTitle = element.title
                         isEditingTitle = true
@@ -72,11 +72,11 @@ struct FrameContentView: View {
                 Image(systemName: frameData.axis == .horizontal
                     ? "arrow.left.arrow.right" : "arrow.up.arrow.down")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(width: 24, height: 24)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Theme.hoverFill)
+                            .fill(Theme.Colors.hoverFill)
                     )
             }
             .buttonStyle(.plain)
@@ -86,7 +86,7 @@ struct FrameContentView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(width: 24, height: 24)
             }
             .buttonStyle(.plain)
@@ -99,10 +99,10 @@ struct FrameContentView: View {
         VStack(spacing: 8) {
             Image(systemName: "plus.rectangle.on.rectangle")
                 .font(.system(size: 20, weight: .thin))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Drag tiles here or right-click to add")
                 .font(Theme.caption(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(frameData.padding)
@@ -169,12 +169,12 @@ struct FrameContentView: View {
 
         if frameData.axis == .horizontal {
             RoundedRectangle(cornerRadius: 1)
-                .fill(Theme.accent)
+                .fill(Theme.Colors.accent)
                 .frame(width: 3, height: frameData.children.first?.size.height ?? 100)
                 .offset(x: indicatorPos.x - 1.5, y: indicatorPos.y)
         } else {
             RoundedRectangle(cornerRadius: 1)
-                .fill(Theme.accent)
+                .fill(Theme.Colors.accent)
                 .frame(width: frameData.children.first?.size.width ?? 200, height: 3)
                 .offset(x: indicatorPos.x, y: indicatorPos.y - 1.5)
         }

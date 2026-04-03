@@ -23,10 +23,10 @@ struct TaskCompletionSheet: View {
             VStack(spacing: 4) {
                 Text("Complete Task")
                     .font(Theme.headline(17))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                 Text(task.branchName)
                     .font(Theme.body(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
             .padding(.top, 24)
             .padding(.bottom, 20)
@@ -36,19 +36,19 @@ struct TaskCompletionSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("PR TITLE")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .tracking(0.8)
                     TextField("Pull request title", text: $prTitle)
                         .textFieldStyle(.plain)
                         .font(Theme.body(13))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(Theme.surface3)
-                        .cornerRadius(Theme.cardCornerRadius)
+                        .background(Theme.Colors.surfaceElevated)
+                        .cornerRadius(Theme.Radius.md)
                         .overlay(
-                            RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
-                                .stroke(Theme.border, lineWidth: 0.5)
+                            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                                .stroke(Theme.Colors.borderLight, lineWidth: 0.5)
                         )
                 }
 
@@ -56,22 +56,22 @@ struct TaskCompletionSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("DESCRIPTION")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .tracking(0.8)
                     TextEditor(text: $prBody)
                         .font(Theme.body(12))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .frame(height: 80)
                         .padding(8)
-                        .background(Theme.surface3)
-                        .cornerRadius(Theme.cardCornerRadius)
+                        .background(Theme.Colors.surfaceElevated)
+                        .cornerRadius(Theme.Radius.md)
                         .scrollContentBackground(.hidden)
                 }
 
                 if let error = errorMessage {
                     Text(error)
                         .font(Theme.caption(11))
-                        .foregroundColor(Theme.error)
+                        .foregroundColor(Theme.Colors.error)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -94,8 +94,8 @@ struct TaskCompletionSheet: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
-                    .background(!prTitle.isEmpty ? Theme.accent.opacity(0.85) : Theme.accent.opacity(0.3))
-                    .cornerRadius(Theme.cardCornerRadius)
+                    .background(!prTitle.isEmpty ? Theme.Colors.accent.opacity(0.85) : Theme.Colors.accent.opacity(0.3))
+                    .cornerRadius(Theme.Radius.md)
                 }
                 .buttonStyle(.plain)
                 .disabled(prTitle.isEmpty || isCreatingPR)
@@ -106,14 +106,14 @@ struct TaskCompletionSheet: View {
                         dismiss()
                     }
                     .font(Theme.body(12))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .buttonStyle(.plain)
 
                     Spacer()
 
                     Button("Cancel") { dismiss() }
                         .font(Theme.body(12))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .buttonStyle(.plain)
                 }
             }
@@ -121,7 +121,7 @@ struct TaskCompletionSheet: View {
             .padding(.bottom, 24)
         }
         .frame(width: 400)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
         .cornerRadius(14)
     }
 

@@ -22,14 +22,14 @@ struct StickyNoteView: View {
                 if isEditing {
                     TextEditor(text: $content)
                         .font(.system(size: 14))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .scrollContentBackground(.hidden)
                         .focused($isFocused)
                         .onExitCommand { exitEditing() }
                 } else {
                     Text(content.isEmpty ? "Click to type..." : content)
                         .font(.system(size: 14))
-                        .foregroundColor(content.isEmpty ? Theme.textMuted : Theme.textPrimary)
+                        .foregroundColor(content.isEmpty ? Theme.Colors.textTertiary : Theme.Colors.textPrimary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .contentShape(Rectangle())
                         .onTapGesture { enterEditing() }

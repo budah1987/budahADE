@@ -35,7 +35,7 @@ struct StepDetailModal: View {
         }
         .frame(width: 420)
         .frame(minHeight: 280, maxHeight: 520)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -50,7 +50,7 @@ struct StepDetailModal: View {
             stateDot
             Text(step.title)
                 .font(Theme.label(14))
-                .foregroundStyle(Theme.textPrimary)
+                .foregroundStyle(Theme.Colors.textPrimary)
                 .lineLimit(2)
             Spacer()
             stateBadge
@@ -96,7 +96,7 @@ struct StepDetailModal: View {
             if !step.description.isEmpty {
                 Text(step.description)
                     .font(Theme.body(13))
-                    .foregroundStyle(Theme.textSecondary)
+                    .foregroundStyle(Theme.Colors.textSecondary)
             }
 
             if !step.filesChanged.isEmpty {
@@ -105,7 +105,7 @@ struct StepDetailModal: View {
                     ForEach(step.filesChanged, id: \.self) { file in
                         Text(file)
                             .font(Theme.code(11))
-                            .foregroundStyle(Theme.textSecondary)
+                            .foregroundStyle(Theme.Colors.textSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -120,7 +120,7 @@ struct StepDetailModal: View {
             if !step.description.isEmpty {
                 Text(step.description)
                     .font(Theme.body(13))
-                    .foregroundStyle(Theme.textSecondary)
+                    .foregroundStyle(Theme.Colors.textSecondary)
             }
 
             if !step.subTasks.isEmpty {
@@ -131,7 +131,7 @@ struct StepDetailModal: View {
                             subTaskIndicator(subTask.state)
                             Text(subTask.title)
                                 .font(Theme.body(12))
-                                .foregroundStyle(subTask.state == .building ? Theme.textPrimary : Theme.textMuted)
+                                .foregroundStyle(subTask.state == .building ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                         }
                     }
                 }
@@ -146,30 +146,30 @@ struct StepDetailModal: View {
             sectionLabel("Position")
             Text("Step \(stepIndex + 1) of \(totalSteps)")
                 .font(Theme.body(13))
-                .foregroundStyle(Theme.textSecondary)
+                .foregroundStyle(Theme.Colors.textSecondary)
 
             if !step.description.isEmpty {
                 sectionLabel("Description")
                 Text(step.description)
                     .font(Theme.body(13))
-                    .foregroundStyle(Theme.textSecondary)
+                    .foregroundStyle(Theme.Colors.textSecondary)
             }
 
             sectionLabel("Notes for Builder")
             TextEditor(text: $step.notesForBuilder)
                 .font(Theme.body(13))
-                .foregroundStyle(Theme.textPrimary)
+                .foregroundStyle(Theme.Colors.textPrimary)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 60, maxHeight: 120)
                 .padding(8)
-                .background(Theme.surface3)
+                .background(Theme.Colors.surfaceElevated)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     Group {
                         if step.notesForBuilder.isEmpty {
                             Text("Add context for the builder agent…")
                                 .font(Theme.body(13))
-                                .foregroundStyle(Theme.textMuted)
+                                .foregroundStyle(Theme.Colors.textTertiary)
                                 .allowsHitTesting(false)
                                 .padding(10)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -186,17 +186,17 @@ struct StepDetailModal: View {
             if !step.description.isEmpty {
                 Text(step.description)
                     .font(Theme.body(13))
-                    .foregroundStyle(Theme.textSecondary)
+                    .foregroundStyle(Theme.Colors.textSecondary)
             }
 
             if let error = step.error {
                 sectionLabel("Error")
                 Text(error)
                     .font(Theme.code(11))
-                    .foregroundStyle(Theme.error)
+                    .foregroundStyle(Theme.Colors.error)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Theme.error.opacity(0.08))
+                    .background(Theme.Colors.error.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 
@@ -206,7 +206,7 @@ struct StepDetailModal: View {
                     ForEach(step.filesChanged, id: \.self) { file in
                         Text(file)
                             .font(Theme.code(11))
-                            .foregroundStyle(Theme.textSecondary)
+                            .foregroundStyle(Theme.Colors.textSecondary)
                     }
                 }
             }
@@ -214,27 +214,27 @@ struct StepDetailModal: View {
             HStack(spacing: 4) {
                 Text("Attempts:")
                     .font(Theme.caption(11))
-                    .foregroundStyle(Theme.textMuted)
+                    .foregroundStyle(Theme.Colors.textTertiary)
                 Text("\(step.attemptCount)")
                     .font(Theme.code(11))
-                    .foregroundStyle(Theme.error)
+                    .foregroundStyle(Theme.Colors.error)
             }
 
             sectionLabel("Notes for Builder")
             TextEditor(text: $step.notesForBuilder)
                 .font(Theme.body(13))
-                .foregroundStyle(Theme.textPrimary)
+                .foregroundStyle(Theme.Colors.textPrimary)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 50, maxHeight: 100)
                 .padding(8)
-                .background(Theme.surface3)
+                .background(Theme.Colors.surfaceElevated)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     Group {
                         if step.notesForBuilder.isEmpty {
                             Text("Add context for retry…")
                                 .font(Theme.body(13))
-                                .foregroundStyle(Theme.textMuted)
+                                .foregroundStyle(Theme.Colors.textTertiary)
                                 .allowsHitTesting(false)
                                 .padding(10)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -250,7 +250,7 @@ struct StepDetailModal: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("This step was skipped.")
                 .font(Theme.body(13))
-                .foregroundStyle(Theme.textMuted)
+                .foregroundStyle(Theme.Colors.textTertiary)
                 .italic()
         }
     }
@@ -292,7 +292,7 @@ struct StepDetailModal: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(Theme.caption(10))
-            .foregroundStyle(Theme.textMuted)
+            .foregroundStyle(Theme.Colors.textTertiary)
             .tracking(0.5)
     }
 
@@ -304,10 +304,10 @@ struct StepDetailModal: View {
                 Text(title)
                     .font(Theme.label(12))
             }
-            .foregroundStyle(Theme.textSecondary)
+            .foregroundStyle(Theme.Colors.textSecondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Theme.surface3)
+            .background(Theme.Colors.surfaceElevated)
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
@@ -317,10 +317,10 @@ struct StepDetailModal: View {
         Button(action: action) {
             Text(title)
                 .font(Theme.label(12))
-                .foregroundStyle(Theme.error)
+                .foregroundStyle(Theme.Colors.error)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Theme.error.opacity(0.1))
+                .background(Theme.Colors.error.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
@@ -332,19 +332,19 @@ struct StepDetailModal: View {
         case .done:
             Image(systemName: "checkmark")
                 .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Theme.success)
+                .foregroundStyle(Theme.Colors.statusDone)
         case .building:
-            Circle().fill(Theme.builder).frame(width: 6, height: 6)
+            Circle().fill(Theme.Colors.statusWorking).frame(width: 6, height: 6)
         case .queued:
-            Circle().strokeBorder(Theme.textMuted, lineWidth: 1).frame(width: 6, height: 6)
+            Circle().strokeBorder(Theme.Colors.textTertiary, lineWidth: 1).frame(width: 6, height: 6)
         case .failed:
             Image(systemName: "xmark")
                 .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Theme.error)
+                .foregroundStyle(Theme.Colors.error)
         case .skipped:
             Image(systemName: "forward.fill")
                 .font(.system(size: 7))
-                .foregroundStyle(Theme.textMuted)
+                .foregroundStyle(Theme.Colors.textTertiary)
         }
     }
 
@@ -352,19 +352,19 @@ struct StepDetailModal: View {
 
     private var dotColor: Color {
         switch step.state {
-        case .done:     return Theme.success
-        case .building: return Theme.builder
-        case .queued:   return Theme.textMuted
-        case .failed:   return Theme.error
-        case .skipped:  return Theme.textMuted
+        case .done:     return Theme.Colors.statusDone
+        case .building: return Theme.Colors.statusWorking
+        case .queued:   return Theme.Colors.textTertiary
+        case .failed:   return Theme.Colors.error
+        case .skipped:  return Theme.Colors.textTertiary
         }
     }
 
     private var borderColor: Color {
         switch step.state {
-        case .building: return Theme.builder.opacity(0.5)
-        case .failed:   return Theme.error.opacity(0.3)
-        default:        return Theme.border
+        case .building: return Theme.Colors.statusWorking.opacity(0.5)
+        case .failed:   return Theme.Colors.error.opacity(0.3)
+        default:        return Theme.Colors.borderLight
         }
     }
 }

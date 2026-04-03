@@ -16,7 +16,7 @@ struct ChangesListView: View {
             sectionHeader(
                 title: "CHANGES",
                 count: repo.unstagedFiles.count,
-                countColor: Theme.accent
+                countColor: Theme.Colors.accent
             )
 
             if repo.unstagedFiles.isEmpty {
@@ -31,10 +31,10 @@ struct ChangesListView: View {
                 } label: {
                     Text("Stage All")
                         .font(Theme.caption(10))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .cornerRadius(3)
                 }
                 .buttonStyle(.plain)
@@ -49,7 +49,7 @@ struct ChangesListView: View {
             sectionHeader(
                 title: "STAGED",
                 count: repo.stagedFiles.count,
-                countColor: Theme.info
+                countColor: Theme.Colors.info
             )
 
             if !repo.stagedFiles.isEmpty {
@@ -62,10 +62,10 @@ struct ChangesListView: View {
                 } label: {
                     Text("Unstage All")
                         .font(Theme.caption(10))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .cornerRadius(3)
                 }
                 .buttonStyle(.plain)
@@ -79,7 +79,7 @@ struct ChangesListView: View {
         HStack(spacing: 6) {
             Text(title)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .tracking(0.8)
 
             if count > 0 {
@@ -104,7 +104,7 @@ struct ChangesListView: View {
 
             Text(file.path)
                 .font(Theme.body(11))
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
@@ -115,16 +115,16 @@ struct ChangesListView: View {
             } label: {
                 Image(systemName: staged ? "minus" : "plus")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(width: 16, height: 16)
-                    .background(Theme.hoverFill)
+                    .background(Theme.Colors.hoverFill)
                     .cornerRadius(3)
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 3)
-        .background(staged ? Theme.info.opacity(0.04) : Color.clear)
+        .background(staged ? Theme.Colors.info.opacity(0.04) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
             onSelectFile(file, staged)
@@ -142,19 +142,19 @@ struct ChangesListView: View {
 
     private func statusColor(_ status: String) -> Color {
         switch status {
-        case "M": return Theme.success
-        case "A": return Theme.info
-        case "D": return Theme.error
-        case "R": return Theme.warning
-        case "?": return Theme.textMuted
-        default: return Theme.textSecondary
+        case "M": return Theme.Colors.statusDone
+        case "A": return Theme.Colors.info
+        case "D": return Theme.Colors.error
+        case "R": return Theme.Colors.warning
+        case "?": return Theme.Colors.textTertiary
+        default: return Theme.Colors.textSecondary
         }
     }
 
     private func emptyState(_ text: String) -> some View {
         Text(text)
             .font(Theme.caption(11))
-            .foregroundColor(Theme.textMuted)
+            .foregroundColor(Theme.Colors.textTertiary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
     }

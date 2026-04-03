@@ -30,7 +30,7 @@ struct EditableMarkdownRenderer: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Theme.accent)
+                .background(Theme.Colors.accent)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .buttonStyle(.plain)
             }
@@ -46,12 +46,12 @@ struct EditableMarkdownRenderer: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(
-                        hoveredBlockId == block.id ? Theme.borderSubtle : Color.clear,
+                        hoveredBlockId == block.id ? Theme.Colors.borderSubtle : Color.clear,
                         lineWidth: 1
                     )
             )
             .background(
-                hoveredBlockId == block.id ? Theme.hoverFill : Color.clear
+                hoveredBlockId == block.id ? Theme.Colors.hoverFill : Color.clear
             )
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .onHover { hovering in
@@ -73,14 +73,14 @@ struct EditableMarkdownRenderer: View {
     private func editableBlock(block: MarkdownBlockItem) -> some View {
         TextEditor(text: $editText)
             .font(Theme.code(13))
-            .foregroundColor(Theme.textPrimary)
+            .foregroundColor(Theme.Colors.textPrimary)
             .scrollContentBackground(.hidden)
             .frame(minHeight: 60)
             .padding(8)
-            .background(Theme.surface2)
+            .background(Theme.Colors.surface)
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Theme.borderActive, lineWidth: 1)
+                    .strokeBorder(Theme.Colors.borderActive, lineWidth: 1)
             )
     }
 

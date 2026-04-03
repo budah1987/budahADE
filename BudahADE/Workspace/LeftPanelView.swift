@@ -28,7 +28,7 @@ struct LeftPanelView: View {
                     .padding(.bottom, 2)
 
                 Rectangle()
-                    .fill(Theme.border)
+                    .fill(Theme.Colors.borderLight)
                     .frame(height: 1)
 
                 // Content area
@@ -69,15 +69,15 @@ struct LeftPanelView: View {
                         .font(Theme.label(11))
                         .foregroundColor(
                             state.activeLeftTab == tab
-                                ? Theme.textPrimary
-                                : Theme.textMuted
+                                ? Theme.Colors.textPrimary
+                                : Theme.Colors.textTertiary
                         )
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(
                             Group {
                                 if state.activeLeftTab == tab {
-                                    RoundedRectangle(cornerRadius: Theme.pillCornerRadius)
+                                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
                                         .fill(Color.white.opacity(0.10))
                                 }
                             }
@@ -94,7 +94,7 @@ struct LeftPanelView: View {
 
     private var dragHandle: some View {
         Rectangle()
-            .fill(isDragging ? Theme.accent.opacity(0.3) : Color.clear)
+            .fill(isDragging ? Theme.Colors.accent.opacity(0.3) : Color.clear)
             .frame(width: 4)
             .contentShape(Rectangle())
             .onHover { hovering in

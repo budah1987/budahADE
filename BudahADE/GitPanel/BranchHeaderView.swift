@@ -17,11 +17,11 @@ struct BranchHeaderView: View {
             }
         }
         .padding(10)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
         .cornerRadius(6)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(isEditing ? Theme.info : Theme.borderSubtle, lineWidth: 1)
+                .stroke(isEditing ? Theme.Colors.info : Theme.Colors.borderSubtle, lineWidth: 1)
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -39,25 +39,25 @@ struct BranchHeaderView: View {
             HStack(spacing: 5) {
                 Image(systemName: "arrow.triangle.branch")
                     .font(.system(size: 11))
-                    .foregroundColor(Theme.info)
+                    .foregroundColor(Theme.Colors.info)
 
                 if let prefix = BranchNameValidator.detectPrefix(repo.currentBranch) {
                     prefixBadge(prefix)
                     Text("/")
                         .font(Theme.body(11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
 
                 let (_, name) = BranchNameValidator.split(repo.currentBranch)
                 Text(name)
                     .font(Theme.label(12))
-                    .foregroundColor(Theme.info)
+                    .foregroundColor(Theme.Colors.info)
             }
 
             HStack(spacing: 5) {
                 Text("→ into")
                     .font(Theme.caption(10))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
 
                 Button {
                     showTargetDropdown.toggle()
@@ -65,11 +65,11 @@ struct BranchHeaderView: View {
                     HStack(spacing: 2) {
                         Text(repo.mergeTarget)
                             .font(Theme.caption(10))
-                            .foregroundColor(Theme.info.opacity(0.8))
+                            .foregroundColor(Theme.Colors.info.opacity(0.8))
                             .underline()
                         Image(systemName: "chevron.down")
                             .font(.system(size: 6))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                 }
                 .buttonStyle(.plain)
@@ -86,20 +86,20 @@ struct BranchHeaderView: View {
                 if repo.aheadCount > 0 {
                     Text("\(repo.aheadCount) ahead")
                         .font(Theme.caption(9))
-                        .foregroundColor(Theme.success)
+                        .foregroundColor(Theme.Colors.statusDone)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Theme.success.opacity(0.12))
+                        .background(Theme.Colors.statusDone.opacity(0.12))
                         .cornerRadius(8)
                 }
 
                 if repo.behindCount > 0 {
                     Text("\(repo.behindCount) behind")
                         .font(Theme.caption(9))
-                        .foregroundColor(Theme.error)
+                        .foregroundColor(Theme.Colors.error)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Theme.error.opacity(0.12))
+                        .background(Theme.Colors.error.opacity(0.12))
                         .cornerRadius(8)
                 }
             }
@@ -111,7 +111,7 @@ struct BranchHeaderView: View {
             HStack(spacing: 4) {
                 Image(systemName: "arrow.triangle.branch")
                     .font(.system(size: 11))
-                    .foregroundColor(Theme.info)
+                    .foregroundColor(Theme.Colors.info)
 
                 Button {
                     showPrefixDropdown.toggle()
@@ -119,18 +119,18 @@ struct BranchHeaderView: View {
                     HStack(spacing: 3) {
                         Text(selectedPrefix ?? "none")
                             .font(Theme.body(11))
-                            .foregroundColor(selectedPrefix != nil ? prefixColor(selectedPrefix!) : Theme.textMuted)
+                            .foregroundColor(selectedPrefix != nil ? prefixColor(selectedPrefix!) : Theme.Colors.textTertiary)
                         Image(systemName: showPrefixDropdown ? "chevron.up" : "chevron.down")
                             .font(.system(size: 6))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(Theme.surface3)
+                    .background(Theme.Colors.surfaceElevated)
                     .cornerRadius(4)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
-                            .stroke(Theme.info, lineWidth: 1)
+                            .stroke(Theme.Colors.info, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -141,20 +141,20 @@ struct BranchHeaderView: View {
                 if selectedPrefix != nil {
                     Text("/")
                         .font(Theme.body(11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
 
                 TextField("branch-name", text: $editedName)
                     .textFieldStyle(.plain)
                     .font(Theme.body(11))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(Theme.surface3)
+                    .background(Theme.Colors.surfaceElevated)
                     .cornerRadius(4)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
-                            .stroke(Theme.info, lineWidth: 1)
+                            .stroke(Theme.Colors.info, lineWidth: 1)
                     )
                     .onChange(of: editedName) { _, newValue in
                         editedName = BranchNameValidator.sanitize(newValue)
@@ -167,7 +167,7 @@ struct BranchHeaderView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Theme.info)
+                        .background(Theme.Colors.info)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -177,7 +177,7 @@ struct BranchHeaderView: View {
             HStack(spacing: 5) {
                 Text("→ into")
                     .font(Theme.caption(10))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
 
                 Button {
                     showTargetDropdown.toggle()
@@ -185,11 +185,11 @@ struct BranchHeaderView: View {
                     HStack(spacing: 2) {
                         Text(repo.mergeTarget)
                             .font(Theme.caption(10))
-                            .foregroundColor(Theme.info.opacity(0.8))
+                            .foregroundColor(Theme.Colors.info.opacity(0.8))
                             .underline()
                         Image(systemName: "chevron.down")
                             .font(.system(size: 6))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                 }
                 .buttonStyle(.plain)
@@ -206,10 +206,10 @@ struct BranchHeaderView: View {
                 if repo.aheadCount > 0 {
                     Text("\(repo.aheadCount) ahead")
                         .font(Theme.caption(9))
-                        .foregroundColor(Theme.success)
+                        .foregroundColor(Theme.Colors.statusDone)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Theme.success.opacity(0.12))
+                        .background(Theme.Colors.statusDone.opacity(0.12))
                         .cornerRadius(8)
                 }
             }
@@ -225,11 +225,11 @@ struct BranchHeaderView: View {
                 HStack(spacing: 6) {
                     Image(systemName: selectedPrefix == nil ? "checkmark" : "")
                         .font(.system(size: 8))
-                        .foregroundColor(Theme.info)
+                        .foregroundColor(Theme.Colors.info)
                         .frame(width: 12)
                     Text("none")
                         .font(Theme.body(11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                     Spacer()
                 }
                 .padding(.horizontal, 8)
@@ -247,7 +247,7 @@ struct BranchHeaderView: View {
                     HStack(spacing: 6) {
                         Image(systemName: selectedPrefix == type.prefix ? "checkmark" : "")
                             .font(.system(size: 8))
-                            .foregroundColor(Theme.info)
+                            .foregroundColor(Theme.Colors.info)
                             .frame(width: 12)
                         Text(type.prefix)
                             .font(Theme.body(11))
@@ -256,7 +256,7 @@ struct BranchHeaderView: View {
                         Spacer()
                         Text(type.label)
                             .font(Theme.caption(9))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 8)
@@ -283,16 +283,16 @@ struct BranchHeaderView: View {
 
     private func prefixColor(_ prefix: String) -> Color {
         guard let type = BranchNameValidator.prefixTypes.first(where: { $0.prefix == prefix }) else {
-            return Theme.textMuted
+            return Theme.Colors.textTertiary
         }
         switch type.color {
-        case "success": return Theme.success
-        case "error": return Theme.error
-        case "accent": return Theme.accent
-        case "info": return Theme.info
-        case "warning": return Theme.warning
-        case "textMuted": return Theme.textMuted
-        default: return Theme.textSecondary
+        case "success": return Theme.Colors.statusDone
+        case "error": return Theme.Colors.error
+        case "accent": return Theme.Colors.accent
+        case "info": return Theme.Colors.info
+        case "warning": return Theme.Colors.warning
+        case "textMuted": return Theme.Colors.textTertiary
+        default: return Theme.Colors.textSecondary
         }
     }
 

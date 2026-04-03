@@ -24,7 +24,7 @@ struct StagingView: View {
             }
 
             Rectangle()
-                .fill(Theme.borderSubtle)
+                .fill(Theme.Colors.borderSubtle)
                 .frame(height: 0.5)
                 .padding(.vertical, 4)
 
@@ -60,15 +60,15 @@ struct StagingView: View {
         HStack {
             Text(title)
                 .font(Theme.label(11))
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .textCase(.uppercase)
 
             Text("\(count)")
                 .font(Theme.caption(10))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1)
-                .background(Theme.surface3)
+                .background(Theme.Colors.surfaceElevated)
                 .cornerRadius(4)
 
             Spacer()
@@ -81,10 +81,10 @@ struct StagingView: View {
                         Text(actionLabel)
                             .font(Theme.label(10))
                     }
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(Theme.hoverFill)
+                    .background(Theme.Colors.hoverFill)
                     .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -103,7 +103,7 @@ struct StagingView: View {
 
             Text(file.path)
                 .font(Theme.body(12))
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
@@ -118,9 +118,9 @@ struct StagingView: View {
             } label: {
                 Image(systemName: staged ? "minus" : "plus")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(width: 16, height: 16)
-                    .background(Theme.hoverFill)
+                    .background(Theme.Colors.hoverFill)
                     .cornerRadius(3)
             }
             .buttonStyle(.plain)
@@ -131,7 +131,7 @@ struct StagingView: View {
         .onTapGesture {
             onSelectFile(file.path, staged)
         }
-        .background(Theme.hoverFill.opacity(0.01))
+        .background(Theme.Colors.hoverFill.opacity(0.01))
     }
 
     // MARK: - Status Badge
@@ -148,12 +148,12 @@ struct StagingView: View {
 
     private func statusColor(_ status: String) -> Color {
         switch status {
-        case "M": return Theme.warning
-        case "A": return Theme.success
-        case "D": return Theme.error
-        case "R": return Theme.info
-        case "?": return Theme.textMuted
-        default: return Theme.textSecondary
+        case "M": return Theme.Colors.warning
+        case "A": return Theme.Colors.statusDone
+        case "D": return Theme.Colors.error
+        case "R": return Theme.Colors.info
+        case "?": return Theme.Colors.textTertiary
+        default: return Theme.Colors.textSecondary
         }
     }
 
@@ -163,7 +163,7 @@ struct StagingView: View {
     private func emptyState(_ text: String) -> some View {
         Text(text)
             .font(Theme.caption(11))
-            .foregroundColor(Theme.textMuted)
+            .foregroundColor(Theme.Colors.textTertiary)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
     }

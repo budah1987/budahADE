@@ -49,12 +49,12 @@ struct SpecStripView: View {
             HStack {
                 Text(specState.result?.title ?? "Spec")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .lineLimit(1)
                 Spacer()
                 Text("\(specState.completedCount)/\(specState.totalCount)")
                     .font(Theme.label(9))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
 
             GeometryReader { geo in
@@ -73,7 +73,7 @@ struct SpecStripView: View {
             if let current = specState.currentTaskTitle {
                 Text(current)
                     .font(.system(size: 9))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .lineLimit(1)
             }
         }
@@ -96,17 +96,17 @@ struct SpecStripView: View {
 
                 Text("\(specState.completedCount)/\(specState.totalCount)")
                     .font(Theme.label(10))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
 
                 if let section = specState.currentSection {
                     Text(section.title)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
 
                 Text(specState.result?.title ?? "")
                     .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .lineLimit(1)
 
                 Spacer()
@@ -122,13 +122,13 @@ struct SpecStripView: View {
                                 .frame(width: 5, height: 5)
                             Image(systemName: isBuilderDrawerOpen.wrappedValue ? "chevron.up" : "terminal")
                                 .font(.system(size: 9, weight: .semibold))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(isBuilderDrawerOpen.wrappedValue ? Theme.accent.opacity(0.12) : Color.white.opacity(0.05))
+                                .fill(isBuilderDrawerOpen.wrappedValue ? Theme.Colors.accent.opacity(0.12) : Color.white.opacity(0.05))
                         )
                     }
                     .buttonStyle(.plain)
@@ -143,7 +143,7 @@ struct SpecStripView: View {
                     Circle()
                         .fill(buildStatus.status == .blocked
                             ? Color(hex: 0xE06C75)
-                            : Theme.accent)
+                            : Theme.Colors.accent)
                         .frame(width: 4, height: 4)
                     Text(buildStatus.status == .blocked
                         ? (buildStatus.blockers ?? "Blocked")
@@ -151,13 +151,13 @@ struct SpecStripView: View {
                         .font(.system(size: 10))
                         .foregroundColor(buildStatus.status == .blocked
                             ? Color(hex: 0xE06C75)
-                            : Theme.textMuted)
+                            : Theme.Colors.textTertiary)
                         .lineLimit(1)
 
                     if buildStatus.status == .working, let elapsed = buildStatus.elapsed {
                         Text(elapsed)
                             .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(Theme.textMuted.opacity(0.6))
+                            .foregroundColor(Theme.Colors.textTertiary.opacity(0.6))
                     }
 
                     Spacer()
@@ -166,7 +166,7 @@ struct SpecStripView: View {
                 .padding(.bottom, 4)
             }
         }
-        .background(Theme.sidebar.opacity(0.5))
+        .background(Theme.Colors.sidebarBackground.opacity(0.5))
     }
 
     // MARK: - Section-Segmented Progress
@@ -212,15 +212,15 @@ struct SpecStripView: View {
     // MARK: - Helpers
 
     private var progressColor: Color {
-        specState.progress >= 1.0 ? Theme.success : Theme.accent
+        specState.progress >= 1.0 ? Theme.Colors.statusDone : Theme.Colors.accent
     }
 
     private var builderDotColor: Color {
         switch buildStatus.status {
-        case .working:   return Theme.accent
+        case .working:   return Theme.Colors.accent
         case .blocked:   return Color(hex: 0xE06C75)
-        case .completed: return Theme.success
-        case .idle:      return Theme.textMuted
+        case .completed: return Theme.Colors.statusDone
+        case .idle:      return Theme.Colors.textTertiary
         }
     }
 }

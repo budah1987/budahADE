@@ -34,12 +34,12 @@ struct TileChrome<Content: View>: View {
                 } else {
                     Image(systemName: icon)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
 
                 Text(title)
                     .font(Theme.label(13))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .lineLimit(1)
 
                 Spacer()
@@ -47,11 +47,11 @@ struct TileChrome<Content: View>: View {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(isCloseHovered ? Theme.textSecondary : Theme.textMuted)
+                        .foregroundColor(isCloseHovered ? Theme.Colors.textSecondary : Theme.Colors.textTertiary)
                         .frame(width: 22, height: 22)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(isCloseHovered ? Theme.hoverFill : Color.clear)
+                                .fill(isCloseHovered ? Theme.Colors.hoverFill : Color.clear)
                         )
                 }
                 .buttonStyle(.plain)
@@ -62,14 +62,14 @@ struct TileChrome<Content: View>: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(Theme.surface2)
+            .background(Theme.Colors.surface)
 
-            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+            Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
 
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Theme.contentBg)
+        .background(Theme.Colors.appBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)

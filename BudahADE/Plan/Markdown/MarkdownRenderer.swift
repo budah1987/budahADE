@@ -234,7 +234,7 @@ struct MarkdownRenderer: View {
         if !tail.isEmpty {
             SwiftUI.Text(tail)
                 .font(Theme.body(14))
-                .foregroundColor(Theme.textPrimary)
+                .foregroundColor(Theme.Colors.textPrimary)
                 .textSelection(.enabled)
                 .padding(.top, stable.isEmpty ? 0 : 8)
         }
@@ -259,7 +259,7 @@ struct MarkdownRenderer: View {
             AnyView(
                 InlineNodesView(nodes: inlines)
                     .font(Theme.body(14))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .padding(.bottom, 8)
             )
 
@@ -290,7 +290,7 @@ struct MarkdownRenderer: View {
         case .thematicBreak:
             AnyView(
                 Rectangle()
-                    .fill(Theme.borderSubtle)
+                    .fill(Theme.Colors.borderSubtle)
                     .frame(height: 1)
                     .padding(.vertical, 12)
             )
@@ -325,7 +325,7 @@ struct MarkdownRenderer: View {
     private func headingView(level: Int, inlines: [InlineNode]) -> some View {
         InlineNodesView(nodes: inlines)
             .font(headingFont(for: level))
-            .foregroundColor(Theme.textPrimary)
+            .foregroundColor(Theme.Colors.textPrimary)
             .padding(.top, headingTopPadding(for: level))
             .padding(.bottom, headingBottomPadding(for: level))
     }
@@ -337,10 +337,10 @@ struct MarkdownRenderer: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     SwiftUI.Text("\u{2022}")
                         .font(Theme.body(14))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                     InlineNodesView(nodes: item.content)
                         .font(Theme.body(14))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                 }
                 .padding(.leading, indent)
 
@@ -359,11 +359,11 @@ struct MarkdownRenderer: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     SwiftUI.Text("\(start + idx).")
                         .font(Theme.body(14))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .frame(minWidth: 20, alignment: .trailing)
                     InlineNodesView(nodes: item.content)
                         .font(Theme.body(14))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                 }
                 .padding(.leading, indent)
 

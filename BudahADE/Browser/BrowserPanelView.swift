@@ -14,10 +14,10 @@ struct BrowserPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             browserChrome
-            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+            Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
             webContent
         }
-        .background(Theme.contentBg)
+        .background(Theme.Colors.appBackground)
         .onChange(of: state.url) { _, newURL in
             if let url = newURL {
                 urlText = url.absoluteString
@@ -46,7 +46,7 @@ struct BrowserPanelView: View {
                 Button(action: onPopOut) {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
                 .help("Pop out to window")
@@ -54,7 +54,7 @@ struct BrowserPanelView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
     }
 
     private var detectedURLsPicker: some View {
@@ -72,10 +72,10 @@ struct BrowserPanelView: View {
                 Text("\(detectedURLs.count)")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
             }
-            .foregroundColor(Theme.accent)
+            .foregroundColor(Theme.Colors.accent)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
-            .background(Theme.accent.opacity(0.15))
+            .background(Theme.Colors.accent.opacity(0.15))
             .cornerRadius(3)
         }
         .menuStyle(.borderlessButton)
@@ -88,7 +88,7 @@ struct BrowserPanelView: View {
             Button(action: { state.goBack() }) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
             .buttonStyle(.plain)
             .disabled(!state.canGoBack)
@@ -96,7 +96,7 @@ struct BrowserPanelView: View {
             Button(action: { state.goForward() }) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
             .buttonStyle(.plain)
             .disabled(!state.canGoForward)
@@ -104,7 +104,7 @@ struct BrowserPanelView: View {
             Button(action: { state.reload() }) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
             .buttonStyle(.plain)
         }
@@ -114,10 +114,10 @@ struct BrowserPanelView: View {
         TextField("URL", text: $urlText)
             .textFieldStyle(.plain)
             .font(.system(size: 11, weight: .regular, design: .monospaced))
-            .foregroundColor(Theme.textPrimary)
+            .foregroundColor(Theme.Colors.textPrimary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Theme.surface3)
+            .background(Theme.Colors.surfaceElevated)
             .cornerRadius(4)
             .onSubmit { state.navigateToString(urlText) }
     }
@@ -125,10 +125,10 @@ struct BrowserPanelView: View {
     private func portBadge(_ port: Int) -> some View {
         Text(":\(port)")
             .font(.system(size: 9, weight: .semibold, design: .monospaced))
-            .foregroundColor(Theme.accent)
+            .foregroundColor(Theme.Colors.accent)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
-            .background(Theme.accent.opacity(0.15))
+            .background(Theme.Colors.accent.opacity(0.15))
             .cornerRadius(3)
     }
 
@@ -143,7 +143,7 @@ struct BrowserPanelView: View {
         }) {
             Image(systemName: "cursorarrow.square")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(isActive ? Theme.accent : Theme.textMuted)
+                .foregroundColor(isActive ? Theme.Colors.accent : Theme.Colors.textTertiary)
         }
         .buttonStyle(.plain)
         .help(isActive ? "Exit inspect mode (Esc)" : "Inspect element (⌘⇧I)")
@@ -167,10 +167,10 @@ struct BrowserPanelView: View {
         VStack(spacing: 8) {
             Image(systemName: "globe")
                 .font(.system(size: 28))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Enter a URL or open a localhost preview")
                 .font(Theme.caption(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
         }
     }
 }

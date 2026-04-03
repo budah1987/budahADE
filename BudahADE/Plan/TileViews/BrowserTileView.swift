@@ -30,7 +30,7 @@ struct BrowserTileView: View {
                     Button(action: { webViewStore.goBack() }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                     .disabled(!webViewStore.canGoBack)
@@ -38,7 +38,7 @@ struct BrowserTileView: View {
                     Button(action: { webViewStore.goForward() }) {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                     .disabled(!webViewStore.canGoForward)
@@ -46,25 +46,25 @@ struct BrowserTileView: View {
                     Button(action: { webViewStore.reload() }) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
 
                     TextField("URL", text: $urlText)
                         .textFieldStyle(.plain)
                         .font(Theme.body(11))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .cornerRadius(4)
                         .onSubmit { navigateToURL() }
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Theme.surface2)
+                .background(Theme.Colors.surface)
 
-                Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+                Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
 
                 // WebView or lightweight placeholder when offscreen
                 if isVisible {
@@ -73,11 +73,11 @@ struct BrowserTileView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "globe")
                             .font(.system(size: 24))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                         if let url = initialURL {
                             Text(url.host ?? url.absoluteString)
                                 .font(Theme.caption(11))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                                 .lineLimit(1)
                         }
                     }

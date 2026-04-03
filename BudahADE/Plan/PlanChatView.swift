@@ -124,7 +124,7 @@ struct PlanChatView: View {
                 messageList
                     .overlay(alignment: .bottom) {
                         LinearGradient(
-                            colors: [Color.clear, Theme.contentBg],
+                            colors: [Color.clear, Theme.Colors.appBackground],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -290,7 +290,7 @@ struct PlanChatView: View {
                 inputArea
             }
         }
-        .background(Theme.contentBg)
+        .background(Theme.Colors.appBackground)
         .onKeyPress(characters: CharacterSet(charactersIn: "p"), phases: .down) { press in
             guard press.modifiers.contains(.option) else { return .ignored }
             cycleModel()
@@ -475,13 +475,13 @@ struct PlanChatView: View {
         VStack(spacing: 12) {
             Image(systemName: "text.bubble")
                 .font(.system(size: 32, weight: .light))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Start planning")
                 .font(Theme.label(16))
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
             Text("Describe what you want to build. The planner will research your codebase and create a spec.")
                 .font(Theme.body(13))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 400)
         }
@@ -573,7 +573,7 @@ struct PlanChatView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                     Spacer()
@@ -596,10 +596,10 @@ struct PlanChatView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.triangle.branch")
                             .font(.system(size: 10))
-                            .foregroundColor(Theme.accent)
+                            .foregroundColor(Theme.Colors.accent)
                         Text("pipeline")
                             .font(Theme.code(14))
-                            .foregroundColor(Theme.accent)
+                            .foregroundColor(Theme.Colors.accent)
                     }
                     .onTapGesture {
                         state.pipelineMode = false
@@ -632,7 +632,7 @@ struct PlanChatView: View {
                 } label: {
                     Image(systemName: state.pipelineMode ? "arrow.triangle.branch" : "arrow.triangle.branch")
                         .font(.system(size: 11))
-                        .foregroundColor(state.pipelineMode ? Theme.accent : Color(hex: 0x938d8d).opacity(0.5))
+                        .foregroundColor(state.pipelineMode ? Theme.Colors.accent : Color(hex: 0x938d8d).opacity(0.5))
                 }
                 .buttonStyle(.plain)
                 .help(state.pipelineMode ? "Pipeline mode ON" : "Pipeline mode OFF")
@@ -666,7 +666,7 @@ struct PlanChatView: View {
                     if inputText.isEmpty {
                         Text("What do you want to build?")
                             .font(.system(size: 14))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .padding(.top, 2)
                             .allowsHitTesting(false)
                     }
@@ -674,7 +674,7 @@ struct PlanChatView: View {
                     if let ghost = ghostCompletion {
                         Text(ghost)
                             .font(.system(size: 14))
-                            .foregroundColor(Theme.textSecondary.opacity(0.5))
+                            .foregroundColor(Theme.Colors.textSecondary.opacity(0.5))
                             .padding(.top, 2)
                             .allowsHitTesting(false)
                     }
@@ -757,7 +757,7 @@ struct PlanChatView: View {
                         Button(action: sendMessage) {
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.system(size: 20))
-                                .foregroundColor(canSend ? Theme.accent : Theme.textMuted)
+                                .foregroundColor(canSend ? Theme.Colors.accent : Theme.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
                         .disabled(!canSend)
@@ -856,15 +856,75 @@ struct PlanChatView: View {
         print("[DEBUG] debugForceSpecComplete called, session: \(session != nil)")
         let session = state.ensureSession()
         let fakeSpec = """
-        # Spec: Debug Test
+        # Spec: Notification Center & Activity Feed
 
-        ## Goals
-        - Test the SpecCompleteSheet modal
-        - Verify it renders correctly
+        A persistent notification center that aggregates activity across all tasks, agents, and build runs. Users can triage, dismiss, and jump to source from a unified inbox view.
 
-        ## Implementation Checklist
-        - Define the struct
-        - Add methods
+        ## 1. Data Model
+
+        Define the core notification types and storage layer used throughout the feature.
+
+        - [ ] Create `NotificationEntry` struct with id, kind, taskId, timestamp, title, body, isRead, sourceURL
+        - [ ] Add `NotificationKind` enum: `.agentMessage`, `.buildComplete`, `.buildFailed`, `.specApproved`, `.mention`, `.system`
+        - [ ] Add `NotificationStore` class (`@Observable`) with ordered array and persistence via JSON
+        - [ ] Write `NotificationStore.add(_:)`, `markRead(_:)`, `markAllRead()`, `delete(_:)`, `clearAll()`
+        - [ ] Wire `NotificationStore` into `WorkspaceState` as `notifications`
+        - [ ] Add `unreadCount: Int` computed property to `WorkspaceState`
+
+        ## 2. Notification Generation
+
+        Emit notifications from the right sources so the feed populates automatically during normal usage.
+
+        - [ ] Emit `.buildComplete` from `BuilderSession` when `buildState` transitions to `.done`
+        - [ ] Emit `.buildFailed` from `BuilderSession` when `buildState` transitions to `.failed`, include failed step title in body
+        - [ ] Emit `.agentMessage` from `AgentSession` when a new assistant message arrives and the task is not active
+        - [ ] Emit `.specApproved` from `PlanChatState` when spec signal fires
+        - [ ] Emit `.system` on app launch if last build was incomplete (crash recovery)
+        - [ ] Throttle `.agentMessage` emissions to at most 1 per 3 seconds per task to prevent spam
+
+        ## 3. Notification Center Panel
+
+        The primary UI: a slide-in panel anchored to the toolbar bell icon.
+
+        - [ ] Add `NotificationCenterView` SwiftUI view with `@Environment` dismiss support
+        - [ ] Render grouped sections by date: Today, Yesterday, Earlier
+        - [ ] Each row: icon (colored by kind), title (semibold 13px), body (muted 12px, 2 lines), relative timestamp (9px muted)
+        - [ ] Unread rows: left 2px accent border, slightly lighter background
+        - [ ] Swipe-to-delete row action (macOS: right-click → Delete)
+        - [ ] Tap row → mark read, jump to source (select task, open correct tab)
+        - [ ] "Mark all read" button in header when unread count > 0
+        - [ ] Empty state: centered icon + "No notifications" label
+
+        ## 4. Toolbar Integration
+
+        Surface unread count and open the panel from the main window toolbar.
+
+        - [ ] Add bell icon button to `WorkspaceToolbar` right cluster
+        - [ ] Show red badge with unread count when > 0; hide badge when 0
+        - [ ] Badge caps at "99+" for large counts
+        - [ ] Button opens `NotificationCenterView` as a popover anchored to bell
+        - [ ] Popover auto-dismisses on outside click
+        - [ ] Keyboard shortcut: `⌘⇧N` to toggle panel
+
+        ## 5. Persistence & State Restoration
+
+        Notifications should survive app restarts and be cleared gracefully.
+
+        - [ ] Persist `NotificationStore` to `~/Library/Application Support/BudahADE/notifications.json`
+        - [ ] Load on app launch before first render to avoid badge flash
+        - [ ] Cap stored notifications at 500; prune oldest read entries when over limit
+        - [ ] Clear all notifications when a task is deleted
+        - [ ] Export `unreadCount` to UserDefaults so Dock badge can reflect it (future)
+
+        ## 6. Tests
+
+        Verify core logic without UI dependencies.
+
+        - [ ] Test `NotificationStore.add` deduplicates by id
+        - [ ] Test `markAllRead` sets isRead on all entries
+        - [ ] Test `clearAll` empties the store
+        - [ ] Test unread count updates reactively after `markRead`
+        - [ ] Test throttle: rapid `.agentMessage` emissions produce at most 1 entry per 3s window
 
         Specification is complete and ready for implementation.
         """
@@ -1070,10 +1130,10 @@ struct PlanMessageBubble: View {
                 HStack(spacing: 4) {
                     Image(systemName: "wrench.and.screwdriver")
                         .font(.system(size: 9))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                     Text("\(tools.count) tool\(tools.count == 1 ? "" : "s")")
                         .font(Theme.caption(10))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
                 .padding(.bottom, 2)
             }
@@ -1097,12 +1157,12 @@ struct PlanMessageBubble: View {
                     Text("Edit")
                         .font(Theme.label(12))
                 }
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Theme.borderSubtle, lineWidth: 1)
+                        .strokeBorder(Theme.Colors.borderSubtle, lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
@@ -1119,7 +1179,7 @@ struct PlanMessageBubble: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Theme.accent)
+                .background(Theme.Colors.accent)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             .buttonStyle(.plain)
@@ -1130,7 +1190,7 @@ struct PlanMessageBubble: View {
     private var systemBubble: some View {
         Text(message.content)
             .font(Theme.caption(12))
-            .foregroundColor(Theme.textMuted)
+            .foregroundColor(Theme.Colors.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -1138,7 +1198,7 @@ struct PlanMessageBubble: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(style: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-                    .foregroundColor(Theme.borderSubtle)
+                    .foregroundColor(Theme.Colors.borderSubtle)
             )
     }
 }
@@ -1169,7 +1229,7 @@ struct OptionButtonsSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             // Accent top border
             Rectangle()
-                .fill(Theme.accent.opacity(0.4))
+                .fill(Theme.Colors.accent.opacity(0.4))
                 .frame(height: 1.5)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -1200,7 +1260,7 @@ struct OptionButtonsSheet: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(Theme.builder)
+                        .background(Theme.Colors.statusWorking)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
@@ -1217,7 +1277,7 @@ struct OptionButtonsSheet: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
         }
-        .background(Theme.sidebar)
+        .background(Theme.Colors.sidebarBackground)
         .focusable()
         .focused($sheetFocused)
         .onAppear {
@@ -1293,7 +1353,7 @@ struct OptionButtonsSheet: View {
         HStack(alignment: .top) {
             Text(cleanContext(contextText))
                 .font(Theme.body(13))
-                .foregroundColor(Theme.textPrimary)
+                .foregroundColor(Theme.Colors.textPrimary)
                 .lineLimit(4)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -1304,9 +1364,9 @@ struct OptionButtonsSheet: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(width: 22, height: 22)
-                    .background(Theme.hoverFill)
+                    .background(Theme.Colors.hoverFill)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
@@ -1362,12 +1422,12 @@ struct OptionButtonsSheet: View {
         HStack(spacing: 8) {
             Text("\u{270E}")  // pencil icon
                 .font(.system(size: 12))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .frame(width: 22, height: 22)
 
             TextField(options.isEmpty ? "Type your answer..." : "Something else...", text: $customText)
                 .font(Theme.body(13))
-                .foregroundColor(Theme.textPrimary)
+                .foregroundColor(Theme.Colors.textPrimary)
                 .textFieldStyle(.plain)
                 .focused($customFieldFocused)
                 .onSubmit {
@@ -1388,15 +1448,15 @@ struct OptionButtonsSheet: View {
         HStack {
             Text("↑↓ navigate")
                 .font(Theme.label(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
             + Text("Enter select")
                 .font(Theme.label(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
             + Text("Esc skip")
                 .font(Theme.label(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
 
             Spacer()
 
@@ -1405,10 +1465,10 @@ struct OptionButtonsSheet: View {
             } label: {
                 Text("Skip")
                     .font(Theme.body(11))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 3)
-                    .background(Theme.hoverFill)
+                    .background(Theme.Colors.hoverFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
                             .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
@@ -1468,7 +1528,7 @@ private struct CompactOptionRow: View {
                 // Badge
                 Text(option.label)
                     .font(Theme.label(11))
-                    .foregroundColor(Theme.accent)
+                    .foregroundColor(Theme.Colors.accent)
                     .frame(width: 22, height: 22)
                     .background(
                         RoundedRectangle(cornerRadius: 5)
@@ -1487,7 +1547,7 @@ private struct CompactOptionRow: View {
                 // Option text
                 Text(option.text)
                     .font(Theme.body(13))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
@@ -1496,7 +1556,7 @@ private struct CompactOptionRow: View {
                 // Arrow indicator
                 Text("→")
                     .font(.system(size: 12))
-                    .foregroundColor(Theme.accent)
+                    .foregroundColor(Theme.Colors.accent)
                     .opacity(isHighlighted ? 1 : 0)
             }
             .padding(.horizontal, 10)
@@ -1533,7 +1593,7 @@ private struct DetailedOptionCard: View {
                 HStack(spacing: 10) {
                     Text(option.label)
                         .font(Theme.label(11))
-                        .foregroundColor(Theme.accent)
+                        .foregroundColor(Theme.Colors.accent)
                         .frame(width: 22, height: 22)
                         .background(
                             RoundedRectangle(cornerRadius: 5)
@@ -1551,7 +1611,7 @@ private struct DetailedOptionCard: View {
 
                     Text(option.text)
                         .font(Theme.label(13))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
@@ -1559,7 +1619,7 @@ private struct DetailedOptionCard: View {
 
                     Text("→")
                         .font(.system(size: 12))
-                        .foregroundColor(Theme.accent)
+                        .foregroundColor(Theme.Colors.accent)
                         .opacity(isHighlighted ? 1 : 0)
                 }
                 .padding(.bottom, 6)
@@ -1572,13 +1632,13 @@ private struct DetailedOptionCard: View {
                             case .plain(let text):
                                 Text(text)
                                     .font(Theme.body(12))
-                                    .foregroundColor(Theme.textSecondary)
+                                    .foregroundColor(Theme.Colors.textSecondary)
                                     .lineLimit(3)
                             case .pros(let text):
-                                (Text("Pros: ").font(Theme.label(11)).foregroundColor(Theme.success)
+                                (Text("Pros: ").font(Theme.label(11)).foregroundColor(Theme.Colors.statusDone)
                                  + Text(text).font(Theme.body(11)).foregroundColor(Color(hex: 0x777777)))
                             case .cons(let text):
-                                (Text("Cons: ").font(Theme.label(11)).foregroundColor(Theme.error)
+                                (Text("Cons: ").font(Theme.label(11)).foregroundColor(Theme.Colors.error)
                                  + Text(text).font(Theme.body(11)).foregroundColor(Color(hex: 0x777777)))
                             }
                         }
@@ -1702,14 +1762,14 @@ struct QuestionStepperSheet: View {
                 HStack {
                     Text("Question \(currentIndex + 1) of \(questions.count)")
                         .font(Theme.label(12))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
 
                     // Step dots
                     HStack(spacing: 4) {
                         ForEach(0..<questions.count, id: \.self) { i in
                             Circle()
                                 .fill(i < currentIndex ? Color(hex: 0x34a853) :
-                                      i == currentIndex ? Theme.accent :
+                                      i == currentIndex ? Theme.Colors.accent :
                                       Color.white.opacity(0.15))
                                 .frame(width: 6, height: 6)
                         }
@@ -1723,9 +1783,9 @@ struct QuestionStepperSheet: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .frame(width: 22, height: 22)
-                            .background(Theme.hoverFill)
+                            .background(Theme.Colors.hoverFill)
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -1736,14 +1796,14 @@ struct QuestionStepperSheet: View {
                 // Question text
                 Text(cleanBold(current.question))
                     .font(Theme.body(14))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 // Context (if any)
                 if !current.context.isEmpty {
                     Text(current.context)
                         .font(Theme.body(12))
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                         .lineLimit(3)
                 }
 
@@ -1772,12 +1832,12 @@ struct QuestionStepperSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: "pencil")
                         .font(.system(size: 11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .frame(width: 20)
 
                     TextField("Something else...", text: $customText)
                         .font(Theme.body(13))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .textFieldStyle(.plain)
                         .focused($customFocused)
                         .onChange(of: customText) { _, newValue in
@@ -1801,11 +1861,11 @@ struct QuestionStepperSheet: View {
                     if !current.suggestions.isEmpty {
                         Text("1–\(current.suggestions.count) select")
                             .font(Theme.label(11))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                         + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
                         + Text("Enter next")
                             .font(Theme.label(11))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                 }
                 HStack {
@@ -1823,7 +1883,7 @@ struct QuestionStepperSheet: View {
                                 Text("Back")
                                     .font(Theme.body(12))
                             }
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
                     }
@@ -1857,7 +1917,7 @@ struct QuestionStepperSheet: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
         }
-        .background(Theme.sidebar)
+        .background(Theme.Colors.sidebarBackground)
         .focusable()
         .focused($sheetFocused)
         .onAppear {
@@ -1929,25 +1989,25 @@ private struct SuggestionRow: View {
             HStack(spacing: 10) {
                 Text("\(number)")
                     .font(Theme.label(11))
-                    .foregroundColor(isSelected ? .white : Theme.accent)
+                    .foregroundColor(isSelected ? .white : Theme.Colors.accent)
                     .frame(width: 22, height: 22)
                     .background(
                         RoundedRectangle(cornerRadius: 5)
                             .fill(isSelected
-                                  ? Theme.accent
+                                  ? Theme.Colors.accent
                                   : (isHighlighted ? Color(hex: 0xc4785c).opacity(0.15) : Color.white.opacity(0.06)))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 5)
                             .strokeBorder(isSelected
-                                          ? Theme.accent
+                                          ? Theme.Colors.accent
                                           : (isHighlighted ? Color(hex: 0xc4785c).opacity(0.3) : Color.white.opacity(0.1)),
                                           lineWidth: 1)
                     )
 
                 Text(text)
                     .font(Theme.body(13))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
 
@@ -2019,7 +2079,7 @@ struct ConfirmButton: View {
                 } label: {
                     Text("Skip")
                         .font(Theme.body(12))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
             }
@@ -2129,7 +2189,7 @@ private struct PipelineStageBar: View {
         case .pending:
             return Color(hex: 0x938d8d).opacity(0.3)
         case .running:
-            return Theme.accent
+            return Theme.Colors.accent
         case .completed:
             return Color(hex: 0x7ab5a0)
         case .failed:
@@ -2177,7 +2237,7 @@ private struct SpecCompleteSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             // Accent bar
             Rectangle()
-                .fill(Theme.builder.opacity(0.6))
+                .fill(Theme.Colors.statusWorking.opacity(0.6))
                 .frame(height: 2)
 
             VStack(spacing: 10) {
@@ -2185,17 +2245,17 @@ private struct SpecCompleteSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(Theme.success)
+                        .foregroundStyle(Theme.Colors.statusDone)
                     Text("Spec complete")
                         .font(Theme.label(14))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     Button {
                         onContinue()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Theme.textMuted)
+                            .foregroundStyle(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -2212,10 +2272,10 @@ private struct SpecCompleteSheet: View {
                             Text("Continue")
                                 .font(Theme.label(12))
                         }
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
@@ -2261,10 +2321,10 @@ private struct SpecCompleteSheet: View {
                             Text("Hand off")
                                 .font(Theme.label(12))
                         }
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
 
@@ -2281,7 +2341,7 @@ private struct SpecCompleteSheet: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Theme.builder)
+                        .background(Theme.Colors.statusWorking)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
@@ -2290,12 +2350,12 @@ private struct SpecCompleteSheet: View {
                 // Hint
                 Text("Esc to continue  ·  ⌘↵ to approve")
                     .font(Theme.caption(10))
-                    .foregroundStyle(Theme.textMuted)
+                    .foregroundStyle(Theme.Colors.textTertiary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .background(Theme.sidebar)
+        .background(Theme.Colors.sidebarBackground)
         .onKeyPress(.escape) {
             onContinue()
             return .handled

@@ -12,7 +12,7 @@ struct MarkdownTableView: View {
                     ForEach(Array(headers.enumerated()), id: \.offset) { colIdx, header in
                         InlineNodesView(nodes: header)
                             .font(Theme.label(13))
-                            .foregroundColor(Theme.textSecondary)
+                            .foregroundColor(Theme.Colors.textSecondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .frame(maxWidth: .infinity, alignment: alignment(for: colIdx))
@@ -20,7 +20,7 @@ struct MarkdownTableView: View {
                 }
                 .overlay(alignment: .bottom) {
                     Rectangle()
-                        .fill(Theme.borderSubtle)
+                        .fill(Theme.Colors.borderSubtle)
                         .frame(height: 1)
                 }
 
@@ -29,7 +29,7 @@ struct MarkdownTableView: View {
                         ForEach(Array(row.enumerated()), id: \.offset) { colIdx, cell in
                             InlineNodesView(nodes: cell)
                                 .font(Theme.body(13))
-                                .foregroundColor(Theme.textPrimary)
+                                .foregroundColor(Theme.Colors.textPrimary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 6)
                                 .frame(maxWidth: .infinity, alignment: alignment(for: colIdx))

@@ -129,7 +129,7 @@ struct FrameChildResizeHandle: View {
             .contentShape(Rectangle())
             .overlay(
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(isHovered ? Theme.accent : Theme.accent.opacity(0.7))
+                    .fill(isHovered ? Theme.Colors.accent : Theme.Colors.accent.opacity(0.7))
                     .frame(width: handleSize, height: handleSize)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -186,7 +186,7 @@ struct CornerHandle: View {
             .contentShape(Rectangle())
             .overlay(
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(isHovered ? Theme.accent : Theme.accent.opacity(0.7))
+                    .fill(isHovered ? Theme.Colors.accent : Theme.Colors.accent.opacity(0.7))
                     .frame(width: handleSize, height: handleSize)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: corner.alignment)
@@ -310,7 +310,7 @@ struct EdgeHandle: View {
                 .overlay(
                     // Visual indicator on hover
                     Rectangle()
-                        .fill(isHovered ? Theme.accent.opacity(0.6) : Color.clear)
+                        .fill(isHovered ? Theme.Colors.accent.opacity(0.6) : Color.clear)
                         .frame(
                             width: edge.isHorizontal ? w : 2,
                             height: edge.isHorizontal ? 2 : h

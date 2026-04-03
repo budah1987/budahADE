@@ -39,17 +39,17 @@ struct GitSidebarView: View {
                             .padding(.horizontal, 8)
                             .padding(.top, 8)
 
-                        Divider().foregroundColor(Theme.borderSubtle)
+                        Divider().foregroundColor(Theme.Colors.borderSubtle)
 
                         ChangesListView(repo: repo) { file, staged in
                             openDiffForFile(file, staged: staged)
                         }
 
-                        Divider().foregroundColor(Theme.borderSubtle)
+                        Divider().foregroundColor(Theme.Colors.borderSubtle)
 
                         CommitBarView(repo: repo, commitMessage: $commitMessage)
 
-                        Divider().foregroundColor(Theme.borderSubtle)
+                        Divider().foregroundColor(Theme.Colors.borderSubtle)
 
                         CommitHistoryView(repo: repo) { commit in
                             openDiffForCommit(commit)
@@ -66,7 +66,7 @@ struct GitSidebarView: View {
                 actionBar
             }
             .frame(width: panelWidth)
-            .background(Theme.sidebar)
+            .background(Theme.Colors.sidebarBackground)
             .onAppear {
                 repo.mergeTarget = taskState.baseBranch
                 repo.startPolling()
@@ -149,10 +149,10 @@ struct GitSidebarView: View {
                     Text(pushButtonLabel)
                         .font(.system(size: 11, weight: .semibold))
                 }
-                .foregroundColor(Theme.appBackground)
+                .foregroundColor(Theme.Colors.appBackground)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
-                .background(Theme.accent)
+                .background(Theme.Colors.accent)
                 .cornerRadius(6)
             }
             .buttonStyle(.plain)
@@ -163,10 +163,10 @@ struct GitSidebarView: View {
             } label: {
                 Text("PR")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background(Theme.surface3)
+                    .background(Theme.Colors.surfaceElevated)
                     .cornerRadius(6)
             }
             .buttonStyle(.plain)
@@ -179,10 +179,10 @@ struct GitSidebarView: View {
                     Text(mergeState == .success ? "Merged ✓" : "Merge")
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(Theme.surface3)
+                .background(Theme.Colors.surfaceElevated)
                 .cornerRadius(6)
             }
             .buttonStyle(.plain)
@@ -190,7 +190,7 @@ struct GitSidebarView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Theme.sidebar)
+        .background(Theme.Colors.sidebarBackground)
     }
 
     private var pushButtonLabel: String {
@@ -246,11 +246,11 @@ struct GitSidebarView: View {
         HStack(spacing: 6) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(Theme.error)
+                .foregroundColor(Theme.Colors.error)
 
             Text(message)
                 .font(Theme.caption(11))
-                .foregroundColor(Theme.error)
+                .foregroundColor(Theme.Colors.error)
                 .lineLimit(2)
 
             Spacer()
@@ -258,20 +258,20 @@ struct GitSidebarView: View {
             Button { actionError = nil } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Theme.error.opacity(0.08))
+        .background(Theme.Colors.error.opacity(0.08))
     }
 
     // MARK: - Drag Handle
 
     private var dragHandle: some View {
         Rectangle()
-            .fill(isDragging ? Theme.accent.opacity(0.3) : Color.clear)
+            .fill(isDragging ? Theme.Colors.accent.opacity(0.3) : Color.clear)
             .frame(width: 4)
             .contentShape(Rectangle())
             .onHover { hovering in

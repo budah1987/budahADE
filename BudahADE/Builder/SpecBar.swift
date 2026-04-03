@@ -3,48 +3,83 @@ import SwiftUI
 // MARK: - Spec Bar (Content Area — below tab bar)
 
 /// Persistent thin strip below the conversation tab bar.
-/// Shows build progress summary. Click to select the builder tab.
+/// Shows active step name (building) or spec title (ready), progress bar, live action text.
+/// Click anywhere to toggle the builder chat view.
 struct SpecBar: View {
     @Bindable var session: BuilderSession
     var specTitle: String = "Spec"
     var isBuilderTabActive: Bool = false
+    /// Last streaming line from the agent — shown during active build
+    var activeActionText: String? = nil
     var onTap: () -> Void
 
+    private var displayTitle: String {
+        if session.buildState == .building, let step = session.activeStep {
+            return step.title
+        }
+        return specTitle
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
-            // Purple accent line when builder tab active
-            if isBuilderTabActive {
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Theme.builder)
-                    .frame(width: 3, height: 20)
+        HStack(spacing: 6) {
+            // Left content: title + count + bar + action text
+            HStack(spacing: 6) {
+                Text(displayTitle)
+                    .font(Theme.label(11))
+                    .foregroundStyle(Color(hex: 0xC4B5FD))
+                    .lineLimit(1)
+                    .fixedSize()
+
+                Text("\(session.completedCount)/\(session.totalCount)")
+                    .font(Theme.code(10))
+                    .foregroundStyle(Color(hex: 0xA78BFA).opacity(0.5))
+                    .fixedSize()
+
+                SpecProgressBar(steps: session.steps, size: .mini)
+                    .frame(width: max(CGFloat(session.steps.count) * 23, 40))
+                    .fixedSize(horizontal: true, vertical: false)
+
+                if let text = activeActionText,
+                   !text.isEmpty,
+                   session.buildState == .building {
+                    Text(lastLine(of: text))
+                        .font(Theme.body(10))
+                        .foregroundStyle(Color.white.opacity(0.65))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(specTitle)
-                .font(Theme.label(11))
-                .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
-
-            Text("\(session.completedCount)/\(session.totalCount)")
-                .font(Theme.code(11))
-                .foregroundStyle(Theme.textMuted)
-
-            SpecProgressBar(steps: session.steps, size: .large)
-                .frame(maxWidth: .infinity)
+            // Close ×
+            Button(action: onTap) {
+                Text("×")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(hex: 0xA78BFA).opacity(0.35))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 12)
-        .frame(height: 32)
-        .background(Theme.surface2)
-        .overlay(alignment: .top) {
-            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
-        }
+        .padding(.leading, 24)
+        .padding(.trailing, 14)
+        .padding(.vertical, 5)
+        .background(Theme.Colors.sidebarBackground)
+        .overlay(
+            Rectangle()
+                .inset(by: 0.5)
+                .strokeBorder(Color(hex: 0xA78BFA).opacity(0.2), lineWidth: 0.5)
+        )
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
     }
+
+    private func lastLine(of text: String) -> String {
+        text.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.last ?? text
+    }
 }
 
-// MARK: - Spec Bar Compact (Sidebar header)
+// MARK: - Spec Bar Compact (Sidebar header — legacy, kept for compatibility)
 
-/// Compact progress summary at top of the step list in the sidebar.
 struct SpecBarCompact: View {
     @Bindable var session: BuilderSession
 
@@ -65,11 +100,11 @@ struct SpecBarCompact: View {
 
     private var stateColor: Color {
         switch session.buildState {
-        case .ready:    return Theme.textMuted
-        case .building: return Theme.builder
-        case .paused:   return Theme.warning
-        case .done:     return Theme.success
-        case .failed:   return Theme.error
+        case .ready:    return Theme.Colors.textTertiary
+        case .building: return Theme.Colors.statusWorking
+        case .paused:   return Theme.Colors.warning
+        case .done:     return Theme.Colors.statusDone
+        case .failed:   return Theme.Colors.error
         }
     }
 
@@ -77,25 +112,15 @@ struct SpecBarCompact: View {
     private var statusBadge: some View {
         switch session.buildState {
         case .ready:
-            Text("READY")
-                .font(Theme.caption(9))
-                .foregroundStyle(Theme.textMuted)
+            Text("READY").font(Theme.caption(9)).foregroundStyle(Theme.Colors.textTertiary)
         case .building:
-            Text("BUILDING")
-                .font(Theme.caption(9))
-                .foregroundStyle(Theme.builder)
+            Text("BUILDING").font(Theme.caption(9)).foregroundStyle(Theme.Colors.statusWorking)
         case .paused:
-            Text("PAUSED")
-                .font(Theme.caption(9))
-                .foregroundStyle(Theme.warning)
+            Text("PAUSED").font(Theme.caption(9)).foregroundStyle(Theme.Colors.warning)
         case .done:
-            Text("DONE")
-                .font(Theme.caption(9))
-                .foregroundStyle(Theme.success)
+            Text("DONE").font(Theme.caption(9)).foregroundStyle(Theme.Colors.statusDone)
         case .failed:
-            Text("FAILED")
-                .font(Theme.caption(9))
-                .foregroundStyle(Theme.error)
+            Text("FAILED").font(Theme.caption(9)).foregroundStyle(Theme.Colors.error)
         }
     }
 }

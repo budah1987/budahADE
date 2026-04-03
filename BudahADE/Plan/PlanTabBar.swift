@@ -34,7 +34,7 @@ struct PlanTabBar: View {
             .background(GlassBackground())
 
             Rectangle()
-                .fill(Theme.borderSubtle)
+                .fill(Theme.Colors.borderSubtle)
                 .frame(height: 0.5)
         }
     }

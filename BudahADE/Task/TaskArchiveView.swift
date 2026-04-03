@@ -11,18 +11,18 @@ struct TaskArchiveView: View {
             HStack {
                 Text("Task Archive")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                 Spacer()
                 Button("Done") { dismiss() }
                     .font(Theme.label(13))
-                    .foregroundColor(Theme.accent)
+                    .foregroundColor(Theme.Colors.accent)
                     .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
 
             Rectangle()
-                .fill(Theme.border)
+                .fill(Theme.Colors.borderLight)
                 .frame(height: 1)
 
             if archive.tasks.isEmpty {
@@ -42,20 +42,20 @@ struct TaskArchiveView: View {
             }
         }
         .frame(width: 480, height: 420)
-        .background(Theme.appBackground)
+        .background(Theme.Colors.appBackground)
     }
 
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "archivebox")
                 .font(.system(size: 28, weight: .light))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("No archived tasks")
                 .font(Theme.label(14))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Completed tasks will appear here")
                 .font(Theme.caption(12))
-                .foregroundColor(Theme.textMuted.opacity(0.6))
+                .foregroundColor(Theme.Colors.textTertiary.opacity(0.6))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -73,7 +73,7 @@ private struct TaskArchiveRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(task.name)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
 
                 HStack(spacing: 10) {
                     HStack(spacing: 4) {
@@ -82,7 +82,7 @@ private struct TaskArchiveRow: View {
                         Text(task.branchName)
                             .font(Theme.caption(10))
                     }
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
 
                     if task.specVersionCount > 0 {
                         metaPill("\(task.specVersionCount) spec \(task.specVersionCount == 1 ? "version" : "versions")")
@@ -95,19 +95,19 @@ private struct TaskArchiveRow: View {
 
                 Text(relativeTime(from: task.completedAt))
                     .font(Theme.caption(10))
-                    .foregroundColor(Theme.textMuted.opacity(0.6))
+                    .foregroundColor(Theme.Colors.textTertiary.opacity(0.6))
             }
 
             Spacer()
 
             Button("Reopen") { onReopen() }
                 .font(Theme.label(11))
-                .foregroundColor(Theme.accent)
+                .foregroundColor(Theme.Colors.accent)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(Theme.accent.opacity(0.10))
+                        .fill(Theme.Colors.accent.opacity(0.10))
                 )
                 .buttonStyle(.plain)
         }
@@ -122,7 +122,7 @@ private struct TaskArchiveRow: View {
     private func metaPill(_ text: String) -> some View {
         Text(text)
             .font(Theme.caption(10))
-            .foregroundColor(Theme.textMuted)
+            .foregroundColor(Theme.Colors.textTertiary)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(

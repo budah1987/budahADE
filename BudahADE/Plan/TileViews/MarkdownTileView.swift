@@ -27,7 +27,7 @@ struct MarkdownTileView: View {
                     progressBar(spec)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                    Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+                    Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
                 }
 
                 // Sections
@@ -45,7 +45,7 @@ struct MarkdownTileView: View {
                     .onTapGesture { commitCurrentEdit() }
                 }
 
-                Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+                Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
 
                 // Footer
                 tileFooter
@@ -61,7 +61,7 @@ struct MarkdownTileView: View {
         HStack(spacing: 8) {
             Text("\(spec.completedCount)/\(spec.totalCount)")
                 .font(Theme.label(12))
-                .foregroundColor(spec.progress >= 1.0 ? Theme.success : Theme.textSecondary)
+                .foregroundColor(spec.progress >= 1.0 ? Theme.Colors.statusDone : Theme.Colors.textSecondary)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -69,7 +69,7 @@ struct MarkdownTileView: View {
                         .fill(Color.white.opacity(0.06))
                         .frame(height: 3)
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(spec.progress >= 1.0 ? Theme.success : Theme.accent)
+                        .fill(spec.progress >= 1.0 ? Theme.Colors.statusDone : Theme.Colors.accent)
                         .frame(width: geo.size.width * spec.progress, height: 3)
                         .animation(.easeOut(duration: 0.3), value: spec.progress)
                 }
@@ -86,15 +86,15 @@ struct MarkdownTileView: View {
             HStack(spacing: 6) {
                 Text(section.heading)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
 
                 // Source attribution
                 if let sourceId = section.sourceId {
                     HStack(spacing: 3) {
-                        Circle().fill(Theme.accent).frame(width: 6, height: 6)
+                        Circle().fill(Theme.Colors.accent).frame(width: 6, height: 6)
                         Text("from \(sourceId)")
                             .font(Theme.caption(11))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                 }
 
@@ -102,7 +102,7 @@ struct MarkdownTileView: View {
                     let done = section.checkboxItems.filter(\.isCompleted).count
                     Text("\(done)/\(section.checkboxItems.count)")
                         .font(Theme.caption(11))
-                        .foregroundColor(done == section.checkboxItems.count ? Theme.success : Theme.textMuted)
+                        .foregroundColor(done == section.checkboxItems.count ? Theme.Colors.statusDone : Theme.Colors.textTertiary)
                 }
 
                 Spacer()
@@ -113,7 +113,7 @@ struct MarkdownTileView: View {
                 } label: {
                     Image(systemName: "arrow.up.right.square")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .frame(width: 24, height: 24)
                 }
                 .buttonStyle(.plain)
@@ -121,7 +121,7 @@ struct MarkdownTileView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(Theme.surface2.opacity(0.5))
+            .background(Theme.Colors.surface.opacity(0.5))
             .contentShape(Rectangle())
             .onTapGesture {
                 if editingSectionId != nil && editingSectionId != section.id {
@@ -134,7 +134,7 @@ struct MarkdownTileView: View {
                 // Edit mode
                 TextEditor(text: $editContent)
                     .font(.system(size: 13))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 60)
                     .padding(.horizontal, 12)
@@ -152,7 +152,7 @@ struct MarkdownTileView: View {
                     if !preview.isEmpty {
                         Text(preview)
                             .font(.system(size: 13))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .lineLimit(5)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
@@ -167,7 +167,7 @@ struct MarkdownTileView: View {
                 }
             }
 
-            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+            Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
         }
     }
 
@@ -178,11 +178,11 @@ struct MarkdownTileView: View {
             HStack(spacing: 8) {
                 Image(systemName: task.isCompleted ? "checkmark.square.fill" : "square")
                     .font(.system(size: 15))
-                    .foregroundColor(task.isCompleted ? Theme.success : Theme.textMuted)
+                    .foregroundColor(task.isCompleted ? Theme.Colors.statusDone : Theme.Colors.textTertiary)
                 Text(task.title)
                     .font(.system(size: 13, weight: task.isCompleted ? .regular : .medium))
-                    .foregroundColor(task.isCompleted ? Theme.textMuted : Theme.textPrimary)
-                    .strikethrough(task.isCompleted, color: Theme.textMuted)
+                    .foregroundColor(task.isCompleted ? Theme.Colors.textTertiary : Theme.Colors.textPrimary)
+                    .strikethrough(task.isCompleted, color: Theme.Colors.textTertiary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 Spacer()
@@ -258,14 +258,14 @@ struct MarkdownTileView: View {
         HStack(spacing: 6) {
             Image(systemName: "doc.text")
                 .font(.system(size: 9))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text(filename)
                 .font(Theme.body(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Spacer()
             Text("\(sections.count) sections")
                 .font(Theme.caption(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -277,10 +277,10 @@ struct MarkdownTileView: View {
         VStack(spacing: 8) {
             Image(systemName: "doc.text")
                 .font(.system(size: 24))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Empty document")
                 .font(Theme.body(14))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

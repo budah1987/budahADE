@@ -94,14 +94,14 @@ final class FileTreeNode: Identifiable, ObservableObject, Hashable {
             case "go":            return Color(hex: 0x4ad4e8)
             case "rs":            return Color(hex: 0xe8a84a)
             case "rb":            return Color(hex: 0xe84a4a)
-            default:              return Theme.textSecondary
+            default:              return Theme.Colors.textSecondary
             }
         case .markup:   return Color(hex: 0xa8c47b)  // green
         case .data:     return Color(hex: 0xe8c47b)  // amber
         case .pdf:      return Color(hex: 0xe87b7b)  // red
         case .document: return Color(hex: 0x7b9fe8)
         case .directory: return Color(hex: 0x7b9fd4)
-        case .other:    return Theme.textMuted
+        case .other:    return Theme.Colors.textTertiary
         }
     }
 

@@ -63,7 +63,7 @@ struct SpecFileBrowserView: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(Theme.textMuted)
+            .foregroundColor(Theme.Colors.textTertiary)
             .textCase(.uppercase)
             .padding(.horizontal, 12)
             .padding(.top, 10)
@@ -79,18 +79,18 @@ struct SpecFileBrowserView: View {
             HStack(spacing: 8) {
                 Image(systemName: "doc.richtext")
                     .font(.system(size: 12))
-                    .foregroundStyle(file.isActive ? Theme.accent : Theme.textMuted)
+                    .foregroundStyle(file.isActive ? Theme.Colors.accent : Theme.Colors.textTertiary)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(file.name)
                         .font(Theme.body(12))
-                        .foregroundStyle(isSelected ? Theme.textPrimary : Theme.textSecondary)
+                        .foregroundStyle(isSelected ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
                         .lineLimit(1)
 
                     if let version = file.version {
                         Text("Version \(version)")
                             .font(Theme.caption(10))
-                            .foregroundStyle(Theme.textMuted)
+                            .foregroundStyle(Theme.Colors.textTertiary)
                     }
                 }
 
@@ -101,8 +101,8 @@ struct SpecFileBrowserView: View {
                         .font(Theme.code(10))
                         .foregroundStyle(
                             file.completedCount == file.taskCount
-                                ? Theme.success
-                                : Theme.textMuted
+                                ? Theme.Colors.statusDone
+                                : Theme.Colors.textTertiary
                         )
                 }
             }
@@ -111,7 +111,7 @@ struct SpecFileBrowserView: View {
             .background(
                 isSelected
                     ? RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(Theme.accent.opacity(0.08))
+                        .fill(Theme.Colors.accent.opacity(0.08))
                     : nil
             )
         }
@@ -134,10 +134,10 @@ struct SpecFileBrowserView: View {
         VStack(spacing: 6) {
             Text("No spec files")
                 .font(Theme.label(12))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Create a *-spec.md or approve\na spec in Plan mode")
                 .font(Theme.caption(11))
-                .foregroundColor(Theme.textMuted.opacity(0.5))
+                .foregroundColor(Theme.Colors.textTertiary.opacity(0.5))
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 16)

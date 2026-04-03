@@ -12,18 +12,18 @@ struct CommitBar: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(repo.stagedFiles.count) file\(repo.stagedFiles.count == 1 ? "" : "s") staged")
                 .font(Theme.caption(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
 
             TextField("Commit message...", text: $commitMessage)
                 .textFieldStyle(.plain)
                 .font(Theme.body(12))
-                .foregroundColor(Theme.textPrimary)
+                .foregroundColor(Theme.Colors.textPrimary)
                 .padding(8)
-                .background(Theme.surface3)
-                .cornerRadius(Theme.pillCornerRadius)
+                .background(Theme.Colors.surfaceElevated)
+                .cornerRadius(Theme.Radius.sm)
                 .overlay(
-                    RoundedRectangle(cornerRadius: Theme.pillCornerRadius)
-                        .stroke(Theme.borderSubtle, lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                        .stroke(Theme.Colors.borderSubtle, lineWidth: 0.5)
                 )
                 .onSubmit {
                     performCommit()
@@ -35,8 +35,8 @@ struct CommitBar: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 7)
-                    .background(canCommit ? Theme.accent.opacity(0.85) : Theme.accent.opacity(0.3))
-                    .cornerRadius(Theme.pillCornerRadius)
+                    .background(canCommit ? Theme.Colors.accent.opacity(0.85) : Theme.Colors.accent.opacity(0.3))
+                    .cornerRadius(Theme.Radius.sm)
             }
             .buttonStyle(.plain)
             .disabled(!canCommit)

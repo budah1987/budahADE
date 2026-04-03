@@ -24,12 +24,12 @@ struct InlineNodesView: View {
         case .code(let code):
             return SwiftUI.Text(code)
                 .font(Theme.code(13))
-                .foregroundColor(Theme.textPrimary)
+                .foregroundColor(Theme.Colors.textPrimary)
 
         case .emphasis(let children):
             return render(children)
                 .italic()
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
 
         case .strong(let children):
             return render(children)
@@ -38,7 +38,7 @@ struct InlineNodesView: View {
 
         case .link(_, let children):
             return render(children)
-                .foregroundColor(Theme.accent)
+                .foregroundColor(Theme.Colors.accent)
                 .underline()
 
         case .lineBreak:

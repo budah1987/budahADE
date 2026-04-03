@@ -3,31 +3,16 @@ import SwiftUI
 // MARK: - Progress Bar Size
 
 enum ProgressBarSize {
-    case mini      // 6pt — task cards, inline
-    case standard  // 10pt — active step card
-    case large     // 16pt — spec bar
+    case mini      // thin bar graph — spec bar, task cards, panels
+    case standard  // same height, slightly more gap
+    case large     // same height, legacy alias
 
-    var height: CGFloat {
-        switch self {
-        case .mini: return 6
-        case .standard: return 10
-        case .large: return 16
-        }
-    }
+    var height: CGFloat { 4 }
 
     var gap: CGFloat {
         switch self {
         case .mini: return 1
-        case .standard: return 2
-        case .large: return 2
-        }
-    }
-
-    var cornerRadius: CGFloat {
-        switch self {
-        case .mini: return 3
-        case .standard: return 5
-        case .large: return 8
+        case .standard, .large: return 2
         }
     }
 }
@@ -46,18 +31,17 @@ struct SpecProgressBar: View {
             }
         }
         .frame(height: size.height)
-        .clipShape(RoundedRectangle(cornerRadius: size.cornerRadius))
     }
 
     @ViewBuilder
     private func segmentView(for step: BuildStep, at index: Int) -> some View {
-        let color = color(for: step.state)
-
-        Rectangle()
-            .fill(color)
+        RoundedRectangle(cornerRadius: 1)
+            .fill(color(for: step.state))
             .overlay {
                 if step.state == .building {
-                    PulsingOverlay()
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Color.white.opacity(0))
+                        .modifier(PulsingSegment())
                 }
             }
             .contentShape(Rectangle())
@@ -68,26 +52,26 @@ struct SpecProgressBar: View {
 
     private func color(for state: StepState) -> Color {
         switch state {
-        case .done:     return Theme.success
-        case .building: return Theme.builder
-        case .queued:   return Theme.textMuted.opacity(0.3)
-        case .failed:   return Theme.error
-        case .skipped:  return Theme.textMuted.opacity(0.15)
+        case .done:     return Theme.Colors.statusDone                  // #4ADE80 bright green
+        case .building: return Theme.Colors.statusWorking                // #A78BFA bright violet
+        case .queued:   return Color.white.opacity(0.078)      // #FFFFFF14
+        case .failed:   return Theme.Colors.error
+        case .skipped:  return Color.white.opacity(0.05)
         }
     }
 }
 
-// MARK: - Pulsing Overlay (building state animation)
+// MARK: - Pulsing Segment (building state animation)
 
-private struct PulsingOverlay: View {
+private struct PulsingSegment: ViewModifier {
     @State private var isPulsing = false
 
-    var body: some View {
-        Rectangle()
-            .fill(Color.white.opacity(isPulsing ? 0.15 : 0))
-            .animation(
-                .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
-                value: isPulsing
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color.white.opacity(isPulsing ? 0.18 : 0))
+                    .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: isPulsing)
             )
             .onAppear { isPulsing = true }
     }
@@ -95,7 +79,7 @@ private struct PulsingOverlay: View {
 
 // MARK: - Preview
 
-#Preview("SpecProgressBar Sizes") {
+#Preview("SpecProgressBar") {
     let steps: [BuildStep] = [
         BuildStep(id: "1", title: "Setup project", state: .done),
         BuildStep(id: "2", title: "Create models", state: .done),
@@ -108,18 +92,15 @@ private struct PulsingOverlay: View {
     ]
 
     VStack(alignment: .leading, spacing: 20) {
-        Text("Mini (6pt)").font(Theme.caption(11)).foregroundStyle(Theme.textSecondary)
-        SpecProgressBar(steps: steps, size: .mini)
-            .frame(width: 200)
+        Text("Mini (4px, 1px gap)").font(Theme.caption(11)).foregroundStyle(Theme.Colors.textSecondary)
+        SpecProgressBar(steps: steps, size: .mini).frame(width: 200)
 
-        Text("Standard (10pt)").font(Theme.caption(11)).foregroundStyle(Theme.textSecondary)
-        SpecProgressBar(steps: steps, size: .standard)
-            .frame(width: 300)
+        Text("Standard (4px, 2px gap)").font(Theme.caption(11)).foregroundStyle(Theme.Colors.textSecondary)
+        SpecProgressBar(steps: steps, size: .standard).frame(width: 300)
 
-        Text("Large (16pt)").font(Theme.caption(11)).foregroundStyle(Theme.textSecondary)
-        SpecProgressBar(steps: steps, size: .large)
-            .frame(width: 400)
+        Text("Large (4px, 2px gap)").font(Theme.caption(11)).foregroundStyle(Theme.Colors.textSecondary)
+        SpecProgressBar(steps: steps, size: .large).frame(width: 400)
     }
     .padding(24)
-    .background(Theme.contentBg)
+    .background(Theme.Colors.appBackground)
 }

@@ -41,7 +41,7 @@ struct SlashCommandPopover: View {
                     }
                 }
 
-                Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+                Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
 
                 HStack(spacing: 12) {
                     HStack(spacing: 3) {
@@ -62,16 +62,16 @@ struct SlashCommandPopover: View {
                     }
                 }
                 .font(Theme.caption(10))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
             }
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Theme.surface2)
+                    .fill(Theme.Colors.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(Theme.border, lineWidth: 1)
+                            .strokeBorder(Theme.Colors.borderLight, lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.4), radius: 16, y: -4)
             )
@@ -113,18 +113,18 @@ private struct CommandRow: View {
             HStack(spacing: 8) {
                 Text("/")
                     .font(Theme.label(12))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                 Text(command)
                     .font(Theme.body(13))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                 Spacer()
                 if isLocal {
                     Text("local")
                         .font(Theme.caption(10))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(Theme.hoverFill)
+                        .background(Theme.Colors.hoverFill)
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                 }
             }
@@ -132,7 +132,7 @@ private struct CommandRow: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Theme.accent.opacity(0.15) : (isHovered ? Theme.hoverFill : Color.clear))
+                    .fill(isSelected ? Theme.Colors.accent.opacity(0.15) : (isHovered ? Theme.Colors.hoverFill : Color.clear))
                     .padding(.horizontal, 4)
             )
             .contentShape(Rectangle())
@@ -151,13 +151,13 @@ private struct KeyHint: View {
     var body: some View {
         Text(text)
             .font(Theme.caption(9))
-            .foregroundColor(Theme.textMuted)
+            .foregroundColor(Theme.Colors.textTertiary)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
-            .background(Theme.surface2.opacity(0.8))
+            .background(Theme.Colors.surface.opacity(0.8))
             .overlay(
                 RoundedRectangle(cornerRadius: 3)
-                    .strokeBorder(Theme.borderSubtle, lineWidth: 0.5)
+                    .strokeBorder(Theme.Colors.borderSubtle, lineWidth: 0.5)
             )
             .clipShape(RoundedRectangle(cornerRadius: 3))
     }

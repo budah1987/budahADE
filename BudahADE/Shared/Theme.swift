@@ -3,73 +3,112 @@ import AppKit
 
 enum Theme {
 
-    // MARK: - Backgrounds (two-zone: sidebar vs content)
+    // MARK: - Colors
 
-    static let appBackground  = Color(hex: 0x111113)
-    static let sidebar        = Color(hex: 0x1a1a1e)   // sidebar zone — slightly warm
-    static let contentBg      = Color(hex: 0x141416)   // content zone — cooler/darker
-    static let surface2       = Color(hex: 0x222226)   // cards, popovers, inputs
-    static let surface3       = Color(hex: 0x2a2a2e)   // active rows, hover cards
+    enum Colors {
+        // Backgrounds
+        static let appBackground = Color(hex: 0x1a1a1c)
+        static let sidebarBackground = Color(hex: 0x222224)
+        static let cardBackground = Color.white.opacity(0.03)
+        static let actionBarBackground = Color(red: 31/255, green: 31/255, blue: 31/255).opacity(0.45)
 
-    /// Legacy aliases
-    static let panelSurface = sidebar
-    static let elevated = surface3
-    static let surface1 = sidebar
+        // Surfaces (solid, for non-glass contexts)
+        static let surface = Color(hex: 0x222224)
+        static let surfaceElevated = Color(hex: 0x2a2a2e)
 
-    // MARK: - Borders
+        // Text
+        static let textPrimary = Color(hex: 0xdddddd)
+        static let textSecondary = Color(hex: 0x888888)
+        static let textTertiary = Color(hex: 0x555555)
+        static let textPlaceholder = Color.white.opacity(0.4)
+        static let textMuted = Color(hex: 0x777777)
+        static let textMonoSecondary = Color(hex: 0x938d8d)
 
-    static let borderSubtle  = Color.white.opacity(0.08)
-    static let border        = Color.white.opacity(0.12)
-    static let borderActive  = Color.white.opacity(0.18)
+        // Status
+        static let statusDone = Color(hex: 0x4add7f)
+        static let statusWorking = Color(hex: 0xa78af9)
+        static let statusIdle = Color(hex: 0x3a3c43)
+        static let error = Color(hex: 0xc45c5c)
+        static let warning = Color(hex: 0xc4a85c)
+        static let info = Color(hex: 0x6b8fb5)
 
-    // MARK: - Text (calibrated to warm palette)
+        // Borders
+        static let borderSubtle = Color.white.opacity(0.06)
+        static let borderLight = Color.white.opacity(0.08)
+        static let borderActive = Color.white.opacity(0.5)
+        static let borderInput = Color(hex: 0x858585)
+        static let divider = Color.white.opacity(0.08)
 
-    static let textPrimary   = Color(hex: 0xe5e5e5)
-    static let textSecondary = Color(hex: 0x999999)
-    static let textMuted     = Color(hex: 0x555555)
+        // Buttons
+        static let buttonBackground = Color(hex: 0x1e1e1e)
+        static let buttonText = Color(hex: 0x888888)
+        static let primaryButtonBackground = Color.white
+        static let primaryButtonText = Color(red: 30/255, green: 30/255, blue: 30/255).opacity(0.8)
 
-    // MARK: - Accent & Status
+        // Accent
+        static let accent = Color(hex: 0xc4785c)
 
-    static let accent  = Color(hex: 0xc4785c)   // terra cotta — use sparingly
-    static let builder = Color(hex: 0x9d7dd8)   // purple — builder mode accent
-    static let success = Color(hex: 0x5a9a6b)
-    static let warning = Color(hex: 0xc4a85c)
-    static let error   = Color(hex: 0xc45c5c)
-    static let info    = Color(hex: 0x6b8fb5)
+        // Interactive States
+        static let hoverFill = Color.white.opacity(0.04)
+        static let pressedFill = Color.white.opacity(0.06)
+        static let selectedFill = Color.white.opacity(0.08)
 
-    // MARK: - Interactive States
+        // Glass Effects
+        static let tabGlassBackground = Color.white.opacity(0.10)
+        static let tabGlassBorder = Color.white.opacity(0.22)
+        static let tabSelectedGlass = Color.white.opacity(0.14)
+        static let tabSelectedBorder = Color.white.opacity(0.28)
+    }
 
-    static let hoverFill     = Color.white.opacity(0.04)
-    static let pressedFill   = Color.white.opacity(0.06)
-    static let selectedFill  = Color.white.opacity(0.08)
+    // MARK: - Radius (locked scale: 1 / 4 / 8 / 12 / 99)
 
-    // MARK: - Glass Materials
+    enum Radius {
+        static let xs: CGFloat = 1   // progress bar segments
+        static let sm: CGFloat = 4   // small elements
+        static let md: CGFloat = 8   // cards, buttons
+        static let lg: CGFloat = 12  // action bar, input bar, modals
+        static let full: CGFloat = 99 // pills, toggles
+    }
 
-    static let tabBarMaterial: NSVisualEffectView.Material = .sidebar
-    static let tabGlassBackground = Color.white.opacity(0.10)
-    static let tabGlassBorder     = Color.white.opacity(0.22)
-    static let tabSelectedGlass   = Color.white.opacity(0.14)
-    static let tabSelectedBorder  = Color.white.opacity(0.28)
+    // MARK: - Spacing
 
-    // MARK: - NSColor Equivalents
+    enum Spacing {
+        static let xxs: CGFloat = 2
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 8
+        static let md: CGFloat = 12
+        static let lg: CGFloat = 16
+        static let xl: CGFloat = 24
+        static let xxl: CGFloat = 32
+        static let xxxl: CGFloat = 48
+    }
 
-    static let nsAppBackground = NSColor(hex: 0x111113)
-    static let nsSurface1      = NSColor(hex: 0x1a1a1e)
-    static let nsSurface2      = NSColor(hex: 0x222226)
-    static let nsBorder        = NSColor(white: 1.0, alpha: 0.12)
-    static let nsTextPrimary   = NSColor(hex: 0xe5e5e5)
-    static let nsTextSecondary = NSColor(hex: 0x999999)
-    static let nsTextMuted     = NSColor(hex: 0x555555)
-    static let nsAccent        = NSColor(hex: 0xc4785c)
-    static let nsBuilder       = NSColor(hex: 0x9d7dd8)
+    // MARK: - Typography Constants
+
+    enum Typography {
+        static let titleSize: CGFloat = 13
+        static let bodySize: CGFloat = 13
+        static let captionSize: CGFloat = 11
+        static let monoSize: CGFloat = 10
+        static let labelSize: CGFloat = 12
+        static let sectionHeaderSize: CGFloat = 16
+        static let specTitleSize: CGFloat = 28
+        static let metaSize: CGFloat = 12
+    }
 
     // MARK: - Layout
 
-    static let panelCornerRadius: CGFloat = 0
-    static let cardCornerRadius: CGFloat = 8
-    static let pillCornerRadius: CGFloat = 6
-    static let panelGap: CGFloat = 0
-    static let edgePadding: CGFloat = 0
+    enum Layout {
+        static let sidebarWidth: CGFloat = 220
+        static let appBarHeight: CGFloat = 36
+        static let taskCardHeight: CGFloat = 84
+        static let taskCardGap: CGFloat = 8
+        static let navItemHeight: CGFloat = 36
+        static let actionBarHeight: CGFloat = 64
+        static let inputBarHeight: CGFloat = 114
+        static let progressBarHeight: CGFloat = 4
+        static let progressBarGap: CGFloat = 1
+    }
 
     // MARK: - Typography (Geist for UI, Menlo for terminal content)
 
@@ -109,6 +148,21 @@ enum Theme {
     static func codeFont(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
         NSFont(name: "Menlo", size: size) ?? NSFont.monospacedSystemFont(ofSize: size, weight: weight)
     }
+
+    // MARK: - NSColor Equivalents
+
+    static let nsAppBackground = NSColor(hex: 0x1a1a1c)
+    static let nsSurface       = NSColor(hex: 0x222224)
+    static let nsBorder        = NSColor(white: 1.0, alpha: 0.08)
+    static let nsTextPrimary   = NSColor(hex: 0xdddddd)
+    static let nsTextSecondary = NSColor(hex: 0x888888)
+    static let nsTextMuted     = NSColor(hex: 0x555555)
+    static let nsAccent        = NSColor(hex: 0xc4785c)
+    static let nsBuilder       = NSColor(hex: 0xa78af9)
+
+    // MARK: - Glass Materials
+
+    static let tabBarMaterial: NSVisualEffectView.Material = .sidebar
 }
 
 // MARK: - Glass Background (NSVisualEffectView wrapper)

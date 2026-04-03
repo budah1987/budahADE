@@ -113,10 +113,10 @@ struct TextStyleToolbar: View {
             } label: {
                 Text("\(Int(textData.fontSize))")
                     .font(Theme.caption(10))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Theme.surface3.cornerRadius(3))
+                    .background(Theme.Colors.surfaceElevated.cornerRadius(3))
             }
 
             Menu {
@@ -130,10 +130,10 @@ struct TextStyleToolbar: View {
             } label: {
                 Text(textData.weight.rawValue.prefix(3).uppercased())
                     .font(Theme.caption(10))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Theme.surface3.cornerRadius(3))
+                    .background(Theme.Colors.surfaceElevated.cornerRadius(3))
             }
 
             Menu {
@@ -147,10 +147,10 @@ struct TextStyleToolbar: View {
             } label: {
                 Text(textData.fontFamily.rawValue.prefix(4).uppercased())
                     .font(Theme.caption(10))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Theme.surface3.cornerRadius(3))
+                    .background(Theme.Colors.surfaceElevated.cornerRadius(3))
             }
         }
         .padding(.horizontal, 8)
@@ -158,7 +158,7 @@ struct TextStyleToolbar: View {
         .fixedSize()  // Escape parent frame constraints — toolbar must not scrunch
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(Theme.surface2)
+                .fill(Theme.Colors.surface)
                 .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
         )
     }
@@ -168,11 +168,11 @@ struct TextStyleToolbar: View {
             Text(label)
                 .font(.system(size: 11, weight: weight))
                 .italic(italic)
-                .foregroundColor(isActive ? Theme.textPrimary : Theme.textMuted)
+                .foregroundColor(isActive ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                 .frame(width: 22, height: 22)
                 .background(
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(isActive ? Theme.selectedFill : Color.clear)
+                        .fill(isActive ? Theme.Colors.selectedFill : Color.clear)
                 )
         }
         .buttonStyle(.plain)

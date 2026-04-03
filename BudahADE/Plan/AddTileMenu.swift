@@ -27,10 +27,10 @@ struct AddTileMenu: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(agent.displayName)
                                 .font(Theme.label(13))
-                                .foregroundColor(Theme.textPrimary)
+                                .foregroundColor(Theme.Colors.textPrimary)
                             Text(agent.description)
                                 .font(Theme.caption(11))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                         Spacer()
                     }
@@ -38,7 +38,7 @@ struct AddTileMenu: View {
                     .padding(.horizontal, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(hoveredAgent == agent ? Theme.hoverFill : Color.clear)
+                            .fill(hoveredAgent == agent ? Theme.Colors.hoverFill : Color.clear)
                     )
                     .contentShape(Rectangle())
                 }
@@ -49,13 +49,13 @@ struct AddTileMenu: View {
             }
 
             Rectangle()
-                .fill(Theme.borderSubtle)
+                .fill(Theme.Colors.borderSubtle)
                 .frame(height: 1)
                 .padding(.vertical, 4)
 
             Text("Chat Agents")
                 .font(Theme.caption(10))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .padding(.horizontal, 10)
                 .padding(.bottom, 2)
 
@@ -72,10 +72,10 @@ struct AddTileMenu: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("\(agent.displayName) Chat")
                                 .font(Theme.label(13))
-                                .foregroundColor(Theme.textPrimary)
+                                .foregroundColor(Theme.Colors.textPrimary)
                             Text("Lightweight, no skills")
                                 .font(Theme.caption(11))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                         Spacer()
                     }
@@ -83,7 +83,7 @@ struct AddTileMenu: View {
                     .padding(.horizontal, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(hoveredChatAgent == agent ? Theme.hoverFill : Color.clear)
+                            .fill(hoveredChatAgent == agent ? Theme.Colors.hoverFill : Color.clear)
                     )
                     .contentShape(Rectangle())
                 }
@@ -94,7 +94,7 @@ struct AddTileMenu: View {
             }
 
             Rectangle()
-                .fill(Theme.borderSubtle)
+                .fill(Theme.Colors.borderSubtle)
                 .frame(height: 1)
                 .padding(.vertical, 4)
 
@@ -140,7 +140,7 @@ struct AddTileMenu: View {
         }
         .padding(8)
         .frame(width: 260)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
     }
 
     private func utilityRow(
@@ -154,15 +154,15 @@ struct AddTileMenu: View {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(width: 8)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(name)
                         .font(Theme.label(13))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                     Text(description)
                         .font(Theme.caption(11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
                 Spacer()
             }
@@ -170,7 +170,7 @@ struct AddTileMenu: View {
             .padding(.horizontal, 10)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(hoveredUtility == key ? Theme.hoverFill : Color.clear)
+                    .fill(hoveredUtility == key ? Theme.Colors.hoverFill : Color.clear)
             )
             .contentShape(Rectangle())
         }

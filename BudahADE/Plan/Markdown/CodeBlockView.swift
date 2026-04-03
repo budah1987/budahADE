@@ -11,7 +11,7 @@ struct CodeBlockView: View {
             header
             codeContent
         }
-        .background(Theme.sidebar)
+        .background(Theme.Colors.sidebarBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
@@ -20,7 +20,7 @@ struct CodeBlockView: View {
             if let lang = language {
                 Text(lang)
                     .font(Theme.caption(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
 
             Spacer()
@@ -30,7 +30,7 @@ struct CodeBlockView: View {
             } label: {
                 Text(copied ? "Copied" : "Copy")
                     .font(Theme.caption(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
             .buttonStyle(.plain)
         }

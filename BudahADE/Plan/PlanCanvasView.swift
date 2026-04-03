@@ -229,7 +229,7 @@ struct PlanCanvasView: View {
                 ix += 1
             }
         }
-        .background(Theme.appBackground)
+        .background(Theme.Colors.appBackground)
         .ignoresSafeArea()
         .allowsHitTesting(false)
     }
@@ -393,16 +393,16 @@ struct PlanCanvasView: View {
             if let path = assembleResult {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(Theme.success)
+                        .foregroundColor(Theme.Colors.statusDone)
                     Text("Spec assembled: \((path as NSString).lastPathComponent)")
                         .font(Theme.label(12))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Theme.surface2.opacity(0.95))
+                        .fill(Theme.Colors.surface.opacity(0.95))
                 )
                 .padding(.top, 12)
                 .transition(.move(edge: .top).combined(with: .opacity))
@@ -419,12 +419,12 @@ struct PlanCanvasView: View {
                 // Zoom indicator
                 Text("\(Int(localZoom * 100))%")
                     .font(Theme.caption(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Theme.surface2.opacity(0.8))
+                            .fill(Theme.Colors.surface.opacity(0.8))
                     )
                     .padding(12)
 
@@ -443,15 +443,15 @@ struct PlanCanvasView: View {
                             Text("Assemble Spec")
                                 .font(Theme.label(12))
                         }
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Theme.accent.opacity(0.2))
+                                .fill(Theme.Colors.accent.opacity(0.2))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .strokeBorder(Theme.accent.opacity(0.4), lineWidth: 0.5)
+                                        .strokeBorder(Theme.Colors.accent.opacity(0.4), lineWidth: 0.5)
                                 )
                         )
                     }
@@ -478,13 +478,13 @@ struct PlanCanvasView: View {
         VStack(spacing: 16) {
             Image(systemName: "rectangle.split.2x2")
                 .font(.system(size: 32, weight: .thin))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Plan your work")
                 .font(Theme.headline(18))
-                .foregroundColor(Theme.textPrimary)
+                .foregroundColor(Theme.Colors.textPrimary)
             Text("Right-click to add tiles, frames, and text")
                 .font(Theme.body(13))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
         }
     }
 

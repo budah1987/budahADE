@@ -81,7 +81,7 @@ private struct FileTreeRowView: View {
                     if node.isDirectory {
                         Image(systemName: node.isExpanded ? "chevron.down" : "chevron.right")
                             .font(.system(size: 8, weight: .semibold))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     } else {
                         Color.clear
                     }
@@ -95,7 +95,7 @@ private struct FileTreeRowView: View {
 
                 Text(node.name)
                     .font(Theme.body(12))
-                    .foregroundColor(isSelected ? Theme.textPrimary : Theme.textSecondary)
+                    .foregroundColor(isSelected ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
@@ -106,7 +106,7 @@ private struct FileTreeRowView: View {
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(isSelected ? Theme.selectedFill : Color.clear)
+                    .fill(isSelected ? Theme.Colors.selectedFill : Color.clear)
                     .padding(.horizontal, 4)
             )
         }

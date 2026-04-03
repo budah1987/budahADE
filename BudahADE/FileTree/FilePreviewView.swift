@@ -19,7 +19,7 @@ struct FilePreviewView: View {
         .clipShape(RoundedRectangle(cornerRadius: 7))
         .overlay(
             RoundedRectangle(cornerRadius: 7)
-                .stroke(Theme.border, lineWidth: 1)
+                .stroke(Theme.Colors.borderLight, lineWidth: 1)
         )
     }
 
@@ -58,12 +58,12 @@ struct FilePreviewView: View {
         ScrollView([.vertical], showsIndicators: false) {
             Text(previewContent)
                 .font(Theme.code(10.5))
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
         }
         .frame(maxHeight: 180)
-        .background(Theme.appBackground)
+        .background(Theme.Colors.appBackground)
     }
 
     // MARK: - Fallback
@@ -72,21 +72,21 @@ struct FilePreviewView: View {
         HStack(spacing: 10) {
             Image(systemName: "doc")
                 .font(.system(size: 22))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             VStack(alignment: .leading, spacing: 3) {
                 Text(URL(fileURLWithPath: path).lastPathComponent)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                 if let size = fileSize {
                     Text(size)
                         .font(.system(size: 11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
             Spacer()
         }
         .padding(12)
-        .background(Theme.elevated)
+        .background(Theme.Colors.surfaceElevated)
     }
 
     // MARK: - Helpers

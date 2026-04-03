@@ -87,10 +87,10 @@ struct SplitDropOverlay: View {
         let isActive = activeZone == zone
         let frame = highlightFrame(zone, geo: geo)
         Rectangle()
-            .fill(isActive ? Theme.accent.opacity(0.12) : Color.clear)
+            .fill(isActive ? Theme.Colors.accent.opacity(0.12) : Color.clear)
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Theme.accent.opacity(isActive ? 0.6 : 0), lineWidth: 2)
+                    .strokeBorder(Theme.Colors.accent.opacity(isActive ? 0.6 : 0), lineWidth: 2)
                     .padding(4)
             )
             .frame(width: frame.width, height: frame.height)
@@ -144,10 +144,10 @@ struct PaneMoveDropOverlay: View {
         let isActive = activePane == pane
         let frame = paneFrame(pane, geo: geo)
         Rectangle()
-            .fill(isActive ? Theme.accent.opacity(0.12) : Color.clear)
+            .fill(isActive ? Theme.Colors.accent.opacity(0.12) : Color.clear)
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Theme.accent.opacity(isActive ? 0.6 : 0), lineWidth: 2)
+                    .strokeBorder(Theme.Colors.accent.opacity(isActive ? 0.6 : 0), lineWidth: 2)
                     .padding(4)
             )
             .frame(width: frame.width, height: frame.height)

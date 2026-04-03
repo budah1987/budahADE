@@ -18,26 +18,26 @@ struct DiffView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Theme.appBackground)
+        .background(Theme.Colors.appBackground)
     }
 
     private func lineColor(for line: String) -> Color {
         if line.hasPrefix("@@") {
-            return Theme.info
+            return Theme.Colors.info
         } else if line.hasPrefix("+") {
-            return Theme.success
+            return Theme.Colors.statusDone
         } else if line.hasPrefix("-") {
-            return Theme.error.opacity(0.85)
+            return Theme.Colors.error.opacity(0.85)
         } else {
-            return Theme.textSecondary
+            return Theme.Colors.textSecondary
         }
     }
 
     private func lineBackground(for line: String) -> Color {
         if line.hasPrefix("+") {
-            return Theme.success.opacity(0.06)
+            return Theme.Colors.statusDone.opacity(0.06)
         } else if line.hasPrefix("-") {
-            return Theme.error.opacity(0.05)
+            return Theme.Colors.error.opacity(0.05)
         } else {
             return .clear
         }

@@ -61,7 +61,7 @@ struct PaneLayout<First: View, Second: View>: View {
         let isHorizontal = orientation == .horizontal
 
         return Rectangle()
-            .fill(Theme.border)
+            .fill(Theme.Colors.borderLight)
             .frame(
                 width: isHorizontal ? 4 : nil,
                 height: isHorizontal ? nil : 4

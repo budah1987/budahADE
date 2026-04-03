@@ -43,7 +43,7 @@ struct CanvasElementView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .strokeBorder(
-                                isSelected ? Theme.accent.opacity(0.6) : Color.white.opacity(0.10),
+                                isSelected ? Theme.Colors.accent.opacity(0.6) : Color.white.opacity(0.10),
                                 lineWidth: isSelected ? 1.5 : 0.5
                             )
                     )
@@ -75,12 +75,12 @@ struct CanvasElementView: View {
                             } label: {
                                 Image(systemName: "xmark")
                                     .font(.system(size: 8, weight: .bold))
-                                    .foregroundColor(Theme.textMuted)
+                                    .foregroundColor(Theme.Colors.textTertiary)
                                     .frame(width: 16, height: 16)
                                     .background(
                                         Circle()
-                                            .fill(Theme.surface2)
-                                            .overlay(Circle().strokeBorder(Theme.borderSubtle, lineWidth: 0.5))
+                                            .fill(Theme.Colors.surface)
+                                            .overlay(Circle().strokeBorder(Theme.Colors.borderSubtle, lineWidth: 0.5))
                                     )
                             }
                             .buttonStyle(.plain)

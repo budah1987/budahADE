@@ -11,14 +11,14 @@ struct PlanArchiveView: View {
             HStack {
                 Text("Plan Archive")
                     .font(Theme.label(16))
-                    .foregroundStyle(Theme.textPrimary)
+                    .foregroundStyle(Theme.Colors.textPrimary)
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
             }
@@ -30,7 +30,7 @@ struct PlanArchiveView: View {
                 VStack(spacing: 8) {
                     Text("No archived conversations")
                         .font(Theme.body(13))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -47,7 +47,7 @@ struct PlanArchiveView: View {
             }
         }
         .frame(width: 420, height: 400)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
     }
 }
 
@@ -62,25 +62,25 @@ private struct PlanArchiveRow: View {
             // Role icon
             Image(systemName: tab.role.iconName)
                 .font(.system(size: 11))
-                .foregroundStyle(Theme.textMuted)
+                .foregroundStyle(Theme.Colors.textTertiary)
                 .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(tab.title)
                         .font(Theme.label(12))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(Theme.Colors.textPrimary)
                         .lineLimit(1)
 
                     Text("\(tab.messageCount) msgs")
                         .font(Theme.caption(10))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                 }
 
                 if !tab.preview.isEmpty {
                     Text(tab.preview)
                         .font(Theme.body(11))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                         .lineLimit(2)
                 }
             }
@@ -89,20 +89,20 @@ private struct PlanArchiveRow: View {
 
             Text(tab.archivedAt.formatted(.relative(presentation: .named)))
                 .font(Theme.caption(10))
-                .foregroundStyle(Theme.textMuted)
+                .foregroundStyle(Theme.Colors.textTertiary)
 
             Button {
                 onDelete()
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 10))
-                    .foregroundStyle(Theme.textMuted)
+                    .foregroundStyle(Theme.Colors.textTertiary)
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Theme.surface3.opacity(0.5))
+        .background(Theme.Colors.surfaceElevated.opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }

@@ -30,7 +30,7 @@ struct ActivityFeedView: View {
                     let idx = Int(timeline.date.timeIntervalSinceReferenceDate / 0.08) % Self.brailleFrames.count
                     Text(Self.brailleFrames[idx])
                         .font(Theme.body(14))
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                 }
 
                 if let startDate {
@@ -38,7 +38,7 @@ struct ActivityFeedView: View {
                         let elapsed = timeline.date.timeIntervalSince(startDate)
                         Text(String(format: "%.1fs", elapsed))
                             .font(Theme.caption(12))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                 }
 
@@ -78,7 +78,7 @@ struct ActivityFeedView: View {
             if let detail = entry.detail {
                 Text(detail)
                     .font(Theme.caption(10))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .lineLimit(1)
             }
         }
@@ -90,14 +90,14 @@ struct ActivityFeedView: View {
         switch status {
         case .inProgress:
             Circle()
-                .fill(kind == .rateLimit ? Color.orange : Theme.accent)
+                .fill(kind == .rateLimit ? Color.orange : Theme.Colors.accent)
                 .frame(width: 5, height: 5)
                 .modifier(PulseModifier())
 
         case .completed:
             Image(systemName: "checkmark")
                 .font(.system(size: 8, weight: .semibold))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .frame(width: 12)
 
         case .failed:
@@ -111,9 +111,9 @@ struct ActivityFeedView: View {
     private func foregroundColor(for entry: ActivityFeedEntry) -> Color {
         switch entry.status {
         case .inProgress:
-            return entry.kind == .rateLimit ? .orange : Theme.textPrimary
+            return entry.kind == .rateLimit ? .orange : Theme.Colors.textPrimary
         case .completed:
-            return Theme.textMuted.opacity(0.5)
+            return Theme.Colors.textTertiary.opacity(0.5)
         case .failed:
             return Color.red.opacity(0.7)
         }

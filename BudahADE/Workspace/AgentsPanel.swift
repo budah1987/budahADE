@@ -31,19 +31,19 @@ struct AgentsPanel: View {
         } label: {
             HStack(spacing: 10) {
                 Circle()
-                    .fill(isActive ? Theme.accent : Theme.textMuted.opacity(0.4))
+                    .fill(isActive ? Theme.Colors.accent : Theme.Colors.textTertiary.opacity(0.4))
                     .frame(width: 5, height: 5)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(tab.title)
                         .font(.system(size: 12, weight: isActive ? .semibold : .regular))
-                        .foregroundColor(isActive ? Theme.textPrimary : Theme.textSecondary)
+                        .foregroundColor(isActive ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
                         .lineLimit(1)
 
                     if tab.isRunning {
                         Text("Running")
                             .font(Theme.caption(10))
-                            .foregroundColor(Theme.accent.opacity(0.7))
+                            .foregroundColor(Theme.Colors.accent.opacity(0.7))
                     }
                 }
 
@@ -52,8 +52,8 @@ struct AgentsPanel: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: Theme.pillCornerRadius)
-                    .fill(isActive ? Theme.selectedFill : Color.clear)
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .fill(isActive ? Theme.Colors.selectedFill : Color.clear)
             )
             .contentShape(Rectangle())
         }
@@ -67,10 +67,10 @@ struct AgentsPanel: View {
         VStack(spacing: 6) {
             Text("No agents running")
                 .font(Theme.label(12))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Press ⌘T to start a new agent")
                 .font(Theme.caption(11))
-                .foregroundColor(Theme.textMuted.opacity(0.5))
+                .foregroundColor(Theme.Colors.textTertiary.opacity(0.5))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

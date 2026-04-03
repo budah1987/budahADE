@@ -14,14 +14,14 @@ struct CommitBarView: View {
             TextField("Commit message...", text: $commitMessage, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(Theme.body(11))
-                .foregroundColor(Theme.textPrimary)
+                .foregroundColor(Theme.Colors.textPrimary)
                 .lineLimit(1...4)
                 .padding(8)
-                .background(Theme.surface3)
+                .background(Theme.Colors.surfaceElevated)
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(Theme.borderSubtle, lineWidth: 1)
+                        .stroke(Theme.Colors.borderSubtle, lineWidth: 1)
                 )
                 .onSubmit { if canCommit { performCommit() } }
 
@@ -29,10 +29,10 @@ struct CommitBarView: View {
                 Button { performCommit() } label: {
                     Text("Commit")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(canCommit ? .white : Theme.textMuted)
+                        .foregroundColor(canCommit ? .white : Theme.Colors.textTertiary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 5)
-                        .background(canCommit ? Theme.info : Theme.surface3)
+                        .background(canCommit ? Theme.Colors.info : Theme.Colors.surfaceElevated)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -52,11 +52,11 @@ struct CommitBarView: View {
                         }
                     }
                     .frame(width: 28, height: 28)
-                    .background(Theme.surface3)
+                    .background(Theme.Colors.surfaceElevated)
                     .cornerRadius(4)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
-                            .stroke(Theme.borderSubtle, lineWidth: 1)
+                            .stroke(Theme.Colors.borderSubtle, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)

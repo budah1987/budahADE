@@ -282,7 +282,7 @@ class ChatResizeNSView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let region = hoveredRegion else { return }
 
-        let accent = NSColor(red: 0.77, green: 0.47, blue: 0.36, alpha: 1.0) // Theme.accent
+        let accent = NSColor(red: 0.77, green: 0.47, blue: 0.36, alpha: 1.0) // Theme.Colors.accent
         accent.withAlphaComponent(0.6).setFill()
 
         let t: CGFloat = 2 // visual indicator thickness

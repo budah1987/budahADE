@@ -36,19 +36,19 @@ struct DiffModalView: View {
         VStack(spacing: 0) {
             if let hash = commitHash {
                 commitHeader(hash)
-                Divider().foregroundColor(Theme.borderSubtle)
+                Divider().foregroundColor(Theme.Colors.borderSubtle)
                 fileList
-                Divider().foregroundColor(Theme.borderSubtle)
+                Divider().foregroundColor(Theme.Colors.borderSubtle)
             } else {
                 workingTreeHeader
-                Divider().foregroundColor(Theme.borderSubtle)
+                Divider().foregroundColor(Theme.Colors.borderSubtle)
             }
             diffContent
-            Divider().foregroundColor(Theme.borderSubtle)
+            Divider().foregroundColor(Theme.Colors.borderSubtle)
             footerBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.appBackground)
+        .background(Theme.Colors.appBackground)
         .task {
             if let hash = commitHash {
                 commitDetail = repo.commitDetail(hash)
@@ -65,13 +65,13 @@ struct DiffModalView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(commitDetail?.subject ?? "Loading...")
                     .font(Theme.label(14))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .lineLimit(2)
 
                 if let body = commitDetail?.body, !body.isEmpty {
                     Text(body)
                         .font(Theme.body(11))
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                         .lineLimit(4)
                 }
             }
@@ -82,22 +82,22 @@ struct DiffModalView: View {
             HStack(spacing: 8) {
                 Text(String(hash.prefix(7)))
                     .font(Theme.code(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
 
-                Circle().fill(Theme.borderSubtle).frame(width: 3, height: 3)
+                Circle().fill(Theme.Colors.borderSubtle).frame(width: 3, height: 3)
 
                 Text(commitDetail?.author ?? "")
                     .font(Theme.caption(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
 
-                Circle().fill(Theme.borderSubtle).frame(width: 3, height: 3)
+                Circle().fill(Theme.Colors.borderSubtle).frame(width: 3, height: 3)
 
                 Text(commitDetail?.date ?? "")
                     .font(Theme.caption(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
 
                 if let detail = commitDetail, detail.parentCount > 1 {
-                    badgePill("merge", color: Theme.warning)
+                    badgePill("merge", color: Theme.Colors.warning)
                 }
 
                 Spacer()
@@ -133,7 +133,7 @@ struct DiffModalView: View {
                 if let error = actionError {
                     Text(error)
                         .font(Theme.caption(10))
-                        .foregroundColor(Theme.error)
+                        .foregroundColor(Theme.Colors.error)
                         .lineLimit(1)
                 }
             }
@@ -141,7 +141,7 @@ struct DiffModalView: View {
             .padding(.top, 10)
             .padding(.bottom, 10)
         }
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
         .alert("Revert this commit?", isPresented: $showRevertConfirm) {
             Button("Cancel", role: .cancel) {}
             Button("Revert", role: .destructive) { performRevert(hash) }
@@ -166,11 +166,11 @@ struct DiffModalView: View {
 
                 Text((file.path as NSString).lastPathComponent)
                     .font(Theme.label(13))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
 
                 Text((file.path as NSString).deletingLastPathComponent)
                     .font(Theme.caption(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
 
             Spacer()
@@ -181,20 +181,20 @@ struct DiffModalView: View {
 
                 Text("+\(adds)")
                     .font(Theme.body(11))
-                    .foregroundColor(Theme.success)
+                    .foregroundColor(Theme.Colors.statusDone)
                 Text("−\(removes)")
                     .font(Theme.body(11))
-                    .foregroundColor(Theme.error)
+                    .foregroundColor(Theme.Colors.error)
 
                 Button {
                     if staged { repo.unstage(file.path) } else { repo.stage(file.path) }
                 } label: {
                     Text(staged ? "Unstage File" : "Stage File")
                         .font(Theme.caption(11))
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -202,7 +202,7 @@ struct DiffModalView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
     }
 
     // MARK: - File List
@@ -220,12 +220,12 @@ struct DiffModalView: View {
 
                             Text((file.path as NSString).lastPathComponent)
                                 .font(Theme.caption(11))
-                                .foregroundColor(isActive ? Theme.textPrimary : Theme.textMuted)
+                                .foregroundColor(isActive ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                                 .lineLimit(1)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(isActive ? Theme.surface3 : Color.clear)
+                        .background(isActive ? Theme.Colors.surfaceElevated : Color.clear)
                         .cornerRadius(4)
                     }
                     .buttonStyle(.plain)
@@ -234,7 +234,7 @@ struct DiffModalView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
         }
-        .background(Theme.appBackground)
+        .background(Theme.Colors.appBackground)
     }
 
     // MARK: - Diff Content
@@ -252,7 +252,7 @@ struct DiffModalView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text("No file selected")
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -284,10 +284,10 @@ struct DiffModalView: View {
             VStack(spacing: 0) {
                 Text("HEAD (before)")
                     .font(Theme.label(11))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 6)
-                    .background(Theme.surface2)
+                    .background(Theme.Colors.surface)
 
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -299,15 +299,15 @@ struct DiffModalView: View {
                 }
             }
 
-            Rectangle().fill(Theme.borderSubtle).frame(width: 1)
+            Rectangle().fill(Theme.Colors.borderSubtle).frame(width: 1)
 
             VStack(spacing: 0) {
                 Text("Working Tree (after)")
                     .font(Theme.label(11))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 6)
-                    .background(Theme.surface2)
+                    .background(Theme.Colors.surface)
 
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -330,7 +330,7 @@ struct DiffModalView: View {
                     HStack(spacing: 0) {
                         Text("\(idx + 1)")
                             .font(Theme.code(10))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .frame(width: 32, alignment: .trailing)
                             .padding(.trailing, 4)
 
@@ -359,21 +359,21 @@ struct DiffModalView: View {
                 } label: {
                     Text("← Prev")
                         .font(Theme.caption(11))
-                        .foregroundColor(currentIndex > 0 ? Theme.info : Theme.textMuted)
+                        .foregroundColor(currentIndex > 0 ? Theme.Colors.info : Theme.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
                 .disabled(currentIndex <= 0)
 
                 Text("\(currentIndex + 1) of \(files.count) files")
                     .font(Theme.caption(11))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
 
                 Button {
                     if currentIndex < files.count - 1 { currentIndex += 1 }
                 } label: {
                     Text("Next →")
                         .font(Theme.caption(11))
-                        .foregroundColor(currentIndex < files.count - 1 ? Theme.info : Theme.textMuted)
+                        .foregroundColor(currentIndex < files.count - 1 ? Theme.Colors.info : Theme.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
                 .disabled(currentIndex >= files.count - 1)
@@ -385,10 +385,10 @@ struct DiffModalView: View {
                 Button { showSplit = false } label: {
                     Text("Unified")
                         .font(Theme.caption(10))
-                        .foregroundColor(!showSplit ? Theme.info : Theme.textMuted)
+                        .foregroundColor(!showSplit ? Theme.Colors.info : Theme.Colors.textTertiary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(!showSplit ? Theme.info.opacity(0.12) : Color.clear)
+                        .background(!showSplit ? Theme.Colors.info.opacity(0.12) : Color.clear)
                         .cornerRadius(3)
                 }
                 .buttonStyle(.plain)
@@ -396,20 +396,20 @@ struct DiffModalView: View {
                 Button { showSplit = true } label: {
                     Text("Split")
                         .font(Theme.caption(10))
-                        .foregroundColor(showSplit ? Theme.info : Theme.textMuted)
+                        .foregroundColor(showSplit ? Theme.Colors.info : Theme.Colors.textTertiary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(showSplit ? Theme.info.opacity(0.12) : Color.clear)
+                        .background(showSplit ? Theme.Colors.info.opacity(0.12) : Color.clear)
                         .cornerRadius(3)
                 }
                 .buttonStyle(.plain)
             }
-            .background(Theme.surface3)
+            .background(Theme.Colors.surfaceElevated)
             .cornerRadius(3)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
     }
 
     // MARK: - Actions
@@ -449,10 +449,10 @@ struct DiffModalView: View {
                 Text(label)
                     .font(Theme.caption(10))
             }
-            .foregroundColor(Theme.textSecondary)
+            .foregroundColor(Theme.Colors.textSecondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Theme.surface3)
+            .background(Theme.Colors.surfaceElevated)
             .cornerRadius(4)
         }
         .buttonStyle(.plain)
@@ -519,7 +519,7 @@ struct DiffModalView: View {
         HStack(spacing: 0) {
             Text(lineNumber.map { "\($0)" } ?? "")
                 .font(Theme.code(10))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .frame(width: 32, alignment: .trailing)
                 .padding(.trailing, 4)
 
@@ -546,40 +546,40 @@ struct DiffModalView: View {
 
     private func statusColor(_ status: String) -> Color {
         switch status {
-        case "M": return Theme.success
-        case "A": return Theme.info
-        case "D": return Theme.error
-        case "R": return Theme.warning
-        default: return Theme.textMuted
+        case "M": return Theme.Colors.statusDone
+        case "A": return Theme.Colors.info
+        case "D": return Theme.Colors.error
+        case "R": return Theme.Colors.warning
+        default: return Theme.Colors.textTertiary
         }
     }
 
     private func lineColor(_ line: String) -> Color {
-        if line.hasPrefix("@@") { return Theme.info }
-        if line.hasPrefix("+") { return Theme.success }
-        if line.hasPrefix("-") { return Theme.error }
-        return Theme.textSecondary
+        if line.hasPrefix("@@") { return Theme.Colors.info }
+        if line.hasPrefix("+") { return Theme.Colors.statusDone }
+        if line.hasPrefix("-") { return Theme.Colors.error }
+        return Theme.Colors.textSecondary
     }
 
     private func lineBackground(_ line: String) -> Color {
-        if line.hasPrefix("+") && !line.hasPrefix("+++") { return Theme.success.opacity(0.06) }
-        if line.hasPrefix("-") && !line.hasPrefix("---") { return Theme.error.opacity(0.05) }
+        if line.hasPrefix("+") && !line.hasPrefix("+++") { return Theme.Colors.statusDone.opacity(0.06) }
+        if line.hasPrefix("-") && !line.hasPrefix("---") { return Theme.Colors.error.opacity(0.05) }
         return .clear
     }
 
     private func lineTypeColor(_ type: LineType) -> Color {
         switch type {
-        case .added: return Theme.success
-        case .removed: return Theme.error
-        case .header: return Theme.info
-        case .context: return Theme.textSecondary
+        case .added: return Theme.Colors.statusDone
+        case .removed: return Theme.Colors.error
+        case .header: return Theme.Colors.info
+        case .context: return Theme.Colors.textSecondary
         }
     }
 
     private func lineTypeBackground(_ type: LineType) -> Color {
         switch type {
-        case .added: return Theme.success.opacity(0.06)
-        case .removed: return Theme.error.opacity(0.05)
+        case .added: return Theme.Colors.statusDone.opacity(0.06)
+        case .removed: return Theme.Colors.error.opacity(0.05)
         case .header, .context: return .clear
         }
     }

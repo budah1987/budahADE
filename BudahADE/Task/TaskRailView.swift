@@ -14,19 +14,27 @@ struct TaskRailView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 6)
 
-            // Plan/Build toggle
-            if let task = workspace.activeTask {
-                PlanBuildToggle(mode: Binding(
-                    get: { task.mode },
-                    set: { newMode in
-                        if newMode == .plan { task.enterPlanMode() }
-                        else { task.enterBuildMode() }
+            // Plan/Build toggle — always visible regardless of which task is selected
+            PlanBuildToggle(mode: Binding(
+                get: { workspace.activeTask?.mode ?? .plan },
+                set: { newMode in
+                    if newMode == .plan {
+                        workspace.activeTask?.enterPlanMode()
+                    } else {
+                        workspace.activeTask?.enterBuildMode()
+                        // Navigate to builder conversation if a session exists
+                        if workspace.activeTask?.builderSession != nil {
+                            workspace.activeTask?.showBuilderChat = true
+                        }
                     }
-                ))
-                .padding(.horizontal, 10)
-                .padding(.bottom, 6)
+                }
+            ))
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
+            .disabled(workspace.activeTask == nil)
 
-                // Spec progress strip
+            // Spec progress strip — only when a task is active
+            if let task = workspace.activeTask {
                 SpecStripView(specState: task.specState, buildStatus: task.buildStatus)
             }
 
@@ -34,11 +42,11 @@ struct TaskRailView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Tasks")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                 Spacer()
                 Text("\(workspace.tasks.count)")
                     .font(Theme.label(9))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
             .padding(.horizontal, 14)
             .padding(.bottom, 6)
@@ -52,7 +60,14 @@ struct TaskRailView: View {
                             isActive: task.id == workspace.activeTaskId,
                             isHovered: task.id == hoveredTaskId,
                             isSpotlit: renameTarget == .task(taskId: task.id),
-                            onSelect: { workspace.selectTask(task.id) },
+                            onSelect: {
+                                workspace.selectTask(task.id)
+                                // If this task has a builder session, navigate to it
+                                if task.builderSession != nil {
+                                    task.enterBuildMode()
+                                    task.showBuilderChat = true
+                                }
+                            },
                             onComplete: { workspace.taskForCompletion = task },
                             onDelete: { workspace.deleteTask(task.id) }
                         )
@@ -79,9 +94,9 @@ struct TaskRailView: View {
                         Spacer()
                         Text("\(task.archivedPlanTabs.count)")
                             .font(Theme.caption(10))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
@@ -89,7 +104,7 @@ struct TaskRailView: View {
                 }
                 .buttonStyle(.plain)
                 .overlay(alignment: .top) {
-                    Rectangle().fill(Theme.border).frame(height: 1)
+                    Rectangle().fill(Theme.Colors.borderLight).frame(height: 1)
                 }
             }
 
@@ -103,7 +118,7 @@ struct TaskRailView: View {
                     Text("Task Archive")
                         .font(Theme.label(12))
                 }
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -111,7 +126,7 @@ struct TaskRailView: View {
             }
             .buttonStyle(.plain)
             .overlay(alignment: .top) {
-                Rectangle().fill(Theme.border).frame(height: 1)
+                Rectangle().fill(Theme.Colors.borderLight).frame(height: 1)
             }
 
             // New Task button
@@ -124,7 +139,7 @@ struct TaskRailView: View {
                     Text("New Task")
                         .font(Theme.label(12))
                 }
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
@@ -132,26 +147,26 @@ struct TaskRailView: View {
             }
             .buttonStyle(.plain)
             .overlay(alignment: .top) {
-                Rectangle().fill(Theme.borderSubtle).frame(height: 1)
+                Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 1)
             }
         }
         .frame(width: 160)
         .sheet(item: $workspace.taskForCompletion) { task in
             TaskCompletionSheet(workspace: workspace, task: task)
-                .background(Theme.appBackground)
+                .background(Theme.Colors.appBackground)
         }
         .sheet(isPresented: $workspace.showTaskArchive) {
             TaskArchiveView(archive: workspace.taskArchive) { archived in
                 workspace.reopenTask(archived)
             }
-            .background(Theme.appBackground)
+            .background(Theme.Colors.appBackground)
         }
         .sheet(isPresented: planArchiveBinding) {
             if let task = workspace.activeTask {
                 PlanArchiveView(archivedTabs: task.archivedPlanTabs) { index in
                     task.archivedPlanTabs.remove(at: index)
                 }
-                .background(Theme.appBackground)
+                .background(Theme.Colors.appBackground)
             }
         }
     }
@@ -199,20 +214,20 @@ private struct TaskCardView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.branch")
                         .font(.system(size: 8, weight: .medium))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
 
                     Text(task.branchName)
                         .font(Theme.caption(9))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .lineLimit(1)
 
                     if let port = task.assignedPort, task.devServerManager?.isRunning == true {
                         Text(":\(port)")
                             .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                            .foregroundColor(Theme.accent)
+                            .foregroundColor(Theme.Colors.accent)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(Theme.accent.opacity(0.12))
+                            .background(Theme.Colors.accent.opacity(0.12))
                             .cornerRadius(3)
                     }
                 }
@@ -281,11 +296,11 @@ private struct TaskCardView: View {
             if task.status == .completed {
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Theme.success)
+                        .fill(Theme.Colors.statusDone)
                         .frame(width: 4, height: 4)
                     Text("completed")
                         .font(.system(size: 9))
-                        .foregroundColor(Theme.success)
+                        .foregroundColor(Theme.Colors.statusDone)
                 }
             } else {
                 HStack(spacing: 3) {
@@ -353,10 +368,10 @@ private struct TaskCardView: View {
 
     private func statusDotColor(_ status: AgentStatus) -> Color {
         switch status {
-        case .inactive:  return Theme.textMuted
-        case .thinking:  return Theme.success
+        case .inactive:  return Theme.Colors.textTertiary
+        case .thinking:  return Theme.Colors.statusDone
         case .working:   return Color(hex: 0x818cf8)
-        case .completed: return Theme.success
+        case .completed: return Theme.Colors.statusDone
         }
     }
 
@@ -381,11 +396,11 @@ private struct TaskCardView: View {
 
     private func buildStatusColor(_ session: BuilderSession) -> Color {
         switch session.buildState {
-        case .ready:    return Theme.textMuted
-        case .building: return Theme.builder
-        case .paused:   return Theme.warning
-        case .done:     return Theme.success
-        case .failed:   return Theme.error
+        case .ready:    return Theme.Colors.textTertiary
+        case .building: return Theme.Colors.statusWorking
+        case .paused:   return Theme.Colors.warning
+        case .done:     return Theme.Colors.statusDone
+        case .failed:   return Theme.Colors.error
         }
     }
 }
@@ -401,11 +416,11 @@ struct PlanBuildToggle: View {
             toggleButton("Build", isActive: mode == .build) { mode = .build }
         }
         .padding(2)
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
         .cornerRadius(6)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Theme.borderSubtle, lineWidth: 0.5)
+                .strokeBorder(Theme.Colors.borderSubtle, lineWidth: 0.5)
         )
     }
 
@@ -413,7 +428,7 @@ struct PlanBuildToggle: View {
         Button(action: action) {
             Text(label)
                 .font(Theme.label(11))
-                .foregroundColor(isActive ? Theme.textPrimary : Theme.textMuted)
+                .foregroundColor(isActive ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
                 .background(

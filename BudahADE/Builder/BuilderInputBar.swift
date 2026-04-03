@@ -55,10 +55,10 @@ struct BuilderInputBar: View {
                             Text("Review Diff")
                                 .font(Theme.label(12))
                         }
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
@@ -73,7 +73,7 @@ struct BuilderInputBar: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Theme.success)
+                        .background(Theme.Colors.statusDone)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
@@ -97,7 +97,7 @@ struct BuilderInputBar: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                     Spacer()
@@ -149,7 +149,7 @@ struct BuilderInputBar: View {
                     if inputText.isEmpty {
                         Text("Talk to the builder…")
                             .font(.system(size: 14))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .padding(.top, 2)
                             .allowsHitTesting(false)
                     }
@@ -202,7 +202,7 @@ struct BuilderInputBar: View {
                     Button(action: submit) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundColor(canSend ? Theme.builder : Theme.textMuted)
+                            .foregroundColor(canSend ? Theme.Colors.statusWorking : Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                     .disabled(!canSend)
@@ -228,7 +228,7 @@ struct BuilderInputBar: View {
                 pendingImage = NSImage(contentsOf: url)
             }
         }
-        .background(Theme.contentBg)
+        .background(Theme.Colors.appBackground)
     }
 
     // MARK: - Context Memory Ring

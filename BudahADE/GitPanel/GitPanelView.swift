@@ -25,7 +25,7 @@ struct GitPanelView: View {
                 .padding(.vertical, 8)
 
                 Rectangle()
-                    .fill(Theme.borderSubtle)
+                    .fill(Theme.Colors.borderSubtle)
                     .frame(height: 0.5)
 
                 ScrollView {
@@ -37,7 +37,7 @@ struct GitPanelView: View {
                 }
 
                 Rectangle()
-                    .fill(Theme.borderSubtle)
+                    .fill(Theme.Colors.borderSubtle)
                     .frame(height: 0.5)
 
                 CommitBar(repo: repo)
@@ -50,7 +50,7 @@ struct GitPanelView: View {
                     HStack {
                         Text(file)
                             .font(Theme.label(11))
-                            .foregroundColor(Theme.textSecondary)
+                            .foregroundColor(Theme.Colors.textSecondary)
                             .lineLimit(1)
 
                         Spacer()
@@ -61,13 +61,13 @@ struct GitPanelView: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 9, weight: .semibold))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
-                    .background(Theme.surface2)
+                    .background(Theme.Colors.surface)
 
                     DiffView(diff: selectedDiff)
                 } else {
@@ -75,16 +75,16 @@ struct GitPanelView: View {
                         Spacer()
                         Text("Select a file to view diff")
                             .font(Theme.body(12))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.appBackground)
+                    .background(Theme.Colors.appBackground)
                 }
             }
             .frame(minHeight: 100)
         }
-        .background(Theme.sidebar)
+        .background(Theme.Colors.sidebarBackground)
         .onAppear {
             repo.startPolling()
         }

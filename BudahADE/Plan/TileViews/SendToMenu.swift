@@ -16,8 +16,8 @@ struct SendToMenu: View {
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
-                .background(Theme.surface2)
-                .foregroundColor(Theme.textSecondary)
+                .background(Theme.Colors.surface)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -36,8 +36,8 @@ struct SendToMenu: View {
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Theme.surface2)
-                    .foregroundColor(Theme.textSecondary)
+                    .background(Theme.Colors.surface)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -45,11 +45,11 @@ struct SendToMenu: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Theme.surface1)
+        .background(Theme.Colors.sidebarBackground)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(Theme.borderSubtle, lineWidth: 0.5)
+                .strokeBorder(Theme.Colors.borderSubtle, lineWidth: 0.5)
         )
     }
 }

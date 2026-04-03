@@ -34,7 +34,7 @@ enum TileSelectionChrome {
     static func elementBackground(for element: CanvasElement) -> some View {
         switch element.kind {
         case .tile:
-            Theme.contentBg
+            Theme.Colors.appBackground
         case .frame:
             Color.clear
         case .text:
@@ -46,7 +46,7 @@ enum TileSelectionChrome {
     static func selectionBorder(isSelected: Bool, isHovered: Bool) -> some View {
         if isSelected {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Theme.accent.opacity(0.6), lineWidth: 1.5)
+                .strokeBorder(Theme.Colors.accent.opacity(0.6), lineWidth: 1.5)
         } else if isHovered {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)

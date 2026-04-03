@@ -21,7 +21,7 @@ struct ChatTurnScrubber: View {
                 MarkerDash(
                     marker: marker,
                     isActive: marker.messageId == activeMessageId,
-                    color: stepColorProvider?(marker.stepIndex) ?? Theme.textMuted
+                    color: stepColorProvider?(marker.stepIndex) ?? Theme.Colors.textTertiary
                 )
                 .onTapGesture {
                     onMarkerTap?(marker.messageId)
@@ -45,7 +45,7 @@ private struct MarkerDash: View {
 
     var body: some View {
         Rectangle()
-            .fill(isActive ? Theme.textPrimary : color)
+            .fill(isActive ? Theme.Colors.textPrimary : color)
             .frame(width: isActive ? 12 : 8, height: isActive ? 3 : 2)
             .frame(width: 20, height: 16)
             .contentShape(Rectangle())
@@ -55,10 +55,10 @@ private struct MarkerDash: View {
             .popover(isPresented: $isHovering, arrowEdge: .leading) {
                 Text(marker.fullText.prefix(100) + (marker.fullText.count > 100 ? "..." : ""))
                     .font(Theme.body(11))
-                    .foregroundStyle(Theme.textPrimary)
+                    .foregroundStyle(Theme.Colors.textPrimary)
                     .padding(8)
                     .frame(maxWidth: 240, alignment: .leading)
-                    .background(Theme.surface2)
+                    .background(Theme.Colors.surface)
             }
     }
 }
@@ -68,13 +68,13 @@ private struct MarkerDash: View {
 /// Default step color provider for builder mode scrubbers
 func builderStepColor(for stepIndex: Int?, steps: [BuildStep]) -> Color {
     guard let idx = stepIndex, steps.indices.contains(idx) else {
-        return Theme.textMuted
+        return Theme.Colors.textTertiary
     }
     switch steps[idx].state {
-    case .done:     return Theme.success
-    case .building: return Theme.builder
-    case .queued:   return Theme.textMuted
-    case .failed:   return Theme.error
-    case .skipped:  return Theme.textMuted.opacity(0.5)
+    case .done:     return Theme.Colors.statusDone
+    case .building: return Theme.Colors.statusWorking
+    case .queued:   return Theme.Colors.textTertiary
+    case .failed:   return Theme.Colors.error
+    case .skipped:  return Theme.Colors.textTertiary.opacity(0.5)
     }
 }

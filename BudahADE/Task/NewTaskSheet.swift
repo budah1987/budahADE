@@ -37,16 +37,16 @@ struct NewTaskSheet: View {
             VStack(spacing: 4) {
                 Text("New task")
                     .font(Theme.label(15))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                 Text(workspace.projectName)
                     .font(Theme.code(11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
             .padding(.top, 24)
             .padding(.bottom, 20)
 
             Rectangle()
-                .fill(Theme.borderSubtle)
+                .fill(Theme.Colors.borderSubtle)
                 .frame(height: 0.5)
 
             VStack(spacing: 14) {
@@ -55,7 +55,7 @@ struct NewTaskSheet: View {
                     TextField("e.g. Rate limiter", text: $taskName)
                         .textFieldStyle(.plain)
                         .font(Theme.body(13))
-                        .foregroundColor(Theme.textPrimary)
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .focused($focusedField, equals: .name)
                         .onChange(of: taskName) { _, newValue in
                             let prevSlug = slugify(taskName.dropLast())
@@ -70,7 +70,7 @@ struct NewTaskSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("BRANCH")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .tracking(0.8)
 
                     HStack(spacing: 6) {
@@ -81,18 +81,18 @@ struct NewTaskSheet: View {
                             HStack(spacing: 3) {
                                 Text(branchPrefix ?? "none")
                                     .font(Theme.body(12))
-                                    .foregroundColor(branchPrefix != nil ? prefixColor(branchPrefix!) : Theme.textMuted)
+                                    .foregroundColor(branchPrefix != nil ? prefixColor(branchPrefix!) : Theme.Colors.textTertiary)
                                 Image(systemName: showPrefixDropdown ? "chevron.up" : "chevron.down")
                                     .font(.system(size: 7))
-                                    .foregroundColor(Theme.textMuted)
+                                    .foregroundColor(Theme.Colors.textTertiary)
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
-                            .background(Theme.surface2)
+                            .background(Theme.Colors.surface)
                             .cornerRadius(4)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .stroke(Theme.border, lineWidth: 0.5)
+                                    .stroke(Theme.Colors.borderLight, lineWidth: 0.5)
                             )
                         }
                         .buttonStyle(.plain)
@@ -103,13 +103,13 @@ struct NewTaskSheet: View {
                         if branchPrefix != nil {
                             Text("/")
                                 .font(Theme.body(13))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
 
                         TextField("my-feature", text: $branchSlug)
                             .textFieldStyle(.plain)
                             .font(Theme.body(14))
-                            .foregroundColor(Theme.textPrimary)
+                            .foregroundColor(Theme.Colors.textPrimary)
                             .focused($focusedField, equals: .branch)
                             .onChange(of: branchSlug) { _, newValue in
                                 branchSlug = BranchNameValidator.sanitize(newValue)
@@ -118,11 +118,11 @@ struct NewTaskSheet: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .background(Theme.surface3)
-                    .cornerRadius(Theme.cardCornerRadius)
+                    .background(Theme.Colors.surfaceElevated)
+                    .cornerRadius(Theme.Radius.md)
                     .overlay(
-                        RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
-                            .stroke(Theme.border, lineWidth: 0.5)
+                        RoundedRectangle(cornerRadius: Theme.Radius.md)
+                            .stroke(Theme.Colors.borderLight, lineWidth: 0.5)
                     )
                 }
 
@@ -131,7 +131,7 @@ struct NewTaskSheet: View {
                     HStack(spacing: 6) {
                         Text("from")
                             .font(Theme.caption(11))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
 
                         Button {
                             showBasedOnDropdown.toggle()
@@ -139,18 +139,18 @@ struct NewTaskSheet: View {
                             HStack(spacing: 4) {
                                 Text(baseBranch)
                                     .font(Theme.body(11))
-                                    .foregroundColor(Theme.textSecondary)
+                                    .foregroundColor(Theme.Colors.textSecondary)
                                 Image(systemName: "chevron.down")
                                     .font(.system(size: 7))
-                                    .foregroundColor(Theme.textMuted)
+                                    .foregroundColor(Theme.Colors.textTertiary)
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Theme.surface3)
+                            .background(Theme.Colors.surfaceElevated)
                             .cornerRadius(4)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .stroke(Theme.border, lineWidth: 0.5)
+                                    .stroke(Theme.Colors.borderLight, lineWidth: 0.5)
                             )
                         }
                         .buttonStyle(.plain)
@@ -169,14 +169,14 @@ struct NewTaskSheet: View {
                         Toggle(isOn: $startWithPlan) {
                             Text("Plan first")
                                 .font(Theme.caption(11))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                         .toggleStyle(.checkbox)
                     }
                 }
 
                 Rectangle()
-                    .fill(Theme.borderSubtle)
+                    .fill(Theme.Colors.borderSubtle)
                     .frame(height: 0.5)
                     .padding(.vertical, 2)
 
@@ -196,7 +196,7 @@ struct NewTaskSheet: View {
                     }
                     .buttonStyle(.plain)
                     .font(Theme.body(12))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
                 }
@@ -213,12 +213,12 @@ struct NewTaskSheet: View {
                         Text(hasSpec ? "Create & Build" : "Create")
                             .font(Theme.label(12))
                     }
-                    .foregroundColor(isValid ? .white : Theme.textMuted)
+                    .foregroundColor(isValid ? .white : Theme.Colors.textTertiary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 7)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(isValid ? Theme.accent : Theme.surface3)
+                            .fill(isValid ? Theme.Colors.accent : Theme.Colors.surfaceElevated)
                     )
                 }
                 .buttonStyle(.plain)
@@ -233,7 +233,7 @@ struct NewTaskSheet: View {
                 .fill(.ultraThinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Theme.border, lineWidth: 0.5)
+                        .strokeBorder(Theme.Colors.borderLight, lineWidth: 0.5)
                 )
                 .shadow(color: .black.opacity(0.45), radius: 40, y: 16)
         )
@@ -262,16 +262,16 @@ struct NewTaskSheet: View {
                 HStack(spacing: 6) {
                     Image(systemName: branchPrefix == nil ? "checkmark" : "")
                         .font(.system(size: 8))
-                        .foregroundColor(Theme.info)
+                        .foregroundColor(Theme.Colors.info)
                         .frame(width: 12)
                     Text("none")
                         .font(Theme.body(11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                     Spacer()
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-                .background(hoveredPrefix == "__none" ? Theme.surface3 : Color.clear)
+                .background(hoveredPrefix == "__none" ? Theme.Colors.surfaceElevated : Color.clear)
                 .cornerRadius(4)
                 .contentShape(Rectangle())
             }
@@ -287,7 +287,7 @@ struct NewTaskSheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: branchPrefix == type.prefix ? "checkmark" : "")
                             .font(.system(size: 8))
-                            .foregroundColor(Theme.info)
+                            .foregroundColor(Theme.Colors.info)
                             .frame(width: 12)
                         Text(type.prefix)
                             .font(Theme.body(11))
@@ -296,12 +296,12 @@ struct NewTaskSheet: View {
                         Spacer()
                         Text(type.label)
                             .font(Theme.caption(9))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
-                    .background(hoveredPrefix == type.prefix ? Theme.surface3 : Color.clear)
+                    .background(hoveredPrefix == type.prefix ? Theme.Colors.surfaceElevated : Color.clear)
                     .cornerRadius(4)
                     .contentShape(Rectangle())
                 }
@@ -321,7 +321,7 @@ struct NewTaskSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("SPEC")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .tracking(0.8)
 
             if let path = specFilePath {
@@ -329,16 +329,16 @@ struct NewTaskSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: "doc.text.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(Theme.accent)
+                        .foregroundColor(Theme.Colors.accent)
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text((path as NSString).lastPathComponent)
                             .font(Theme.code(11))
-                            .foregroundColor(Theme.textPrimary)
+                            .foregroundColor(Theme.Colors.textPrimary)
                             .lineLimit(1)
                         Text("\(specItemCount) items")
                             .font(Theme.caption(10))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
 
                     Spacer()
@@ -349,9 +349,9 @@ struct NewTaskSheet: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .frame(width: 18, height: 18)
-                            .background(Theme.surface3)
+                            .background(Theme.Colors.surfaceElevated)
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -360,10 +360,10 @@ struct NewTaskSheet: View {
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Theme.accent.opacity(0.06))
+                        .fill(Theme.Colors.accent.opacity(0.06))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(Theme.accent.opacity(0.15), lineWidth: 0.5)
+                                .strokeBorder(Theme.Colors.accent.opacity(0.15), lineWidth: 0.5)
                         )
                 )
             } else {
@@ -372,20 +372,20 @@ struct NewTaskSheet: View {
                     VStack(spacing: 6) {
                         Image(systemName: "doc.badge.plus")
                             .font(.system(size: 14))
-                            .foregroundColor(isDropTargeted ? Theme.accent : Theme.textMuted)
+                            .foregroundColor(isDropTargeted ? Theme.Colors.accent : Theme.Colors.textTertiary)
                         Text("Drop a spec or browse")
                             .font(Theme.caption(11))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(isDropTargeted ? Theme.accent.opacity(0.06) : Color.white.opacity(0.02))
+                            .fill(isDropTargeted ? Theme.Colors.accent.opacity(0.06) : Color.white.opacity(0.02))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                                     .strokeBorder(
-                                        isDropTargeted ? Theme.accent.opacity(0.3) : Theme.borderSubtle,
+                                        isDropTargeted ? Theme.Colors.accent.opacity(0.3) : Theme.Colors.borderSubtle,
                                         style: StrokeStyle(lineWidth: 1, dash: [4, 3])
                                     )
                             )
@@ -399,7 +399,7 @@ struct NewTaskSheet: View {
 
             Text(hasSpec ? "Task opens in Build mode with builder agent" : "Optional — skip to start from scratch")
                 .font(Theme.caption(10))
-                .foregroundColor(Theme.textMuted.opacity(0.7))
+                .foregroundColor(Theme.Colors.textTertiary.opacity(0.7))
         }
     }
 
@@ -409,7 +409,7 @@ struct NewTaskSheet: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .tracking(0.8)
 
             content()
@@ -417,10 +417,10 @@ struct NewTaskSheet: View {
                 .padding(.vertical, 7)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Theme.surface3)
+                        .fill(Theme.Colors.surfaceElevated)
                         .overlay(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(Theme.borderSubtle, lineWidth: 0.5)
+                                .strokeBorder(Theme.Colors.borderSubtle, lineWidth: 0.5)
                         )
                 )
         }
@@ -487,16 +487,16 @@ struct NewTaskSheet: View {
 
     private func prefixColor(_ prefix: String) -> Color {
         guard let type = BranchNameValidator.prefixTypes.first(where: { $0.prefix == prefix }) else {
-            return Theme.textMuted
+            return Theme.Colors.textTertiary
         }
         switch type.color {
-        case "success": return Theme.success
-        case "error": return Theme.error
-        case "accent": return Theme.accent
-        case "info": return Theme.info
-        case "warning": return Theme.warning
-        case "textMuted": return Theme.textMuted
-        default: return Theme.textSecondary
+        case "success": return Theme.Colors.statusDone
+        case "error": return Theme.Colors.error
+        case "accent": return Theme.Colors.accent
+        case "info": return Theme.Colors.info
+        case "warning": return Theme.Colors.warning
+        case "textMuted": return Theme.Colors.textTertiary
+        default: return Theme.Colors.textSecondary
         }
     }
 }
@@ -531,17 +531,17 @@ struct BasedOnDropdownView: View {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 10))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                 TextField("Search branches...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(Theme.body(11))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .focused($searchFocused)
                 if !searchText.isEmpty {
                     Button { searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 10))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -557,7 +557,7 @@ struct BasedOnDropdownView: View {
                     ProgressView().scaleEffect(0.6)
                     Text("Loading branches…")
                         .font(Theme.caption(10))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -600,7 +600,7 @@ struct BasedOnDropdownView: View {
         HStack {
             Text(title)
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .tracking(0.6)
             Spacer()
         }
@@ -617,17 +617,17 @@ struct BasedOnDropdownView: View {
             HStack(spacing: 6) {
                 Image(systemName: branch == baseBranch ? "checkmark" : "")
                     .font(.system(size: 8))
-                    .foregroundColor(Theme.info)
+                    .foregroundColor(Theme.Colors.info)
                     .frame(width: 12)
                 Text(branch)
                     .font(Theme.body(11))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                     .lineLimit(1)
                 Spacer()
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(hoveredBranch == branch ? Theme.surface3 : Color.clear)
+            .background(hoveredBranch == branch ? Theme.Colors.surfaceElevated : Color.clear)
             .cornerRadius(4)
             .contentShape(Rectangle())
         }

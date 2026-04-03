@@ -21,16 +21,16 @@ struct ChangesToolbar: View {
                 HStack(spacing: 8) {
                     Text("CHANGES")
                         .font(Theme.caption(9))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                         .tracking(0.5)
 
                     // Count badge
                     Text("\(changeCount)")
                         .font(Theme.code(10, weight: .bold))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(Theme.Colors.textPrimary)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
 
                     Spacer()
@@ -39,17 +39,17 @@ struct ChangesToolbar: View {
                     if insertions > 0 {
                         Text("+\(insertions)")
                             .font(Theme.code(10))
-                            .foregroundStyle(Theme.success)
+                            .foregroundStyle(Theme.Colors.statusDone)
                     }
                     if deletions > 0 {
                         Text("-\(deletions)")
                             .font(Theme.code(10))
-                            .foregroundStyle(Theme.error)
+                            .foregroundStyle(Theme.Colors.error)
                     }
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 36)
-                .background(Theme.sidebar)
+                .background(Theme.Colors.sidebarBackground)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onTap)
             }

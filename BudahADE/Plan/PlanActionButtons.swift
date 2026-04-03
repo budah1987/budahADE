@@ -72,14 +72,14 @@ private struct ActionButton: View {
                 Text(label)
                     .font(Theme.label(12))
             }
-            .foregroundColor(isHovered ? Theme.textPrimary : Theme.textSecondary)
+            .foregroundColor(isHovered ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(isHovered ? Theme.hoverFill : Color.white.opacity(0.05))
+            .background(isHovered ? Theme.Colors.hoverFill : Color.white.opacity(0.05))
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .strokeBorder(Theme.borderSubtle, lineWidth: 0.75)
+                    .strokeBorder(Theme.Colors.borderSubtle, lineWidth: 0.75)
             )
         }
         .buttonStyle(.plain)
@@ -105,7 +105,7 @@ private struct ApproveButton: View {
             .foregroundColor(.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
-            .background(isHovered ? Theme.accent.opacity(0.85) : Theme.accent)
+            .background(isHovered ? Theme.Colors.accent.opacity(0.85) : Theme.Colors.accent)
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -123,7 +123,7 @@ private struct HandOffPopover: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Send to tab")
                 .font(Theme.caption(11))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .padding(.horizontal, 10)
                 .padding(.top, 8)
 
@@ -134,10 +134,10 @@ private struct HandOffPopover: View {
                     HStack(spacing: 8) {
                         Image(systemName: "bubble.left")
                             .font(.system(size: 11))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                         Text(tab.title)
                             .font(Theme.body(13))
-                            .foregroundColor(Theme.textPrimary)
+                            .foregroundColor(Theme.Colors.textPrimary)
                         Spacer()
                     }
                     .padding(.horizontal, 10)

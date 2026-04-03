@@ -76,15 +76,15 @@ struct WorkspaceView: View {
 
     private var coreView: some View {
         ZStack {
-            Theme.appBackground.ignoresSafeArea()
+            Theme.Colors.appBackground.ignoresSafeArea()
 
             HStack(spacing: 0) {
                 // ── TASK RAIL ──
                 TaskRailView(workspace: state, renameTarget: renameTarget)
-                    .background(Theme.sidebar)
+                    .background(Theme.Colors.sidebarBackground)
 
                 Rectangle()
-                    .fill(Theme.border)
+                    .fill(Theme.Colors.borderLight)
                     .frame(width: 1)
 
                 // ── CONTENT ZONE ──
@@ -160,10 +160,10 @@ struct WorkspaceView: View {
                                 )
                                 .id("\(state.activeTaskId?.uuidString ?? "")-\(state.activeTask?.tabs.count ?? 0)")
                                 .transition(.move(edge: .leading).combined(with: .opacity))
-                                .background(Theme.sidebar)
+                                .background(Theme.Colors.sidebarBackground)
 
                                 Rectangle()
-                                    .fill(Theme.border)
+                                    .fill(Theme.Colors.borderLight)
                                     .frame(width: 1)
                             }
 
@@ -171,7 +171,7 @@ struct WorkspaceView: View {
 
                             if state.rightPanelVisible, let task = state.activeTask {
                                 Rectangle()
-                                    .fill(Theme.border)
+                                    .fill(Theme.Colors.borderLight)
                                     .frame(width: 1)
 
                                 GitSidebarView(task: task, projectPath: state.projectPath)
@@ -201,7 +201,7 @@ struct WorkspaceView: View {
         .animation(.easeOut(duration: 0.15), value: renameTarget != nil)
         .sheet(isPresented: $state.showNewTaskSheet) {
             NewTaskSheet(workspace: state)
-                .background(Theme.appBackground)
+                .background(Theme.Colors.appBackground)
         }
         .alert("Close conversation?", isPresented: $showCloseConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -387,9 +387,10 @@ struct WorkspaceView: View {
                         session: builderSession,
                         specTitle: task.specState.activeSpec?.title ?? "Spec",
                         isBuilderTabActive: task.showBuilderChat,
+                        activeActionText: task.builderAgent?.agentSession?.currentStreamingText,
                         onTap: {
                             withAnimation(.easeInOut(duration: 0.2)) {
-                                task.showBuilderChat.toggle()
+                                task.showBuilderChat = true
                             }
                         }
                     )
@@ -407,7 +408,7 @@ struct WorkspaceView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
 
                     Rectangle()
-                        .fill(Theme.borderSubtle)
+                        .fill(Theme.Colors.borderSubtle)
                         .frame(height: 0.5)
                 }
             }
@@ -425,7 +426,8 @@ struct WorkspaceView: View {
                     builderAgent: task.builderAgent,
                     onLaunchAgent: { launchBuilderAgent(task: task) },
                     onBackToPlan: { task.enterPlanMode() },
-                    onEditSpec: nil  // nil → handled internally (opens spec sheet)
+                    onEditSpec: nil,
+                    branchName: task.branchName
                 )
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -490,10 +492,10 @@ struct WorkspaceView: View {
                             VStack(spacing: 8) {
                                 Text("No tasks yet")
                                     .font(Theme.label(14))
-                                    .foregroundColor(Theme.textMuted)
+                                    .foregroundColor(Theme.Colors.textTertiary)
                                 Text("Press ⌘N to create a task")
                                     .font(Theme.caption(12))
-                                    .foregroundColor(Theme.textMuted.opacity(0.6))
+                                    .foregroundColor(Theme.Colors.textTertiary.opacity(0.6))
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
@@ -534,7 +536,7 @@ struct WorkspaceView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
-            .background(Theme.contentBg)
+            .background(Theme.Colors.appBackground)
             .animation(.easeInOut(duration: 0.25), value: state.activeTask?.isBuilderDrawerOpen)
             } // end if !showBuilderChat
         }
@@ -573,7 +575,7 @@ struct WorkspaceView: View {
 
     private func paneFocusBorder(focused: Bool) -> some View {
         RoundedRectangle(cornerRadius: 2)
-            .strokeBorder(focused ? Theme.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
+            .strokeBorder(focused ? Theme.Colors.accent.opacity(0.4) : Color.clear, lineWidth: 1.5)
             .allowsHitTesting(false)
     }
 
@@ -612,7 +614,7 @@ struct WorkspaceView: View {
             // Spotlight ring around the target element
             if spotlightFrame != .zero {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1.5)
+                    .strokeBorder(Theme.Colors.accent.opacity(0.5), lineWidth: 1.5)
                     .frame(
                         width: spotlightFrame.width + 6,
                         height: spotlightFrame.height + 6
@@ -629,24 +631,24 @@ struct WorkspaceView: View {
                 HStack(spacing: 6) {
                     Image(systemName: renameTarget?.icon ?? "pencil")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                     Text(renameTarget?.label ?? "Rename")
                         .font(Theme.label(12))
-                        .foregroundStyle(Theme.textSecondary)
+                        .foregroundStyle(Theme.Colors.textSecondary)
                     Spacer()
                     Text("esc to cancel")
                         .font(Theme.caption(10))
-                        .foregroundStyle(Theme.textMuted)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
 
-                Rectangle().fill(Theme.borderSubtle).frame(height: 1)
+                Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 1)
 
                 // Text field
                 TextField("", text: $renameText)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Theme.textPrimary)
+                    .foregroundStyle(Theme.Colors.textPrimary)
                     .textFieldStyle(.plain)
                     .focused($renameFieldFocused)
                     .onSubmit { commitRename() }
@@ -657,10 +659,10 @@ struct WorkspaceView: View {
             .frame(width: 380)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Theme.surface2)
+                    .fill(Theme.Colors.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Theme.border, lineWidth: 1)
+                            .strokeBorder(Theme.Colors.borderLight, lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
             )
@@ -783,7 +785,7 @@ struct BuildTransitionOverlay: View {
                         if step.rawValue < state.step.rawValue {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(Theme.success)
+                                .foregroundColor(Theme.Colors.statusDone)
                                 .frame(width: 14)
                         } else if step == state.step {
                             ProgressView()
@@ -791,7 +793,7 @@ struct BuildTransitionOverlay: View {
                                 .frame(width: 14)
                         } else {
                             Circle()
-                                .fill(Theme.textMuted.opacity(0.3))
+                                .fill(Theme.Colors.textTertiary.opacity(0.3))
                                 .frame(width: 6, height: 6)
                                 .frame(width: 14)
                         }
@@ -800,8 +802,8 @@ struct BuildTransitionOverlay: View {
                             .font(.system(size: 13, weight: step == state.step ? .medium : .regular))
                             .foregroundColor(
                                 step.rawValue <= state.step.rawValue
-                                    ? Theme.textPrimary
-                                    : Theme.textMuted
+                                    ? Theme.Colors.textPrimary
+                                    : Theme.Colors.textTertiary
                             )
                     }
                 }
@@ -810,10 +812,10 @@ struct BuildTransitionOverlay: View {
             .padding(.vertical, 20)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Theme.surface2)
+                    .fill(Theme.Colors.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Theme.borderSubtle, lineWidth: 0.5)
+                            .strokeBorder(Theme.Colors.borderSubtle, lineWidth: 0.5)
                     )
                     .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
             )

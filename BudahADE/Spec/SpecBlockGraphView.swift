@@ -25,7 +25,7 @@ struct SpecBlockGraphView: View {
                 Text("\(percentage)%")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundColor(
-                        completedCount == tasks.count ? Theme.success : Theme.textSecondary
+                        completedCount == tasks.count ? Theme.Colors.statusDone : Theme.Colors.textSecondary
                     )
             }
             .padding(.horizontal, 12)
@@ -61,8 +61,8 @@ struct SpecBlockGraphView: View {
 
         var color: Color {
             switch self {
-            case .completed: return Theme.success
-            case .active:    return Theme.accent
+            case .completed: return Theme.Colors.statusDone
+            case .active:    return Theme.Colors.accent
             case .blocked:   return Color(hex: 0xE06C75)
             case .pending:   return Color.white.opacity(0.1)
             }

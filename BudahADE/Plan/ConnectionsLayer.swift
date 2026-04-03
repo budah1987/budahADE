@@ -94,11 +94,11 @@ struct ConnectionsLayer: View {
     // MARK: - Color Helpers
 
     fileprivate func tileColor(for element: CanvasElement) -> Color {
-        guard case .tile(let tileType) = element.kind else { return Theme.textMuted }
+        guard case .tile(let tileType) = element.kind else { return Theme.Colors.textTertiary }
         switch tileType {
         case .chatAgent(_, let role): return role.color
         case .terminal(_, let agent): return agent.dotColor
-        default: return Theme.textMuted
+        default: return Theme.Colors.textTertiary
         }
     }
 }
@@ -230,7 +230,7 @@ private struct DragPreviewArrow: View {
     @State private var pulseOpacity: Double = 0.0
 
     private var arrowColor: Color {
-        isOverTarget ? Color.green : Theme.accent
+        isOverTarget ? Color.green : Theme.Colors.accent
     }
 
     var body: some View {
@@ -346,7 +346,7 @@ struct OutputPort: View {
     }
 
     private var dotFill: Color {
-        isRevealed ? Color.white.opacity(0.9) : Theme.surface2
+        isRevealed ? Color.white.opacity(0.9) : Theme.Colors.surface
     }
 
     var body: some View {
@@ -358,11 +358,11 @@ struct OutputPort: View {
                     .fill(dotFill)
                     .overlay(
                         Circle().strokeBorder(
-                            Theme.accent.opacity(isRevealed ? 0.9 : 0.3),
+                            Theme.Colors.accent.opacity(isRevealed ? 0.9 : 0.3),
                             lineWidth: 1.5
                         )
                     )
-                    .shadow(color: Theme.accent.opacity(isRevealed ? 0.5 : 0), radius: 6)
+                    .shadow(color: Theme.Colors.accent.opacity(isRevealed ? 0.5 : 0), radius: 6)
                     .frame(width: dotSize, height: dotSize)
                     .scaleEffect(dotScale)
                     .opacity(dotOpacity)
@@ -442,14 +442,14 @@ struct InputPort: View {
 
     var body: some View {
         Circle()
-            .fill(isHighlighted ? Color.white.opacity(0.9) : Theme.surface2)
+            .fill(isHighlighted ? Color.white.opacity(0.9) : Theme.Colors.surface)
             .overlay(
                 Circle().strokeBorder(
-                    Theme.accent.opacity(isHighlighted ? 0.9 : 0.3),
+                    Theme.Colors.accent.opacity(isHighlighted ? 0.9 : 0.3),
                     lineWidth: 1.5
                 )
             )
-            .shadow(color: Theme.accent.opacity(isHighlighted ? 0.5 : 0), radius: 6)
+            .shadow(color: Theme.Colors.accent.opacity(isHighlighted ? 0.5 : 0), radius: 6)
             .frame(width: dotSize, height: dotSize)
             .scaleEffect(dotScale)
             .opacity(dotOpacity)
@@ -478,8 +478,8 @@ struct ConnectionDestinationHighlight: View {
     var body: some View {
         if isHighlighted {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Theme.accent.opacity(0.8), lineWidth: 2)
-                .shadow(color: Theme.accent.opacity(0.4), radius: 8)
+                .strokeBorder(Theme.Colors.accent.opacity(0.8), lineWidth: 2)
+                .shadow(color: Theme.Colors.accent.opacity(0.4), radius: 8)
         }
     }
 }

@@ -19,20 +19,20 @@ struct CommitHistoryView: View {
                 HStack(spacing: 6) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .frame(width: 10)
 
                     Text("HISTORY")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                         .tracking(0.8)
 
                     Text("\(repo.totalCommitCount)")
                         .font(Theme.caption(9))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(Theme.surface3)
+                        .background(Theme.Colors.surfaceElevated)
                         .cornerRadius(8)
 
                     Spacer()
@@ -64,7 +64,7 @@ struct CommitHistoryView: View {
                 } label: {
                     Text("Load more...")
                         .font(Theme.caption(10))
-                        .foregroundColor(Theme.info)
+                        .foregroundColor(Theme.Colors.info)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .padding(.leading, 24)
@@ -83,8 +83,8 @@ struct CommitHistoryView: View {
         }()
         let isForkPoint = commit.id == repo.forkPointHash
         let isAtOrBelowFork = isForkPoint || isBelowFork
-        let dotColor = isBelowFork ? Theme.accent : Theme.info
-        let lineColor = isAtOrBelowFork ? Theme.accent : Theme.info
+        let dotColor = isBelowFork ? Theme.Colors.accent : Theme.Colors.info
+        let lineColor = isAtOrBelowFork ? Theme.Colors.accent : Theme.Colors.info
 
         return HStack(alignment: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -92,7 +92,7 @@ struct CommitHistoryView: View {
                     Color.clear.frame(width: 2, height: 4)
                 } else {
                     Rectangle()
-                        .fill(isBelowFork ? Theme.accent : Theme.info)
+                        .fill(isBelowFork ? Theme.Colors.accent : Theme.Colors.info)
                         .frame(width: 2, height: 4)
                 }
 
@@ -122,27 +122,27 @@ struct CommitHistoryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(commit.message)
                     .font(Theme.body(11))
-                    .foregroundColor(isBelowFork ? Theme.textMuted : Theme.textSecondary)
+                    .foregroundColor(isBelowFork ? Theme.Colors.textTertiary : Theme.Colors.textSecondary)
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
                     Text(String(commit.id.prefix(7)))
                         .font(Theme.caption(9))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
 
                     Text(commit.date)
                         .font(Theme.caption(9))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
 
                     Spacer()
 
                     if isHead {
-                        badgePill("HEAD", color: Theme.info)
-                        badgePill(repo.currentBranch.components(separatedBy: "/").last ?? repo.currentBranch, color: Theme.success)
+                        badgePill("HEAD", color: Theme.Colors.info)
+                        badgePill(repo.currentBranch.components(separatedBy: "/").last ?? repo.currentBranch, color: Theme.Colors.statusDone)
                     }
 
                     if isBelowFork, index == (commits.firstIndex(where: { $0.id == repo.forkPointHash }).map { $0 + 1 } ?? -1) {
-                        badgePill("origin/\(repo.mergeTarget)", color: Theme.accent)
+                        badgePill("origin/\(repo.mergeTarget)", color: Theme.Colors.accent)
                     }
                 }
             }

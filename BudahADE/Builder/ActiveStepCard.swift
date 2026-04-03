@@ -13,12 +13,12 @@ struct ActiveStepCard: View {
             // Header: purple dot + title + sub-progress
             HStack(spacing: 6) {
                 Circle()
-                    .fill(Theme.builder)
+                    .fill(Theme.Colors.statusWorking)
                     .frame(width: 8, height: 8)
 
                 Text(step.title)
                     .font(Theme.label(12))
-                    .foregroundStyle(Theme.textPrimary)
+                    .foregroundStyle(Theme.Colors.textPrimary)
                     .lineLimit(2)
 
                 Spacer()
@@ -26,7 +26,7 @@ struct ActiveStepCard: View {
                 if !step.subTasks.isEmpty {
                     Text("\(step.subTasksDone)/\(step.subTasksTotal)")
                         .font(Theme.code(10))
-                        .foregroundStyle(Theme.builder)
+                        .foregroundStyle(Theme.Colors.statusWorking)
                 }
             }
 
@@ -48,18 +48,18 @@ struct ActiveStepCard: View {
             if let activity = currentActivity(for: step) {
                 Text(activity)
                     .font(Theme.caption(10))
-                    .foregroundStyle(Theme.textMuted)
+                    .foregroundStyle(Theme.Colors.textTertiary)
                     .italic()
                     .lineLimit(1)
             }
         }
         .padding(10)
-        .background(Theme.builder.opacity(0.05))
+        .background(Theme.Colors.statusWorking.opacity(0.05))
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
-                .strokeBorder(Theme.builder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .strokeBorder(Theme.Colors.statusWorking, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardCornerRadius))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
     }
 
     // MARK: - Sub-task progress (mini bar using sub-task states)
@@ -79,11 +79,11 @@ struct ActiveStepCard: View {
 
     private func subTaskColor(_ state: StepState) -> Color {
         switch state {
-        case .done:     return Theme.success
-        case .building: return Theme.builder
-        case .queued:   return Theme.textMuted.opacity(0.3)
-        case .failed:   return Theme.error
-        case .skipped:  return Theme.textMuted.opacity(0.15)
+        case .done:     return Theme.Colors.statusDone
+        case .building: return Theme.Colors.statusWorking
+        case .queued:   return Theme.Colors.textTertiary.opacity(0.3)
+        case .failed:   return Theme.Colors.error
+        case .skipped:  return Theme.Colors.textTertiary.opacity(0.15)
         }
     }
 
@@ -112,7 +112,7 @@ private struct SubTaskRow: View {
         }
         .padding(.vertical, 1)
         .padding(.horizontal, 4)
-        .background(subTask.state == .building ? Theme.builder.opacity(0.08) : Color.clear)
+        .background(subTask.state == .building ? Theme.Colors.statusWorking.opacity(0.08) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
@@ -122,33 +122,33 @@ private struct SubTaskRow: View {
         case .done:
             Image(systemName: "checkmark")
                 .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Theme.success)
+                .foregroundStyle(Theme.Colors.statusDone)
         case .building:
             Circle()
-                .fill(Theme.builder)
+                .fill(Theme.Colors.statusWorking)
                 .frame(width: 6, height: 6)
         case .queued:
             Circle()
-                .strokeBorder(Theme.textMuted, lineWidth: 1)
+                .strokeBorder(Theme.Colors.textTertiary, lineWidth: 1)
                 .frame(width: 6, height: 6)
         case .failed:
             Image(systemName: "xmark")
                 .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Theme.error)
+                .foregroundStyle(Theme.Colors.error)
         case .skipped:
             Image(systemName: "forward.fill")
                 .font(.system(size: 7))
-                .foregroundStyle(Theme.textMuted)
+                .foregroundStyle(Theme.Colors.textTertiary)
         }
     }
 
     private var textColor: Color {
         switch subTask.state {
-        case .done:     return Theme.textMuted
-        case .building: return Theme.textPrimary
-        case .queued:   return Theme.textMuted
-        case .failed:   return Theme.error
-        case .skipped:  return Theme.textMuted
+        case .done:     return Theme.Colors.textTertiary
+        case .building: return Theme.Colors.textPrimary
+        case .queued:   return Theme.Colors.textTertiary
+        case .failed:   return Theme.Colors.error
+        case .skipped:  return Theme.Colors.textTertiary
         }
     }
 }

@@ -10,7 +10,7 @@ struct BudahADEApp: App {
             ContentView()
                 .environmentObject(appState)
                 .frame(minWidth: 900, minHeight: 600)
-                .background(Theme.appBackground)
+                .background(Theme.Colors.appBackground)
                 .preferredColorScheme(.dark)
                 .onAppear {
                     // Wire AppState to AppDelegate for save-on-quit and restore-after-Ghostty-init
@@ -299,7 +299,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            Theme.appBackground.ignoresSafeArea()
+            Theme.Colors.appBackground.ignoresSafeArea()
 
             if appState.hasNoWorkspaces {
                 ProjectPickerView()

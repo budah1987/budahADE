@@ -55,7 +55,7 @@ struct ChatTileView: View {
         case .streaming:  return Color(hex: 0x68ce6a)
         case .done:       return Color(hex: 0x4264ef)
         case .error:      return .red
-        case .idle:       return session.messages.isEmpty ? Theme.textMuted : Color(hex: 0x4264ef)
+        case .idle:       return session.messages.isEmpty ? Theme.Colors.textTertiary : Color(hex: 0x4264ef)
         }
     }
 
@@ -108,14 +108,14 @@ struct ChatTileView: View {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                         .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Theme.surface2)
+            .background(Theme.Colors.surface)
 
             // Messages with fade-out at bottom into input
             messageList
@@ -216,7 +216,7 @@ struct ChatTileView: View {
                                     .scaleEffect(0.7)
                                 Text("Working... (\(session.pendingToolCalls.count) tool calls)")
                                     .font(Theme.caption(12))
-                                    .foregroundColor(Theme.textMuted)
+                                    .foregroundColor(Theme.Colors.textTertiary)
                                 Spacer()
                             }
                             .padding(.horizontal, 4)
@@ -244,10 +244,10 @@ struct ChatTileView: View {
         VStack(spacing: 8) {
             Image(systemName: "bubble.left.and.text.bubble.right")
                 .font(.system(size: 24))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
             Text("Send a message to start the conversation")
                 .font(Theme.body(14))
-                .foregroundColor(Theme.textMuted)
+                .foregroundColor(Theme.Colors.textTertiary)
                 .multilineTextAlignment(.center)
         }
     }
@@ -343,7 +343,7 @@ struct ChatTileView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                     Spacer()
@@ -358,10 +358,10 @@ struct ChatTileView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("From \(staged.fromAgent)")
                             .font(Theme.caption(11))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                         Text(staged.content.prefix(100) + (staged.content.count > 100 ? "..." : ""))
                             .font(Theme.body(12))
-                            .foregroundColor(Theme.textSecondary)
+                            .foregroundColor(Theme.Colors.textSecondary)
                             .lineLimit(2)
                     }
                     Spacer()
@@ -370,12 +370,12 @@ struct ChatTileView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 11))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
                 }
                 .padding(6)
-                .background(Theme.accent.opacity(0.06))
+                .background(Theme.Colors.accent.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .padding(.horizontal, 8)
                 .padding(.top, 4)
@@ -428,7 +428,7 @@ struct ChatTileView: View {
                             ? "What should \(role.name) do with this?"
                             : "Hi, \(role.name). I need help with something")
                             .font(.system(size: 13))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .padding(.top, 2)
                             .allowsHitTesting(false)
                     }
@@ -497,7 +497,7 @@ struct ChatTileView: View {
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.system(size: 18))
                                 .foregroundColor(
-                                    canSend ? Theme.accent : Theme.textMuted
+                                    canSend ? Theme.Colors.accent : Theme.Colors.textTertiary
                                 )
                         }
                         .buttonStyle(.plain)
@@ -744,10 +744,10 @@ private struct MessageBubble: View {
                         HStack(spacing: 4) {
                             Image(systemName: "wrench.and.screwdriver")
                                 .font(.system(size: 9))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                             Text("\(tools.count) tool\(tools.count == 1 ? "" : "s")")
                                 .font(Theme.caption(10))
-                                .foregroundColor(Theme.textMuted)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                         .padding(.bottom, 2)
                     }
@@ -755,7 +755,7 @@ private struct MessageBubble: View {
                     if !message.content.isEmpty {
                         Text(message.content)
                             .font(Theme.body(14))
-                            .foregroundColor(Theme.textPrimary)
+                            .foregroundColor(Theme.Colors.textPrimary)
                             .textSelection(.enabled)
                     }
                 }
@@ -780,7 +780,7 @@ private struct MessageBubble: View {
                         Text("Send to")
                             .font(Theme.caption(11))
                     }
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                 }
@@ -793,7 +793,7 @@ private struct MessageBubble: View {
     private var systemBubble: some View {
         Text(message.content)
             .font(Theme.caption(12))
-            .foregroundColor(Theme.textMuted)
+            .foregroundColor(Theme.Colors.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -801,7 +801,7 @@ private struct MessageBubble: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(style: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-                    .foregroundColor(Theme.borderSubtle)
+                    .foregroundColor(Theme.Colors.borderSubtle)
             )
     }
 

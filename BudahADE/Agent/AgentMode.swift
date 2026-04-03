@@ -47,11 +47,11 @@ enum AgentMode: String, CaseIterable, Identifiable, Codable {
 
     var dotColor: Color {
         switch self {
-        case .claude:      return Theme.textSecondary
+        case .claude:      return Theme.Colors.textSecondary
         case .researcher:  return Color(hex: 0x7ab5a0)
         case .ideator:     return Color(hex: 0xc4a85c)
         case .designer:    return .pink
-        case .developer:   return Theme.accent
+        case .developer:   return Theme.Colors.accent
         case .specAuthor:  return .orange
         }
     }

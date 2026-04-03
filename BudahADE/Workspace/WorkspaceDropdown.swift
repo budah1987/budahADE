@@ -28,18 +28,18 @@ struct WorkspaceDropdown: View {
             HStack(spacing: 4) {
                 Text(appState.activeWorkspace?.projectName ?? "No Project")
                     .font(Theme.label(12))
-                    .foregroundColor(isHovered || isExpanded ? Theme.textPrimary : Theme.textSecondary)
+                    .foregroundColor(isHovered || isExpanded ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .rotationEffect(.degrees(isExpanded ? 180 : 0))
                     .animation(.easeInOut(duration: 0.15), value: isExpanded)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: Theme.pillCornerRadius)
-                    .fill(isHovered || isExpanded ? Theme.hoverFill : Color.clear)
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .fill(isHovered || isExpanded ? Theme.Colors.hoverFill : Color.clear)
             )
             .animation(.easeInOut(duration: 0.12), value: isHovered)
         }
@@ -107,17 +107,17 @@ struct WorkspaceDropdown: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                 TextField("Search projects...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(Theme.body(13))
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .onSubmit { selectHighlighted() }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
-            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+            Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -142,7 +142,7 @@ struct WorkspaceDropdown: View {
             }
             .frame(maxHeight: 300)
 
-            Rectangle().fill(Theme.borderSubtle).frame(height: 0.5)
+            Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
 
             Button(action: openFolderPanel) {
                 HStack(spacing: 6) {
@@ -151,18 +151,18 @@ struct WorkspaceDropdown: View {
                     Text("Open Folder...")
                         .font(Theme.body(12))
                 }
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.Colors.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(
                     highlightedIndex == openFolderIndex
-                        ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.hoverFill)
+                        ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.Colors.hoverFill)
                         : nil
                 )
             }
             .buttonStyle(.plain)
         }
-        .background(Theme.surface2)
+        .background(Theme.Colors.surface)
         .onKeyPress(.downArrow) {
             if selectableCount > 0 {
                 highlightedIndex = (highlightedIndex + 1) % selectableCount
@@ -186,7 +186,7 @@ struct WorkspaceDropdown: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(Theme.textMuted)
+            .foregroundColor(Theme.Colors.textTertiary)
             .tracking(0.8)
             .padding(.horizontal, 14)
             .padding(.top, 10)
@@ -201,16 +201,16 @@ struct WorkspaceDropdown: View {
         } label: {
             HStack(spacing: 10) {
                 Circle()
-                    .fill(isActive ? Theme.accent : Theme.textMuted.opacity(0.4))
+                    .fill(isActive ? Theme.Colors.accent : Theme.Colors.textTertiary.opacity(0.4))
                     .frame(width: 5, height: 5)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(ws.projectName)
                         .font(.system(size: 13, weight: isActive ? .semibold : .regular))
-                        .foregroundColor(isActive ? Theme.textPrimary : Theme.textSecondary)
+                        .foregroundColor(isActive ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
                     Text("\(ws.tasks.count) task\(ws.tasks.count == 1 ? "" : "s")")
                         .font(Theme.caption(11))
-                        .foregroundColor(Theme.textMuted)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
 
                 Spacer()
@@ -221,7 +221,7 @@ struct WorkspaceDropdown: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 8, weight: .semibold))
-                            .foregroundColor(Theme.textMuted)
+                            .foregroundColor(Theme.Colors.textTertiary)
                             .frame(width: 16, height: 16)
                     }
                     .buttonStyle(.plain)
@@ -231,7 +231,7 @@ struct WorkspaceDropdown: View {
             .padding(.vertical, 7)
             .background(
                 isHighlighted
-                    ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.hoverFill)
+                    ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.Colors.hoverFill)
                     : nil
             )
             .contentShape(Rectangle())
@@ -247,18 +247,18 @@ struct WorkspaceDropdown: View {
             HStack(spacing: 10) {
                 Image(systemName: "folder")
                     .font(.system(size: 11))
-                    .foregroundColor(Theme.textMuted)
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .frame(width: 5)
                 Text(project.name)
                     .font(Theme.body(13))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.Colors.textSecondary)
                 Spacer()
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(
                 isHighlighted
-                    ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.hoverFill)
+                    ? RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Theme.Colors.hoverFill)
                     : nil
             )
             .contentShape(Rectangle())
