@@ -764,24 +764,26 @@ final class TaskState: ObservableObject, Identifiable {
     /// Create a new terminal tab assigned to the secondary pane.
     @discardableResult
     func createTabInSecondaryPane() -> UUID {
-        guard splitPane != nil else { return createTab() }
+        guard var split = splitPane else { return createTab() }
         let prevSelected = selectedTabId
         let id = createTab()
         selectedTabId = prevSelected   // keep primary selection unchanged
-        splitPane?.secondaryTabIds.append(id)
-        splitPane?.secondarySelectedId = id
+        split.secondaryTabIds.append(id)
+        split.secondarySelectedId = id
+        splitPane = split  // Trigger @Published update
         return id
     }
 
     /// Create a new browser tab assigned to the secondary pane.
     @discardableResult
     func createBrowserTabInSecondaryPane() -> UUID {
-        guard splitPane != nil else { return createBrowserTab() }
+        guard var split = splitPane else { return createBrowserTab() }
         let prevSelected = selectedTabId
         let id = createBrowserTab()
         selectedTabId = prevSelected   // keep primary selection unchanged
-        splitPane?.secondaryTabIds.append(id)
-        splitPane?.secondarySelectedId = id
+        split.secondaryTabIds.append(id)
+        split.secondarySelectedId = id
+        splitPane = split  // Trigger @Published update
         return id
     }
 
