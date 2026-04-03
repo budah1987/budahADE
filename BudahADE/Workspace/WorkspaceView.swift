@@ -369,15 +369,27 @@ struct WorkspaceView: View {
                     TerminalTabBar(
                         selectedTabID: Binding(
                             get: { task.selectedTabId ?? UUID() },
-                            set: { task.selectTab($0) }
+                            set: {
+                                task.selectTab($0)
+                                // Clicking a conversation tab dismisses the builder view
+                                task.showBuilderChat = false
+                            }
                         ),
                         tabs: task.tabs.filter { $0.tabType != .builder },
                         renameTarget: renameTarget,
-                        onSelectTab: { task.selectTab($0) },
+                        onSelectTab: {
+                            task.selectTab($0)
+                            task.showBuilderChat = false
+                        },
                         onCloseTab: { requestCloseTab(.build($0)) },
                         onNewTab: { task.createTab() },
                         onNewBrowserTab: { task.createBrowserTab() }
                     )
+
+                    // Builder tab row — below conversation tabs, click to show builder
+                    if task.builderSession != nil {
+                        BuilderTabRow(task: task)
+                    }
                 }
             }
 
@@ -702,6 +714,87 @@ struct WorkspaceView: View {
 enum TabCloseRequest {
     case plan(UUID)
     case build(UUID)
+}
+
+// MARK: - Builder Tab Row (below conversation tabs)
+
+struct BuilderTabRow: View {
+    @ObservedObject var task: TaskState
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    task.showBuilderChat = true
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(builderStatusColor)
+                        .frame(width: 6, height: 6)
+
+                    if let session = task.builderSession {
+                        Text("\(session.completedCount)/\(session.totalCount)")
+                            .font(Theme.code(9))
+                            .foregroundColor(Theme.Colors.statusWorking.opacity(0.5))
+                    }
+
+                    Text(task.specState.activeSpec?.title ?? "Builder")
+                        .font(Theme.label(11))
+                        .foregroundColor(
+                            task.showBuilderChat
+                                ? Theme.Colors.textPrimary
+                                : Theme.Colors.textSecondary
+                        )
+                        .lineLimit(1)
+
+                    if let session = task.builderSession {
+                        SpecProgressBar(steps: session.steps, size: .mini)
+                            .frame(width: 120)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(task.showBuilderChat
+                              ? Theme.Colors.tabSelectedGlass
+                              : Theme.Colors.tabGlassBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(
+                            task.showBuilderChat
+                                ? Theme.Colors.statusWorking.opacity(0.2)
+                                : Theme.Colors.tabGlassBorder,
+                            lineWidth: 0.5
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(GlassBackground())
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Theme.Colors.borderSubtle)
+                .frame(height: 0.5)
+        }
+    }
+
+    private var builderStatusColor: Color {
+        guard let session = task.builderSession else { return Theme.Colors.statusIdle }
+        switch session.buildState {
+        case .building: return Theme.Colors.statusWorking
+        case .done:     return Theme.Colors.statusDone
+        case .failed:   return Theme.Colors.error
+        case .ready:    return Theme.Colors.statusIdle
+        case .paused:   return Theme.Colors.warning
+        }
+    }
 }
 
 // MARK: - Rename Spotlight Preference
