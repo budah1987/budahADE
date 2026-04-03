@@ -38,13 +38,23 @@ struct GlassPanel<Content: View>: View {
                 Theme.Colors.sidebarBackground.opacity(0.85)
             }
         case .actionBar:
-            Theme.Colors.actionBarBackground
+            ZStack {
+                GlassBackground(material: .popover, cornerRadius: Theme.Radius.lg)
+                Theme.Colors.actionBarBackground
+            }
         case .card:
-            Theme.Colors.cardBackground
+            ZStack {
+                GlassBackground(material: .hudWindow, cornerRadius: Theme.Radius.md)
+                Color.white.opacity(0.04)
+            }
         case .cardActive:
-            Theme.Colors.cardBackground
+            ZStack {
+                GlassBackground(material: .hudWindow, cornerRadius: Theme.Radius.md)
+                Color.white.opacity(0.06)
+            }
         case .modal:
             ZStack {
+                GlassBackground(material: .popover, cornerRadius: Theme.Radius.lg)
                 Theme.Colors.actionBarBackground
             }
         case .input:

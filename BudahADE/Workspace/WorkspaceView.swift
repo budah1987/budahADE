@@ -78,17 +78,45 @@ struct WorkspaceView: View {
         ZStack {
             Theme.Colors.appBackground.ignoresSafeArea()
 
-            HStack(spacing: 0) {
-                // ── TASK RAIL ──
-                TaskRailView(workspace: state, renameTarget: renameTarget)
-                    .background(Theme.Colors.sidebarBackground)
+            VStack(spacing: 0) {
+                // ── APP BAR (full width) ──
+                AppBar(
+                    workspace: state,
+                    renameTarget: renameTarget,
+                    onCloseTab: { tabId in
+                        if state.activeTask?.mode == .plan {
+                            requestCloseTab(.plan(tabId))
+                        } else {
+                            requestCloseTab(.build(tabId))
+                        }
+                    },
+                    onNewTab: {
+                        if state.activeTask?.mode == .plan {
+                            showRoleModal = true
+                        } else {
+                            state.activeTask?.createTab()
+                        }
+                    },
+                    onNewBrowserTab: { state.activeTask?.createBrowserTab() }
+                )
 
-                Rectangle()
-                    .fill(Theme.Colors.borderLight)
-                    .frame(width: 1)
+                // ── BODY: sidebar + content ──
+                HStack(spacing: 0) {
+                    // ── TASK RAIL ──
+                    TaskRailView(workspace: state, renameTarget: renameTarget)
+                        .background(
+                            ZStack {
+                                GlassBackground(material: .sidebar)
+                                Theme.Colors.sidebarBackground.opacity(0.7)
+                            }
+                        )
 
-                // ── CONTENT ZONE ──
-                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(Theme.Colors.borderLight)
+                        .frame(width: 1)
+
+                    // ── CONTENT ZONE ──
+                    VStack(spacing: 0) {
                     // Content
                     if let task = state.activeTask, task.mode == .plan {
                         // Plan mode: role modal or tab bar + chat
@@ -100,16 +128,7 @@ struct WorkspaceView: View {
                                 }
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             } else {
-                                PlanTabBar(
-                                    selectedTabID: Binding(
-                                        get: { task.selectedPlanTabId ?? UUID() },
-                                        set: { task.selectPlanTab($0) }
-                                    ),
-                                    tabs: task.planTabs,
-                                    onSelectTab: { task.selectPlanTab($0) },
-                                    onCloseTab: { requestCloseTab(.plan($0)) },
-                                    onNewTab: { showRoleModal = true }
-                                )
+                                // Tabs now live in AppBar — only SpecBar + content here
 
                                 // Task-scoped SpecBar — visible in plan mode when a build exists
                                 if let builderSession = task.builderSession {
@@ -181,7 +200,8 @@ struct WorkspaceView: View {
                         }
                     }
                 }
-            }
+                } // end HStack (body)
+            } // end VStack (appbar + body)
             .blur(radius: renameTarget != nil ? 2 : 0)
             .animation(.easeOut(duration: 0.15), value: renameTarget != nil)
 
@@ -365,20 +385,9 @@ struct WorkspaceView: View {
     private var terminalArea: some View {
         VStack(spacing: 0) {
             if let task = state.activeTask {
-                // Single tab bar — only shown when NOT split (split mode embeds tab bars per-pane)
-                if task.splitPane == nil {
-                    TerminalTabBar(
-                        selectedTabID: Binding(
-                            get: { task.selectedTabId ?? UUID() },
-                            set: { task.selectTab($0) }
-                        ),
-                        tabs: task.tabs,
-                        renameTarget: renameTarget,
-                        onSelectTab: { task.selectTab($0) },
-                        onCloseTab: { requestCloseTab(.build($0)) },
-                        onNewTab: { task.createTab() },
-                        onNewBrowserTab: { task.createBrowserTab() }
-                    )
+                // Tabs now live in AppBar — TerminalTabBar only for split-pane secondary
+                if task.splitPane != nil {
+                    // Split pane still uses inline tab bars (handled in split pane views)
                 }
 
                 // Builder SpecBar or legacy spec strip — below terminal tabs
