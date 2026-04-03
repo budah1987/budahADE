@@ -139,8 +139,8 @@ struct WorkspaceView: View {
                                 .background(Theme.Colors.appBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                                 .padding(.top, Theme.Spacing.sm)
-                                .padding(.bottom, Theme.Spacing.sm)
-                                .padding(.horizontal, Theme.Spacing.sm)
+                                .padding(.bottom, Theme.Spacing.lg)
+                                .padding(.horizontal, Theme.Spacing.lg)
                             }
                         }
                         .sheet(isPresented: $showRoleModal) {
@@ -171,8 +171,8 @@ struct WorkspaceView: View {
                                     .background(Theme.Colors.appBackground)
                                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                                     .padding(.top, Theme.Spacing.sm)
-                                    .padding(.bottom, Theme.Spacing.sm)
-                                    .padding(.horizontal, Theme.Spacing.sm)
+                                    .padding(.bottom, Theme.Spacing.lg)
+                                    .padding(.horizontal, Theme.Spacing.lg)
                             }
 
                             if state.rightPanelVisible, let task = state.activeTask {
