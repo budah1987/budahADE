@@ -324,6 +324,8 @@ final class TaskState: ObservableObject, Identifiable {
            planTabs[index].status == .done {
             planTabs[index].status = .idle
         }
+        // Request focus on the plan chat input
+        NotificationCenter.default.post(name: .focusInput, object: nil)
     }
 
     /// Routes the last assistant message from sourceTab to targetTab as handed-off context.
@@ -621,6 +623,8 @@ final class TaskState: ObservableObject, Identifiable {
         // Make terminal first responder so keyboard events (paste, Shift+Enter) go to the right tab
         if tabs[index].isTerminal {
             terminals[id]?.focus()
+            // Request focus on input (for consistency across tab types)
+            NotificationCenter.default.post(name: .focusInput, object: nil)
         }
     }
 
@@ -705,7 +709,11 @@ final class TaskState: ObservableObject, Identifiable {
         focusedPane = .secondary
         if let index = tabs.firstIndex(where: { $0.id == id }) {
             if tabs[index].agentStatus == .completed { tabs[index].agentStatus = .inactive }
-            if tabs[index].isTerminal { terminals[id]?.focus() }
+            if tabs[index].isTerminal {
+                terminals[id]?.focus()
+                // Request focus on input
+                NotificationCenter.default.post(name: .focusInput, object: nil)
+            }
         }
     }
 
@@ -713,6 +721,7 @@ final class TaskState: ObservableObject, Identifiable {
     func moveTab(_ tabId: UUID, to pane: PanePosition) {
         guard var split = splitPane else { return }
         let isInSecondary = split.secondaryTabIds.contains(tabId)
+        guard let tab = tabs.first(where: { $0.id == tabId }) else { return }
 
         switch pane {
         case .secondary:
@@ -727,6 +736,10 @@ final class TaskState: ObservableObject, Identifiable {
             }
             splitPane = split
             focusedPane = .secondary
+            // Focus the terminal in the target pane
+            if tab.isTerminal {
+                terminals[tabId]?.focus()
+            }
 
         case .primary:
             guard isInSecondary else { return }
@@ -741,6 +754,10 @@ final class TaskState: ObservableObject, Identifiable {
             }
             selectedTabId = tabId
             focusedPane = .primary
+            // Focus the terminal in the target pane
+            if tab.isTerminal {
+                terminals[tabId]?.focus()
+            }
         }
     }
 

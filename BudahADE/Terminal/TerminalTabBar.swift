@@ -124,6 +124,7 @@ struct TerminalTabBar: View {
                 .padding(.trailing, 8)
             }
             .padding(.top, 6)
+            .frame(height: 44)  // Consistent height: 6px padding + 32px tab + 6px bottom
             .coordinateSpace(name: "tabbar")
             .onPreferenceChange(TabMidpointKey.self) { midpoints in
                 tabMidpoints = (0..<tabs.count).map { midpoints[$0] ?? 0 }
