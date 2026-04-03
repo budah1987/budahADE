@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Tab Drag Tracking
 //
@@ -74,21 +75,44 @@ struct TerminalTabBar: View {
     let onCloseTab: (UUID) -> Void
     let onNewTab: () -> Void
     var onNewBrowserTab: (() -> Void)?
+    var onReorderTab: ((UUID, Int) -> Void)?
+
+    @State private var insertionIndex: Int?
+    @State private var tabMidpoints: [CGFloat] = []
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
-                ForEach(tabs) { tab in
-                    ConversationTab(
-                        id: tab.id,
-                        title: tab.title,
-                        isSelected: tab.id == selectedTabID,
-                        isSpotlit: renameTarget?.tabId == tab.id,
-                        tabType: tab.tabType,
-                        agentState: TabAgentState(from: tab.agentStatus),
-                        onSelect: { onSelectTab(tab.id) },
-                        onClose: { onCloseTab(tab.id) }
-                    )
+                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                    ZStack(alignment: .leading) {
+                        // Insertion indicator before this tab
+                        if insertionIndex == index {
+                            insertionIndicator
+                                .offset(x: -4)
+                        }
+
+                        ConversationTab(
+                            id: tab.id,
+                            title: tab.title,
+                            isSelected: tab.id == selectedTabID,
+                            isSpotlit: renameTarget?.tabId == tab.id,
+                            tabType: tab.tabType,
+                            agentState: TabAgentState(from: tab.agentStatus),
+                            onSelect: { onSelectTab(tab.id) },
+                            onClose: { onCloseTab(tab.id) }
+                        )
+                        .background(GeometryReader { geo in
+                            Color.clear.preference(
+                                key: TabMidpointKey.self,
+                                value: [index: geo.frame(in: .named("tabbar")).midX]
+                            )
+                        })
+                    }
+                }
+
+                // Insertion indicator after last tab
+                if insertionIndex == tabs.count {
+                    insertionIndicator
                 }
 
                 Spacer(minLength: 0)
@@ -100,7 +124,76 @@ struct TerminalTabBar: View {
                 .padding(.trailing, 8)
             }
             .padding(.top, 6)
+            .coordinateSpace(name: "tabbar")
+            .onPreferenceChange(TabMidpointKey.self) { midpoints in
+                tabMidpoints = (0..<tabs.count).map { midpoints[$0] ?? 0 }
+            }
+            .onDrop(of: [UTType.text], delegate: TabBarReorderDelegate(
+                tabs: tabs,
+                midpoints: tabMidpoints,
+                insertionIndex: $insertionIndex,
+                onReorder: { tabId, newIndex in onReorderTab?(tabId, newIndex) }
+            ))
         }
+    }
+
+    private var insertionIndicator: some View {
+        RoundedRectangle(cornerRadius: 1)
+            .fill(Theme.Colors.accent)
+            .frame(width: 2, height: 20)
+            .shadow(color: Theme.Colors.accent.opacity(0.5), radius: 4)
+    }
+}
+
+// MARK: - Tab Midpoint Preference Key
+
+private struct TabMidpointKey: PreferenceKey {
+    static var defaultValue: [Int: CGFloat] = [:]
+    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
+// MARK: - Tab Bar Reorder Delegate
+
+private struct TabBarReorderDelegate: DropDelegate {
+    let tabs: [TabInfo]
+    let midpoints: [CGFloat]
+    @Binding var insertionIndex: Int?
+    let onReorder: (UUID, Int) -> Void
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        guard let draggingId = currentlyDraggingTabId else {
+            return DropProposal(operation: .forbidden)
+        }
+        let x = info.location.x
+        var index = tabs.count
+        for (i, mid) in midpoints.enumerated() where mid > 0 {
+            if x < mid { index = i; break }
+        }
+        // Don't show indicator at the tab's own position
+        if let currentIndex = tabs.firstIndex(where: { $0.id == draggingId }) {
+            if index == currentIndex || index == currentIndex + 1 {
+                withAnimation(.easeInOut(duration: 0.1)) { insertionIndex = nil }
+                return DropProposal(operation: .move)
+            }
+        }
+        withAnimation(.easeInOut(duration: 0.1)) { insertionIndex = index }
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(.easeInOut(duration: 0.1)) { insertionIndex = nil }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        defer { withAnimation(.easeInOut(duration: 0.1)) { insertionIndex = nil } }
+        guard let index = insertionIndex else { return false }
+        if let tabId = currentlyDraggingTabId {
+            onReorder(tabId, index)
+            return true
+        }
+        return false
     }
 }
 
@@ -115,6 +208,9 @@ struct ConversationTab: View {
     let agentState: TabAgentState
     let onSelect: () -> Void
     let onClose: () -> Void
+
+    @State private var isCloseHovered = false
+    @State private var isDragging = false
 
     private var isBrowser: Bool {
         if case .browser = tabType { return true } else { return false }
@@ -151,12 +247,16 @@ struct ConversationTab: View {
                     )
             }
 
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundStyle(Theme.Colors.textTertiary)
-            }
-            .buttonStyle(.plain)
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(isCloseHovered ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
+                .frame(width: 16, height: 16)
+                .background(
+                    Circle()
+                        .fill(Color.white.opacity(isCloseHovered ? 0.12 : 0))
+                        .frame(width: 18, height: 18)
+                )
+                .animation(.easeInOut(duration: 0.1), value: isCloseHovered)
         }
         .padding(.horizontal, 12)
         .frame(height: 32)
@@ -176,7 +276,15 @@ struct ConversationTab: View {
                     )
             }
         )
-        .overlay(TabDragClickHandler(dragId: id.uuidString, onClick: onSelect, onMiddleClick: onClose))
+        .opacity(isDragging ? 0.4 : 1.0)
+        .overlay(TabDragClickHandler(
+            dragId: id.uuidString,
+            onClick: onSelect,
+            onMiddleClick: onClose,
+            onCloseClick: onClose,
+            onCloseHoverChanged: { isCloseHovered = $0 },
+            onDragStateChanged: { isDragging = $0 }
+        ))
     }
 
     // MARK: - Tab Background
@@ -188,12 +296,9 @@ struct ConversationTab: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(isSelected ? Theme.Colors.tabSelectedGlass : Theme.Colors.tabGlassBackground)
 
-            // Glass border
+            // Border — solid state color for crisp edges
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .strokeBorder(
-                    isSelected ? Theme.Colors.tabSelectedBorder : Theme.Colors.tabGlassBorder,
-                    lineWidth: 0.5
-                )
+                .strokeBorder(borderColor, lineWidth: 1)
 
             // Subtle state tint
             if agentState == .working {
@@ -207,7 +312,15 @@ struct ConversationTab: View {
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 
-    // MARK: - State Shadow
+    // MARK: - Border & Shadow
+
+    private var borderColor: Color {
+        switch agentState {
+        case .working:   return Color(hex: 0x8b5cf6).opacity(0.5)
+        case .completed: return Color(hex: 0x22c55e).opacity(0.5)
+        case .idle:      return isSelected ? Theme.Colors.tabSelectedBorder : Theme.Colors.tabGlassBorder
+        }
+    }
 
     private var stateShadow: Color {
         switch agentState {
@@ -266,37 +379,32 @@ struct RotatingBorderGlow: View {
     }
 
     private var lightGradient: Gradient {
-        let (bright, mid, dim): (Color, Color, Color) = {
+        let (bright, dim): (Color, Color) = {
             switch state {
             case .working:
                 return (
-                    Color(hex: 0x8b5cf6).opacity(0.85),
-                    Color(hex: 0x7c3aed).opacity(0.35),
-                    Color(hex: 0x6366f1).opacity(0.10)
+                    Color(hex: 0x8b5cf6).opacity(0.45),
+                    Color(hex: 0x6366f1).opacity(0.0)
                 )
             case .completed:
                 return (
-                    Color(hex: 0x22c55e).opacity(0.85),
-                    Color(hex: 0x10b981).opacity(0.35),
-                    Color(hex: 0x14b8a6).opacity(0.10)
+                    Color(hex: 0x22c55e).opacity(0.45),
+                    Color(hex: 0x14b8a6).opacity(0.0)
                 )
             case .idle:
                 return (
-                    Color.white.opacity(0.12),
-                    Color.white.opacity(0.05),
-                    Color.white.opacity(0.02)
+                    Color.white.opacity(0.10),
+                    Color.white.opacity(0.0)
                 )
             }
         }()
 
         return Gradient(stops: [
             .init(color: bright, location: 0.0),
-            .init(color: mid, location: 0.12),
-            .init(color: dim, location: 0.25),
-            .init(color: .clear, location: 0.45),
-            .init(color: .clear, location: 0.55),
-            .init(color: dim, location: 0.75),
-            .init(color: mid, location: 0.88),
+            .init(color: dim, location: 0.20),
+            .init(color: .clear, location: 0.40),
+            .init(color: .clear, location: 0.60),
+            .init(color: dim, location: 0.80),
             .init(color: bright, location: 1.0),
         ])
     }
@@ -412,11 +520,17 @@ struct TabDragClickHandler: NSViewRepresentable {
     let dragId: String
     let onClick: () -> Void
     let onMiddleClick: () -> Void
+    var onCloseClick: (() -> Void)?
+    var onCloseHoverChanged: ((Bool) -> Void)?
+    var onDragStateChanged: ((Bool) -> Void)?
 
     func makeNSView(context: Context) -> TabDragView {
         let view = TabDragView()
         view.dragId = dragId
         view.onClick = onClick
+        view.onCloseClick = onCloseClick
+        view.onCloseHoverChanged = onCloseHoverChanged
+        view.onDragStateChanged = onDragStateChanged
         return view
     }
 
@@ -424,12 +538,20 @@ struct TabDragClickHandler: NSViewRepresentable {
         nsView.dragId = dragId
         nsView.onClick = onClick
         nsView.onMiddleClick = onMiddleClick
+        nsView.onCloseClick = onCloseClick
+        nsView.onCloseHoverChanged = onCloseHoverChanged
+        nsView.onDragStateChanged = onDragStateChanged
     }
 
     class TabDragView: NSView, NSDraggingSource {
         var dragId: String = ""
         var onClick: (() -> Void)?
         var onMiddleClick: (() -> Void)?
+        var onCloseClick: (() -> Void)?
+        var onCloseHoverChanged: ((Bool) -> Void)?
+        var onDragStateChanged: ((Bool) -> Void)?
+        private let closeZoneWidth: CGFloat = 28
+        private var isInCloseZone = false
 
         private var mouseDownEvent: NSEvent?
         private var dragStarted = false
@@ -439,6 +561,36 @@ struct TabDragClickHandler: NSViewRepresentable {
         override var acceptsFirstResponder: Bool { false }
 
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            trackingAreas.forEach { removeTrackingArea($0) }
+            addTrackingArea(NSTrackingArea(
+                rect: bounds,
+                options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow],
+                owner: self
+            ))
+        }
+
+        override func mouseMoved(with event: NSEvent) {
+            let loc = convert(event.locationInWindow, from: nil)
+            let inZone = bounds.contains(loc) && loc.x > bounds.width - closeZoneWidth
+            if inZone != isInCloseZone {
+                isInCloseZone = inZone
+                DispatchQueue.main.async { [weak self] in
+                    self?.onCloseHoverChanged?(inZone)
+                }
+            }
+        }
+
+        override func mouseExited(with event: NSEvent) {
+            if isInCloseZone {
+                isInCloseZone = false
+                DispatchQueue.main.async { [weak self] in
+                    self?.onCloseHoverChanged?(false)
+                }
+            }
+        }
 
         override func mouseDown(with event: NSEvent) {
             mouseDownEvent = event
@@ -453,10 +605,11 @@ struct TabDragClickHandler: NSViewRepresentable {
 
             dragStarted = true
             currentlyDraggingTabId = UUID(uuidString: dragId)
+            DispatchQueue.main.async { [weak self] in self?.onDragStateChanged?(true) }
             NotificationCenter.default.post(name: .tabDragBegan, object: nil)
             let item = NSDraggingItem(pasteboardWriter: dragId as NSString)
-            let img = NSImage(size: NSSize(width: 1, height: 1))
-            item.setDraggingFrame(NSRect(origin: .zero, size: NSSize(width: 1, height: 1)), contents: img)
+            let dragImg = Self.makeDragImage(size: bounds.size)
+            item.setDraggingFrame(NSRect(origin: .zero, size: bounds.size), contents: dragImg)
             beginDraggingSession(with: [item], event: origin, source: self)
         }
 
@@ -466,10 +619,14 @@ struct TabDragClickHandler: NSViewRepresentable {
                 dragStarted = false
             }
             guard !dragStarted else { return }
-            // Confirm release is still within the view bounds
             let loc = convert(event.locationInWindow, from: nil)
             guard bounds.contains(loc) else { return }
-            DispatchQueue.main.async { [weak self] in self?.onClick?() }
+            // Trailing edge click → close tab
+            if let onCloseClick, loc.x > bounds.width - closeZoneWidth {
+                DispatchQueue.main.async { onCloseClick() }
+            } else {
+                DispatchQueue.main.async { [weak self] in self?.onClick?() }
+            }
         }
 
         override func otherMouseDown(with event: NSEvent) {
@@ -490,9 +647,25 @@ struct TabDragClickHandler: NSViewRepresentable {
                              endedAt screenPoint: NSPoint,
                              operation: NSDragOperation) {
             currentlyDraggingTabId = nil
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                self?.onDragStateChanged?(false)
                 NotificationCenter.default.post(name: .tabDragEnded, object: nil)
             }
+        }
+
+        /// Render a ghost pill for the drag preview
+        private static func makeDragImage(size: NSSize) -> NSImage {
+            let img = NSImage(size: size)
+            img.lockFocus()
+            let rect = NSRect(origin: .zero, size: size)
+            let path = NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7)
+            NSColor(white: 0.25, alpha: 0.7).setFill()
+            path.fill()
+            NSColor(white: 1.0, alpha: 0.2).setStroke()
+            path.lineWidth = 1
+            path.stroke()
+            img.unlockFocus()
+            return img
         }
     }
 }
