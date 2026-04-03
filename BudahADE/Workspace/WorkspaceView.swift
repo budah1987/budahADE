@@ -42,9 +42,14 @@ struct WorkspaceView: View {
                 state.selectTaskByIndex(index)
             }
             .onReceive(NotificationCenter.default.publisher(for: .renameTab)) { _ in
-                guard let task = state.activeTask,
-                      let tabId = task.selectedTabId,
-                      let tab = task.tabs.first(where: { $0.id == tabId }) else { return }
+                guard let task = state.activeTask else { return }
+                let tabId: UUID?
+                if task.focusedPane == .secondary, let split = task.splitPane {
+                    tabId = split.secondarySelectedId
+                } else {
+                    tabId = task.selectedTabId
+                }
+                guard let tabId, let tab = task.tabs.first(where: { $0.id == tabId }) else { return }
                 renameText = tab.title
                 renameTarget = .tab(taskId: task.id, tabId: tabId)
             }
@@ -676,6 +681,7 @@ struct WorkspaceView: View {
             if let task = state.tasks.first(where: { $0.id == taskId }),
                let index = task.tabs.firstIndex(where: { $0.id == tabId }) {
                 task.tabs[index].title = name
+                task.tabs[index].restoredTitle = name
             }
         }
         dismissRename()

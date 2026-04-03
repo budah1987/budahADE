@@ -6,6 +6,7 @@ import WebKit
 struct BrowserPanelView: View {
     @Bindable var state: BrowserState
     @State private var urlText: String = ""
+    @FocusState private var urlBarFocused: Bool
     var assignedPort: Int?
     var detectedURLs: [URL] = []
     var onPopOut: (() -> Void)?
@@ -111,19 +112,31 @@ struct BrowserPanelView: View {
     }
 
     private var urlBar: some View {
-        TextField("URL", text: $urlText)
-            .textFieldStyle(.plain)
-            .font(.system(size: 11, weight: .regular, design: .monospaced))
-            .foregroundColor(Theme.Colors.textPrimary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Theme.Colors.surfaceElevated)
-            .cornerRadius(4)
-            .onSubmit { state.navigateToString(urlText) }
+        ZStack {
+            // Hidden button so Cmd+L focuses the URL bar from anywhere in the browser pane
+            Button("") { urlBarFocused = true }
+                .keyboardShortcut("l", modifiers: .command)
+                .opacity(0)
+                .frame(width: 0, height: 0)
+
+            TextField("URL", text: $urlText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                .foregroundColor(Theme.Colors.textPrimary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Theme.Colors.surfaceElevated)
+                .cornerRadius(4)
+                .focused($urlBarFocused)
+                .onSubmit {
+                    state.navigateToString(urlText)
+                    urlBarFocused = false
+                }
+        }
     }
 
     private func portBadge(_ port: Int) -> some View {
-        Text(":\(port)")
+        Text(":" + String(port))
             .font(.system(size: 9, weight: .semibold, design: .monospaced))
             .foregroundColor(Theme.Colors.accent)
             .padding(.horizontal, 5)

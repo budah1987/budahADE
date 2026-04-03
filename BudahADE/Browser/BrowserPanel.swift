@@ -17,6 +17,13 @@ final class BrowserPanel: ObservableObject, Identifiable {
         }
     }
 
+    func focus() {
+        guard let wv = state.webView else { return }
+        DispatchQueue.main.async {
+            wv.window?.makeFirstResponder(wv)
+        }
+    }
+
     func popOut() {
         popoutWindow.open()
     }

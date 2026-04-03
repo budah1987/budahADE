@@ -124,7 +124,7 @@ struct PaneMoveDropOverlay: View {
                 paneTint(.secondary, geo: geo)
 
                 Color.clear
-                    .contentShape(Rectangle())
+                    .contentShape(dropShape(geo: geo))
                     .onDrop(
                         of: [UTType.text],
                         delegate: PaneMoveDropDelegate(
@@ -137,6 +137,25 @@ struct PaneMoveDropOverlay: View {
             }
         }
         .allowsHitTesting(true)
+    }
+
+    /// Drop hit area that excludes tab bar zones so TerminalTabBar's reorder delegate
+    /// can fire when the cursor is over a tab bar rather than the content area.
+    private func dropShape(geo: GeometryProxy) -> Path {
+        let tabBarH: CGFloat = 44
+        let w = geo.size.width
+        let h = geo.size.height
+        var path = Path()
+        switch orientation {
+        case .horizontal:
+            // Both panes share the same top edge; skip y = 0..44 across full width.
+            path.addRect(CGRect(x: 0, y: tabBarH, width: w, height: max(0, h - tabBarH)))
+        case .vertical:
+            // Primary tab bar: y = 0..44. Secondary tab bar: y = h/2..h/2+44.
+            path.addRect(CGRect(x: 0, y: tabBarH, width: w, height: max(0, h / 2 - tabBarH)))
+            path.addRect(CGRect(x: 0, y: h / 2 + tabBarH, width: w, height: max(0, h / 2 - tabBarH)))
+        }
+        return path
     }
 
     @ViewBuilder

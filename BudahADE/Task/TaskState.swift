@@ -620,11 +620,12 @@ final class TaskState: ObservableObject, Identifiable {
         if tabs[index].agentStatus == .completed {
             tabs[index].agentStatus = .inactive
         }
-        // Make terminal first responder so keyboard events (paste, Shift+Enter) go to the right tab
+        // Make the content first responder so keyboard/mouse events go to the right tab
         if tabs[index].isTerminal {
             terminals[id]?.focus()
-            // Request focus on input (for consistency across tab types)
             NotificationCenter.default.post(name: .focusInput, object: nil)
+        } else if tabs[index].isBrowser {
+            browserPanels[id]?.focus()
         }
     }
 
@@ -711,8 +712,9 @@ final class TaskState: ObservableObject, Identifiable {
             if tabs[index].agentStatus == .completed { tabs[index].agentStatus = .inactive }
             if tabs[index].isTerminal {
                 terminals[id]?.focus()
-                // Request focus on input
                 NotificationCenter.default.post(name: .focusInput, object: nil)
+            } else if tabs[index].isBrowser {
+                browserPanels[id]?.focus()
             }
         }
     }
@@ -736,9 +738,11 @@ final class TaskState: ObservableObject, Identifiable {
             }
             splitPane = split
             focusedPane = .secondary
-            // Focus the terminal in the target pane
+            // Focus the content in the target pane
             if tab.isTerminal {
                 terminals[tabId]?.focus()
+            } else if tab.isBrowser {
+                browserPanels[tabId]?.focus()
             }
 
         case .primary:
@@ -754,9 +758,11 @@ final class TaskState: ObservableObject, Identifiable {
             }
             selectedTabId = tabId
             focusedPane = .primary
-            // Focus the terminal in the target pane
+            // Focus the content in the target pane
             if tab.isTerminal {
                 terminals[tabId]?.focus()
+            } else if tab.isBrowser {
+                browserPanels[tabId]?.focus()
             }
         }
     }
@@ -806,8 +812,12 @@ final class TaskState: ObservableObject, Identifiable {
         guard let newFocus else { return }
         focusedPane = newFocus
         let tabId = focusedPane == .primary ? selectedTabId : splitPane?.secondarySelectedId
-        if let tabId, let idx = tabs.firstIndex(where: { $0.id == tabId }), tabs[idx].isTerminal {
-            terminals[tabId]?.focus()
+        if let tabId, let idx = tabs.firstIndex(where: { $0.id == tabId }) {
+            if tabs[idx].isTerminal {
+                terminals[tabId]?.focus()
+            } else if tabs[idx].isBrowser {
+                browserPanels[tabId]?.focus()
+            }
         }
     }
 
