@@ -8,149 +8,100 @@ struct TaskRailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Project name — like Attio's "Acme Tech" at top of sidebar
-            WorkspaceDropdown()
-                .padding(.horizontal, 10)
-                .padding(.top, 8)
-                .padding(.bottom, 6)
-
-            // Plan/Build toggle — always visible regardless of which task is selected
-            PlanBuildToggle(mode: Binding(
+            // View toggle: Plan / Build
+            ViewToggle(mode: Binding(
                 get: { workspace.activeTask?.mode ?? .plan },
                 set: { newMode in
                     if newMode == .plan {
                         workspace.activeTask?.enterPlanMode()
                     } else {
                         workspace.activeTask?.enterBuildMode()
-                        // Navigate to builder conversation if a session exists
                         if workspace.activeTask?.builderSession != nil {
                             workspace.activeTask?.showBuilderChat = true
                         }
                     }
                 }
             ))
-            .padding(.horizontal, 10)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 14)
+            .padding(.top, Theme.Spacing.sm)
+            .padding(.bottom, Theme.Spacing.lg)
             .disabled(workspace.activeTask == nil)
 
-            // Spec progress strip — only when a task is active
-            if let task = workspace.activeTask {
-                SpecStripView(specState: task.specState, buildStatus: task.buildStatus)
+            // Notification Summary — aggregate progress across all tasks
+            if !workspace.tasks.isEmpty {
+                NotificationSummaryBar(tasks: workspace.tasks)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.bottom, Theme.Spacing.lg)
             }
 
-            // Section header
-            HStack(alignment: .firstTextBaseline) {
-                Text("Tasks")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Theme.Colors.textTertiary)
-                Spacer()
-                Text("\(workspace.tasks.count)")
-                    .font(Theme.label(9))
-                    .foregroundColor(Theme.Colors.textTertiary)
-            }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 6)
-
-            // Task list
+            // Task cards
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 2) {
+                VStack(spacing: Theme.Layout.taskCardGap) {
                     ForEach(workspace.tasks) { task in
-                        TaskCardView(
+                        TaskCard(
                             task: task,
                             isActive: task.id == workspace.activeTaskId,
-                            isHovered: task.id == hoveredTaskId,
-                            isSpotlit: renameTarget == .task(taskId: task.id),
                             onSelect: {
                                 workspace.selectTask(task.id)
-                                // If this task has a builder session, navigate to it
                                 if task.builderSession != nil {
                                     task.enterBuildMode()
                                     task.showBuilderChat = true
                                 }
-                            },
-                            onComplete: { workspace.taskForCompletion = task },
-                            onDelete: { workspace.deleteTask(task.id) }
+                            }
                         )
                         .onHover { hovering in
                             hoveredTaskId = hovering ? task.id : nil
                         }
+                        .contextMenu {
+                            Button("Rename") {
+                                NotificationCenter.default.post(name: .renameTask, object: nil)
+                            }
+                            Button("Complete Task...") {
+                                workspace.taskForCompletion = task
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                workspace.deleteTask(task.id)
+                            } label: {
+                                Label("Delete Task", systemImage: "trash")
+                            }
+                        }
                     }
                 }
-                .padding(.horizontal, 6)
+                .padding(.horizontal, Theme.Spacing.sm)
             }
 
             Spacer(minLength: 0)
 
-            // Plan Archive button — only when there are archived conversations
-            if let task = workspace.activeTask, !task.archivedPlanTabs.isEmpty {
-                Button {
-                    task.showPlanArchive = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bubble.left.and.text.bubble.right")
-                            .font(.system(size: 10, weight: .medium))
-                        Text("Plan Archive")
-                            .font(Theme.label(12))
-                        Spacer()
-                        Text("\(task.archivedPlanTabs.count)")
-                            .font(Theme.caption(10))
-                            .foregroundColor(Theme.Colors.textTertiary)
+            // Bottom nav items
+            VStack(spacing: 0) {
+                // Plan Archive (conditional)
+                if let task = workspace.activeTask, !task.archivedPlanTabs.isEmpty {
+                    SidebarNavItem(
+                        icon: "archivebox",
+                        label: "Plan Archive",
+                        trailing: "\(task.archivedPlanTabs.count)",
+                        showDivider: true
+                    ) {
+                        task.showPlanArchive = true
                     }
-                    .foregroundColor(Theme.Colors.textTertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .overlay(alignment: .top) {
-                    Rectangle().fill(Theme.Colors.borderLight).frame(height: 1)
-                }
-            }
 
-            // Task Archive button
-            Button {
-                workspace.showTaskArchive = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "archivebox")
-                        .font(.system(size: 10, weight: .medium))
-                    Text("Task Archive")
-                        .font(Theme.label(12))
+                SidebarNavItem(icon: "archivebox", label: "Task Archive", showDivider: true) {
+                    workspace.showTaskArchive = true
                 }
-                .foregroundColor(Theme.Colors.textTertiary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Theme.Colors.borderLight).frame(height: 1)
-            }
 
-            // New Task button
-            Button {
-                workspace.showNewTaskSheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text("New Task")
-                        .font(Theme.label(12))
+                SidebarNavItem(icon: "plus.circle", label: "New Task", showDivider: true) {
+                    workspace.showNewTaskSheet = true
                 }
-                .foregroundColor(Theme.Colors.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .contentShape(Rectangle())
+
+                SidebarNavItem(icon: "gearshape", label: "Settings", showDivider: false) {
+                    // Settings action
+                }
             }
-            .buttonStyle(.plain)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 1)
-            }
+            .padding(.bottom, Theme.Spacing.xxl)
         }
-        .frame(width: 160)
+        .frame(width: Theme.Layout.sidebarWidth)
         .sheet(item: $workspace.taskForCompletion) { task in
             TaskCompletionSheet(workspace: workspace, task: task)
                 .background(Theme.Colors.appBackground)
@@ -179,263 +130,200 @@ struct TaskRailView: View {
     }
 }
 
+// MARK: - View Toggle (Plan/Build)
+
+struct ViewToggle: View {
+    @Binding var mode: TaskMode
+
+    var body: some View {
+        HStack(spacing: 0) {
+            togglePill("Plan", isActive: mode == .plan) { mode = .plan }
+            togglePill("Build", isActive: mode == .build) { mode = .build }
+        }
+        .padding(2)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(6)
+    }
+
+    private func togglePill(_ label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(isActive ? Theme.label(11) : Theme.body(11))
+                .foregroundColor(isActive ? .white : Color.white.opacity(0.45))
+                .frame(width: 94, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(isActive ? Color.white.opacity(0.1) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Notification Summary Bar
+
+private struct NotificationSummaryBar: View {
+    let tasks: [TaskState]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+            HStack {
+                Text("Notification Summary")
+                    .font(Theme.body(9))
+                    .foregroundColor(.white)
+                Spacer()
+                Text("\(doneCount)/\(totalCount)")
+                    .font(Theme.body(9))
+                    .foregroundColor(Theme.Colors.statusIdle)
+            }
+
+            SpecProgressBar(steps: aggregateSteps, size: .mini)
+        }
+    }
+
+    private var aggregateSteps: [BuildStep] {
+        // Collect build steps from all tasks, or synthesize from task status
+        var steps: [BuildStep] = []
+        for task in tasks {
+            if let session = task.builderSession {
+                steps.append(contentsOf: session.steps)
+            } else {
+                // Represent each task as a single step
+                let state: StepState = task.status == .completed ? .done : .queued
+                steps.append(BuildStep(id: task.id.uuidString, title: task.name, state: state))
+            }
+        }
+        return steps
+    }
+
+    private var doneCount: Int {
+        aggregateSteps.filter { $0.state == .done }.count
+    }
+
+    private var totalCount: Int {
+        aggregateSteps.count
+    }
+}
+
 // MARK: - Task Card
 
-private struct TaskCardView: View {
+struct TaskCard: View {
     @ObservedObject var task: TaskState
     let isActive: Bool
-    let isHovered: Bool
-    var isSpotlit: Bool = false
     let onSelect: () -> Void
-    let onComplete: () -> Void
-    let onDelete: () -> Void
 
     var body: some View {
         Button(action: onSelect) {
-            VStack(alignment: .leading, spacing: 6) {
-                // Row 1: Status indicator + Task name
-                HStack(spacing: 6) {
-                    AgentStatusView(status: leadingStatus)
-
+            GlassPanel(style: isActive ? .cardActive : .card) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    // Title
                     Text(task.name)
-                        .font(.system(size: 12, weight: isActive && task.status != .completed ? .semibold : .regular))
-                        .foregroundColor(
-                            task.status == .completed
-                                ? Color.white.opacity(0.25)
-                                : isActive
-                                    ? Color.white.opacity(0.92)
-                                    : Color.white.opacity(0.38)
-                        )
-                        .lineLimit(1)
-                        .animation(.easeOut(duration: 0.12), value: isActive)
-                }
-
-                // Row 2: Branch name + port badge
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundColor(Theme.Colors.textTertiary)
-
-                    Text(task.branchName)
-                        .font(Theme.caption(9))
-                        .foregroundColor(Theme.Colors.textTertiary)
+                        .font(.custom("Geist-SemiBold", size: Theme.Typography.titleSize))
+                        .foregroundColor(Theme.Colors.textPrimary)
                         .lineLimit(1)
 
-                    if let port = task.assignedPort, task.devServerManager?.isRunning == true {
-                        Text(":\(port)")
-                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                            .foregroundColor(Theme.Colors.accent)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Theme.Colors.accent.opacity(0.12))
-                            .cornerRadius(3)
-                    }
-                }
-                .padding(.leading, 12)
+                    // Branch + progress
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        HStack(spacing: Theme.Spacing.xs) {
+                            Image(systemName: "arrow.triangle.branch")
+                                .font(.system(size: 10))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                            Text(task.branchName)
+                                .font(Theme.code(Theme.Typography.monoSize))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                                .lineLimit(1)
+                        }
 
-                // Row 3: Build progress (when builder is active)
-                if let builderSession = task.builderSession {
-                    VStack(alignment: .leading, spacing: 3) {
-                        SpecProgressBar(steps: builderSession.steps, size: .mini)
-                        HStack(spacing: 4) {
-                            Text(buildStatusText(builderSession))
-                                .font(Theme.caption(9))
-                                .foregroundStyle(buildStatusColor(builderSession))
+                        if let session = task.builderSession {
+                            SpecProgressBar(steps: session.steps, size: .mini)
                         }
                     }
-                    .padding(.leading, 12)
-                }
 
-                // Row 4: Status summary + elapsed time
-                statusSummaryRow
-                    .padding(.leading, 12)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(fillColor)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(borderColor, lineWidth: 0.5)
-                    )
-            )
-            .animation(.easeOut(duration: 0.12), value: isHovered)
-            .animation(.easeOut(duration: 0.12), value: leadingStatus)
-            .contentShape(Rectangle())
-            .background(
-                GeometryReader { geo in
-                    Color.clear
-                        .preference(
-                            key: RenameSpotlightKey.self,
-                            value: isSpotlit
-                                ? geo.frame(in: .named("workspace"))
-                                : .zero
-                        )
+                    // Status counts row
+                    statusCountsRow
                 }
-            )
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.vertical, Theme.Spacing.sm)
+            }
+            .opacity(isActive ? 1 : 0.5)
         }
         .buttonStyle(.plain)
-        .contextMenu {
-            Button("Rename") {
-                NotificationCenter.default.post(name: .renameTask, object: nil)
-            }
-            Button("Complete Task...") { onComplete() }
-            Divider()
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete Task", systemImage: "trash")
-            }
-        }
     }
-
-    // MARK: - Status Summary
 
     @ViewBuilder
-    private var statusSummaryRow: some View {
+    private var statusCountsRow: some View {
+        let summary = task.statusSummary
         HStack {
-            if task.status == .completed {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Theme.Colors.statusDone)
-                        .frame(width: 4, height: 4)
-                    Text("completed")
-                        .font(.system(size: 9))
-                        .foregroundColor(Theme.Colors.statusDone)
-                }
-            } else {
-                HStack(spacing: 3) {
-                    ForEach(Array(task.statusSummary.enumerated()), id: \.offset) { _, entry in
-                        let (status, count) = entry
-                        Circle()
-                            .fill(statusDotColor(status))
-                            .frame(width: 4, height: 4)
-                        Text("\(count) \(statusLabel(status))")
-                            .font(.system(size: 9))
-                            .foregroundColor(statusDotColor(status))
-                    }
-                }
+            ForEach(Array(summary.enumerated()), id: \.offset) { _, entry in
+                let (status, count) = entry
+                Text("\(count) \(statusLabel(status))")
+                    .font(Theme.caption(Theme.Typography.captionSize))
+                    .foregroundColor(statusColor(status))
             }
-
+            if summary.isEmpty && task.status == .completed {
+                Text("Done")
+                    .font(Theme.caption(Theme.Typography.captionSize))
+                    .foregroundColor(Theme.Colors.statusDone)
+            }
             Spacer()
-
-            Text(task.elapsedTime)
-                .font(Theme.caption(9))
-                .foregroundColor(Color.white.opacity(0.18))
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var fillColor: Color {
-        switch leadingStatus {
-        case .working:
-            return isHovered
-                ? Color(hex: 0x6366f1).opacity(0.10)
-                : Color(hex: 0x6366f1).opacity(0.05)
-        case .completed:
-            return isHovered
-                ? Color(hex: 0x5a9a6b).opacity(0.08)
-                : Color(hex: 0x5a9a6b).opacity(0.04)
-        default:
-            return isHovered ? Color.white.opacity(0.03) : .clear
-        }
-    }
-
-    private var borderColor: Color {
-        switch leadingStatus {
-        case .working:
-            return isHovered
-                ? Color(hex: 0x6366f1).opacity(0.28)
-                : Color(hex: 0x6366f1).opacity(0.15)
-        case .completed:
-            return isHovered
-                ? Color(hex: 0x5a9a6b).opacity(0.20)
-                : Color(hex: 0x5a9a6b).opacity(0.12)
-        default:
-            return .clear
-        }
-    }
-
-    /// Highest-priority agent status to show as the card's leading indicator
-    private var leadingStatus: AgentStatus {
-        if task.status == .completed { return .completed }
-        // Show the most active status across all agents
-        let statuses = task.tabs.map(\.agentStatus)
-        if statuses.contains(.working) { return .working }
-        if statuses.contains(.thinking) { return .thinking }
-        return .inactive
-    }
-
-    private func statusDotColor(_ status: AgentStatus) -> Color {
-        switch status {
-        case .inactive:  return Theme.Colors.textTertiary
-        case .thinking:  return Theme.Colors.statusDone
-        case .working:   return Color(hex: 0x818cf8)
-        case .completed: return Theme.Colors.statusDone
         }
     }
 
     private func statusLabel(_ status: AgentStatus) -> String {
         switch status {
-        case .inactive:  return "idle"
-        case .thinking:  return "active"
-        case .working:   return "working"
-        case .completed: return "done"
+        case .working:   return "Working"
+        case .completed: return "Done"
+        case .thinking:  return "Active"
+        case .inactive:  return "Idle"
         }
     }
 
-    private func buildStatusText(_ session: BuilderSession) -> String {
-        switch session.buildState {
-        case .ready:    return "Ready"
-        case .building: return "Building \(session.completedCount + 1)/\(session.totalCount)"
-        case .paused:   return "Paused"
-        case .done:     return "Done"
-        case .failed:   return "Failed at step \((session.activeStepIndex ?? 0) + 1)"
-        }
-    }
-
-    private func buildStatusColor(_ session: BuilderSession) -> Color {
-        switch session.buildState {
-        case .ready:    return Theme.Colors.textTertiary
-        case .building: return Theme.Colors.statusWorking
-        case .paused:   return Theme.Colors.warning
-        case .done:     return Theme.Colors.statusDone
-        case .failed:   return Theme.Colors.error
+    private func statusColor(_ status: AgentStatus) -> Color {
+        switch status {
+        case .working:   return Theme.Colors.statusWorking
+        case .completed: return Theme.Colors.statusDone
+        case .thinking:  return Theme.Colors.statusDone
+        case .inactive:  return Theme.Colors.statusIdle
         }
     }
 }
 
-// MARK: - Plan/Build Toggle
+// MARK: - Sidebar Nav Item
 
-struct PlanBuildToggle: View {
-    @Binding var mode: TaskMode
+private struct SidebarNavItem: View {
+    let icon: String
+    let label: String
+    var trailing: String? = nil
+    var showDivider: Bool = true
+    let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            toggleButton("Plan", isActive: mode == .plan) { mode = .plan }
-            toggleButton("Build", isActive: mode == .build) { mode = .build }
-        }
-        .padding(2)
-        .background(Theme.Colors.surface)
-        .cornerRadius(6)
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Theme.Colors.borderSubtle, lineWidth: 0.5)
-        )
-    }
-
-    private func toggleButton(_ label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(label)
-                .font(Theme.label(11))
-                .foregroundColor(isActive ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(isActive ? Color.white.opacity(0.08) : Color.clear)
-                )
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .frame(width: 24, height: 24)
+
+                Text(label)
+                    .font(Theme.body(Theme.Typography.labelSize))
+
+                if let trailing {
+                    Spacer()
+                    Text(trailing)
+                        .font(Theme.caption(10))
+                }
+            }
+            .foregroundColor(Theme.Colors.textTertiary)
+            .frame(height: Theme.Layout.navItemHeight)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.Spacing.lg)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .bottom) {
+            if showDivider {
+                Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 1)
+            }
+        }
     }
 }
