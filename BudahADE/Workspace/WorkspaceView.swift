@@ -79,26 +79,8 @@ struct WorkspaceView: View {
             Theme.Colors.appBackground.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // ── APP BAR (full width) ──
-                AppBar(
-                    workspace: state,
-                    renameTarget: renameTarget,
-                    onCloseTab: { tabId in
-                        if state.activeTask?.mode == .plan {
-                            requestCloseTab(.plan(tabId))
-                        } else {
-                            requestCloseTab(.build(tabId))
-                        }
-                    },
-                    onNewTab: {
-                        if state.activeTask?.mode == .plan {
-                            showRoleModal = true
-                        } else {
-                            state.activeTask?.createTab()
-                        }
-                    },
-                    onNewBrowserTab: { state.activeTask?.createBrowserTab() }
-                )
+                // ── APP BAR (full width: dropdown + resource meter) ──
+                AppBar(workspace: state)
 
                 // ── BODY: sidebar + content ──
                 HStack(spacing: 0) {
@@ -128,20 +110,17 @@ struct WorkspaceView: View {
                                 }
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             } else {
-                                // Tabs now live in AppBar — only SpecBar + content here
-
-                                // Task-scoped SpecBar — visible in plan mode when a build exists
-                                if let builderSession = task.builderSession {
-                                    SpecBar(
-                                        session: builderSession,
-                                        specTitle: task.specState.activeSpec?.title ?? "Spec",
-                                        isBuilderTabActive: false,
-                                        onTap: {
-                                            task.enterBuildMode()
-                                            task.showBuilderChat = true
-                                        }
-                                    )
-                                }
+                                // Plan tab bar
+                                PlanTabBar(
+                                    selectedTabID: Binding(
+                                        get: { task.selectedPlanTabId ?? UUID() },
+                                        set: { task.selectPlanTab($0) }
+                                    ),
+                                    tabs: task.planTabs,
+                                    onSelectTab: { task.selectPlanTab($0) },
+                                    onCloseTab: { requestCloseTab(.plan($0)) },
+                                    onNewTab: { showRoleModal = true }
+                                )
 
                                 if let planChat = task.activePlanChat,
                                    let selectedId = task.selectedPlanTabId {
@@ -385,40 +364,20 @@ struct WorkspaceView: View {
     private var terminalArea: some View {
         VStack(spacing: 0) {
             if let task = state.activeTask {
-                // Tabs now live in AppBar — TerminalTabBar only for split-pane secondary
-                if task.splitPane != nil {
-                    // Split pane still uses inline tab bars (handled in split pane views)
-                }
-
-                // Builder SpecBar or legacy spec strip — below terminal tabs
-                if let builderSession = task.builderSession {
-                    SpecBar(
-                        session: builderSession,
-                        specTitle: task.specState.activeSpec?.title ?? "Spec",
-                        isBuilderTabActive: task.showBuilderChat,
-                        activeActionText: task.builderAgent?.agentSession?.currentStreamingText,
-                        onTap: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                task.showBuilderChat = true
-                            }
-                        }
+                // Conversation tab bar — aligned with terminal content
+                if task.splitPane == nil {
+                    TerminalTabBar(
+                        selectedTabID: Binding(
+                            get: { task.selectedTabId ?? UUID() },
+                            set: { task.selectTab($0) }
+                        ),
+                        tabs: task.tabs.filter { $0.tabType != .builder },
+                        renameTarget: renameTarget,
+                        onSelectTab: { task.selectTab($0) },
+                        onCloseTab: { requestCloseTab(.build($0)) },
+                        onNewTab: { task.createTab() },
+                        onNewBrowserTab: { task.createBrowserTab() }
                     )
-                } else if task.specState.hasSpec {
-                    SpecStripView(
-                        specState: task.specState,
-                        buildStatus: task.buildStatus,
-                        variant: .inline,
-                        hasBuilder: task.builderPanel != nil,
-                        isBuilderDrawerOpen: Binding(
-                            get: { task.isBuilderDrawerOpen },
-                            set: { task.isBuilderDrawerOpen = $0 }
-                        )
-                    )
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-
-                    Rectangle()
-                        .fill(Theme.Colors.borderSubtle)
-                        .frame(height: 0.5)
                 }
             }
 
