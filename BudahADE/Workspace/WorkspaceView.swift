@@ -139,8 +139,8 @@ struct WorkspaceView: View {
                                 .background(Theme.Colors.appBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                                 .padding(.top, Theme.Spacing.sm)
-                                .padding(.bottom, Theme.Spacing.xs)
-                                .padding(.trailing, Theme.Spacing.xs)
+                                .padding(.bottom, Theme.Spacing.sm)
+                                .padding(.horizontal, Theme.Spacing.sm)
                             }
                         }
                         .sheet(isPresented: $showRoleModal) {
@@ -166,13 +166,13 @@ struct WorkspaceView: View {
                                 // Tabs sit on app chrome
                                 buildModeTabBar
 
-                                // Agent content — rounded dark inset
+                                // Agent content — rounded dark inset, aligned with tabs
                                 agentContentArea
                                     .background(Theme.Colors.appBackground)
                                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                                     .padding(.top, Theme.Spacing.sm)
-                                    .padding(.bottom, Theme.Spacing.xs)
-                                    .padding(.trailing, state.rightPanelVisible ? 0 : Theme.Spacing.xs)
+                                    .padding(.bottom, Theme.Spacing.sm)
+                                    .padding(.horizontal, Theme.Spacing.sm)
                             }
 
                             if state.rightPanelVisible, let task = state.activeTask {
