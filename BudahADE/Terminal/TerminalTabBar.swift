@@ -23,8 +23,8 @@ enum TabAgentState: Equatable {
 
     init(from status: AgentStatus) {
         switch status {
-        case .inactive:            self = .idle
-        case .thinking, .working:  self = .working
+        case .inactive, .thinking: self = .idle     // thinking = Claude at prompt, not actively processing
+        case .working:             self = .working  // braille spinner = actively processing
         case .completed:           self = .completed
         }
     }
