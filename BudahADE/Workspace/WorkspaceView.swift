@@ -87,21 +87,23 @@ struct WorkspaceView: View {
                 HStack(spacing: 0) {
                     // ── TASK RAIL ──
                     TaskRailView(workspace: state, renameTarget: renameTarget)
+                        .overlay(alignment: .trailing) {
+                            Rectangle().fill(Theme.Colors.borderSubtle).frame(width: 1)
+                        }
 
                     // ── CONTENT ZONE ──
                     VStack(spacing: 0) {
                     // Content
                     if let task = state.activeTask, task.mode == .plan {
-                        // Plan mode: role modal or tab bar + chat
+                        // Plan mode: tabs on chrome, chat in dark inset
                         VStack(spacing: 0) {
                             if task.planTabs.isEmpty {
-                                // No tabs — show role selection
                                 RoleSelectionModal { role in
                                     task.createPlanTab(role: role)
                                 }
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             } else {
-                                // Plan tab bar
+                                // Plan tab bar (on chrome)
                                 PlanTabBar(
                                     selectedTabID: Binding(
                                         get: { task.selectedPlanTabId ?? UUID() },
@@ -113,24 +115,32 @@ struct WorkspaceView: View {
                                     onNewTab: { showRoleModal = true }
                                 )
 
-                                if let planChat = task.activePlanChat,
-                                   let selectedId = task.selectedPlanTabId {
-                                    PlanChatView(
-                                        state: planChat,
-                                        siblingTabs: task.planTabs.filter { $0.id != selectedId },
-                                        onHandOff: { targetId in
-                                            task.handOff(from: selectedId, to: targetId)
-                                        },
-                                        onCreateAndHandOff: { role in
-                                            let newTabId = task.createPlanTab(role: role)
-                                            task.handOff(from: selectedId, to: newTabId)
-                                        },
-                                        onApproveToBuild: { itemCount in
-                                            startBuildTransition(task: task, itemCount: itemCount)
-                                        }
-                                    )
-                                    .id(task.selectedPlanTabId)
+                                // Plan chat in dark rounded inset
+                                Group {
+                                    if let planChat = task.activePlanChat,
+                                       let selectedId = task.selectedPlanTabId {
+                                        PlanChatView(
+                                            state: planChat,
+                                            siblingTabs: task.planTabs.filter { $0.id != selectedId },
+                                            onHandOff: { targetId in
+                                                task.handOff(from: selectedId, to: targetId)
+                                            },
+                                            onCreateAndHandOff: { role in
+                                                let newTabId = task.createPlanTab(role: role)
+                                                task.handOff(from: selectedId, to: newTabId)
+                                            },
+                                            onApproveToBuild: { itemCount in
+                                                startBuildTransition(task: task, itemCount: itemCount)
+                                            }
+                                        )
+                                        .id(task.selectedPlanTabId)
+                                    }
                                 }
+                                .background(Theme.Colors.appBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                                .padding(.top, Theme.Spacing.sm)
+                                .padding(.bottom, Theme.Spacing.xs)
+                                .padding(.trailing, Theme.Spacing.xs)
                             }
                         }
                         .sheet(isPresented: $showRoleModal) {
@@ -140,7 +150,7 @@ struct WorkspaceView: View {
                             }
                         }
                     } else {
-                        // Build mode: file tree + agent content (rounded inset) + git panel
+                        // Build mode: file tree + tabs (chrome) + agent content (dark inset) + git panel
                         HStack(spacing: 0) {
                             if state.leftPanelVisible {
                                 LeftPanelView(
@@ -151,13 +161,19 @@ struct WorkspaceView: View {
                                 .transition(.move(edge: .leading).combined(with: .opacity))
                             }
 
-                            // Agent content area — rounded inset with darker background
-                            terminalArea
-                                .background(Theme.Colors.appBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-                                .padding(.vertical, Theme.Spacing.xs)
-                                .padding(.trailing, state.rightPanelVisible ? 0 : Theme.Spacing.xs)
-                                .padding(.leading, state.leftPanelVisible ? 0 : Theme.Spacing.xs)
+                            // Tabs on chrome + agent content in dark inset
+                            VStack(spacing: 0) {
+                                // Tabs sit on app chrome
+                                buildModeTabBar
+
+                                // Agent content — rounded dark inset
+                                agentContentArea
+                                    .background(Theme.Colors.appBackground)
+                                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                                    .padding(.top, Theme.Spacing.sm)
+                                    .padding(.bottom, Theme.Spacing.xs)
+                                    .padding(.trailing, state.rightPanelVisible ? 0 : Theme.Spacing.xs)
+                            }
 
                             if state.rightPanelVisible, let task = state.activeTask {
                                 GitSidebarView(task: task, projectPath: state.projectPath)
@@ -349,17 +365,18 @@ struct WorkspaceView: View {
 
     // MARK: - Terminal Area (content zone — opaque dark)
 
-    private var terminalArea: some View {
-        VStack(spacing: 0) {
-            if let task = state.activeTask {
-                // Conversation tab bar — aligned with terminal content
-                if task.splitPane == nil {
+    // MARK: - Build Mode Tab Bar (sits on app chrome)
+
+    @ViewBuilder
+    private var buildModeTabBar: some View {
+        if let task = state.activeTask {
+            if task.splitPane == nil {
+                VStack(spacing: 0) {
                     TerminalTabBar(
                         selectedTabID: Binding(
                             get: { task.selectedTabId ?? UUID() },
                             set: {
                                 task.selectTab($0)
-                                // Clicking a conversation tab dismisses the builder view
                                 task.showBuilderChat = false
                             }
                         ),
@@ -374,14 +391,19 @@ struct WorkspaceView: View {
                         onNewBrowserTab: { task.createBrowserTab() }
                     )
 
-                    // Builder tab row — below conversation tabs, click to show builder
                     if task.builderSession != nil {
                         BuilderTabRow(task: task)
                     }
                 }
             }
+        }
+    }
 
-            // Builder chat (toggles via SpecBar click)
+    // MARK: - Agent Content Area (dark rounded inset)
+
+    private var agentContentArea: some View {
+        VStack(spacing: 0) {
+            // Builder chat
             if let task = state.activeTask,
                task.showBuilderChat,
                let builderSession = task.builderSession {

@@ -31,11 +31,6 @@ struct PlanTabBar: View {
             }
             .padding(.horizontal, 6)
             .padding(.top, 6)
-            .background(GlassBackground())
-
-            Rectangle()
-                .fill(Theme.Colors.borderSubtle)
-                .frame(height: 0.5)
         }
     }
 }
