@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct WorkspaceView: View {
     @EnvironmentObject var appState: AppState
@@ -21,6 +22,10 @@ struct WorkspaceView: View {
 
     /// True while a tab drag session is in progress — gates the inter-pane drop overlay
     @State private var isTabDragging = false
+
+    /// Drop highlight for inter-pane content area drops
+    @State private var primaryContentDropTargeted = false
+    @State private var secondaryContentDropTargeted = false
 
 
     var body: some View {
@@ -444,10 +449,30 @@ struct WorkspaceView: View {
                                 onCloseTab: { requestCloseTab(.build($0)) },
                                 onNewTab: { task.createTab() },
                                 onNewBrowserTab: { task.createBrowserTab() },
-                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex) }
+                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex, inPane: .primary) }
                             )
-                            tabContentView(for: task, tabId: task.selectedTabId)
-                                .overlay(paneFocusBorder(focused: task.focusedPane == .primary))
+                            ZStack {
+                                ForEach(task.primaryTabs) { tab in
+                                    tabContentPanel(task: task, tab: tab)
+                                        .opacity(tab.id == task.selectedTabId ? 1 : 0)
+                                        .allowsHitTesting(tab.id == task.selectedTabId)
+                                }
+                                if primaryContentDropTargeted {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .strokeBorder(Theme.Colors.accent.opacity(0.6), lineWidth: 2)
+                                        .background(RoundedRectangle(cornerRadius: 4).fill(Theme.Colors.accent.opacity(0.08)))
+                                        .padding(4)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .onDrop(of: [UTType.text], isTargeted: $primaryContentDropTargeted) { _ in
+                                guard let tabId = currentlyDraggingTabId else { return false }
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    task.moveTab(tabId, to: .primary)
+                                }
+                                return true
+                            }
+                            .overlay(paneFocusBorder(focused: task.focusedPane == .primary))
                         }
                         .opacity(task.focusedPane == .primary ? 1.0 : 0.6)
                         .animation(.easeInOut(duration: 0.15), value: task.focusedPane)
@@ -464,10 +489,30 @@ struct WorkspaceView: View {
                                 onCloseTab: { requestCloseTab(.build($0)) },
                                 onNewTab: { task.createTabInSecondaryPane() },
                                 onNewBrowserTab: { task.createBrowserTabInSecondaryPane() },
-                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex) }
+                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex, inPane: .secondary) }
                             )
-                            tabContentView(for: task, tabId: split.secondarySelectedId)
-                                .overlay(paneFocusBorder(focused: task.focusedPane == .secondary))
+                            ZStack {
+                                ForEach(task.secondaryTabs) { tab in
+                                    tabContentPanel(task: task, tab: tab)
+                                        .opacity(tab.id == split.secondarySelectedId ? 1 : 0)
+                                        .allowsHitTesting(tab.id == split.secondarySelectedId)
+                                }
+                                if secondaryContentDropTargeted {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .strokeBorder(Theme.Colors.accent.opacity(0.6), lineWidth: 2)
+                                        .background(RoundedRectangle(cornerRadius: 4).fill(Theme.Colors.accent.opacity(0.08)))
+                                        .padding(4)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .onDrop(of: [UTType.text], isTargeted: $secondaryContentDropTargeted) { _ in
+                                guard let tabId = currentlyDraggingTabId else { return false }
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    task.moveTab(tabId, to: .secondary)
+                                }
+                                return true
+                            }
+                            .overlay(paneFocusBorder(focused: task.focusedPane == .secondary))
                         }
                         .opacity(task.focusedPane == .secondary ? 1.0 : 0.6)
                         .animation(.easeInOut(duration: 0.15), value: task.focusedPane)
@@ -498,23 +543,12 @@ struct WorkspaceView: View {
                     }
                 }
 
-                // Create-split drag overlay — only when not already split
-                if let task = state.activeTask, task.splitPane == nil {
+                // Create-split drag overlay — only during active tab drag and when not already split
+                if let task = state.activeTask, task.splitPane == nil, isTabDragging {
                     SplitDropOverlay { zone, tabIdString in
                         if let tabId = UUID(uuidString: tabIdString) {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 task.splitTab(tabId, to: zone)
-                            }
-                        }
-                    }
-                }
-
-                // Inter-pane move overlay — only while a tab drag is active in split mode
-                if let task = state.activeTask, let split = task.splitPane, isTabDragging {
-                    PaneMoveDropOverlay(orientation: split.orientation) { pane, tabIdStr in
-                        if let tabId = UUID(uuidString: tabIdStr) {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                task.moveTab(tabId, to: pane)
                             }
                         }
                     }

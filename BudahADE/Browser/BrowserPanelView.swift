@@ -29,7 +29,7 @@ struct BrowserPanelView: View {
     // MARK: - Chrome (URL bar + nav)
 
     private var browserChrome: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             navButtons
             urlBar
 
@@ -46,15 +46,17 @@ struct BrowserPanelView: View {
             if let onPopOut {
                 Button(action: onPopOut) {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Theme.Colors.textTertiary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Pop out to window")
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(Theme.Colors.surface)
     }
 
@@ -67,17 +69,17 @@ struct BrowserPanelView: View {
                 }
             }
         } label: {
-            HStack(spacing: 3) {
+            HStack(spacing: 4) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                 Text("\(detectedURLs.count)")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
             }
             .foregroundColor(Theme.Colors.accent)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
             .background(Theme.Colors.accent.opacity(0.15))
-            .cornerRadius(3)
+            .cornerRadius(4)
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -85,27 +87,33 @@ struct BrowserPanelView: View {
     }
 
     private var navButtons: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             Button(action: { state.goBack() }) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.Colors.textTertiary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(state.canGoBack ? Theme.Colors.textSecondary : Theme.Colors.textTertiary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!state.canGoBack)
 
             Button(action: { state.goForward() }) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.Colors.textTertiary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(state.canGoForward ? Theme.Colors.textSecondary : Theme.Colors.textTertiary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!state.canGoForward)
 
             Button(action: { state.reload() }) {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.Colors.textTertiary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
@@ -121,12 +129,12 @@ struct BrowserPanelView: View {
 
             TextField("URL", text: $urlText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                .font(.system(size: 13, weight: .regular, design: .monospaced))
                 .foregroundColor(Theme.Colors.textPrimary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(Theme.Colors.surfaceElevated)
-                .cornerRadius(4)
+                .cornerRadius(6)
                 .focused($urlBarFocused)
                 .onSubmit {
                     state.navigateToString(urlText)
@@ -137,12 +145,12 @@ struct BrowserPanelView: View {
 
     private func portBadge(_ port: Int) -> some View {
         Text(":" + String(port))
-            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            .font(.system(size: 11, weight: .semibold, design: .monospaced))
             .foregroundColor(Theme.Colors.accent)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
             .background(Theme.Colors.accent.opacity(0.15))
-            .cornerRadius(3)
+            .cornerRadius(4)
     }
 
     private var inspectButton: some View {
@@ -155,8 +163,10 @@ struct BrowserPanelView: View {
             }
         }) {
             Image(systemName: "cursorarrow.square")
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundColor(isActive ? Theme.Colors.accent : Theme.Colors.textTertiary)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(isActive ? "Exit inspect mode (Esc)" : "Inspect element (⌘⇧I)")

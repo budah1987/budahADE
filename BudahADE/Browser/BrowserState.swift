@@ -105,7 +105,7 @@ final class BrowserState {
         }
         ucc.add(pickerHandler, name: "elementPicker")
 
-        let wv = WKWebView(frame: .zero, configuration: config)
+        let wv = InteractiveWebView(frame: .zero, configuration: config)
         self.webView = wv
     }
 
@@ -133,4 +133,13 @@ final class BrowserState {
         networkLogs.append(entry)
         if networkLogs.count > 100 { networkLogs.removeFirst() }
     }
+}
+
+// MARK: - Interactive WKWebView
+
+/// WKWebView subclass that accepts first-click interaction without requiring
+/// the window to be focused first, matching native browser behavior.
+final class InteractiveWebView: WKWebView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override var acceptsFirstResponder: Bool { true }
 }

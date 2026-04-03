@@ -559,6 +559,8 @@ final class TaskState: ObservableObject, Identifiable {
                         guard let self,
                               let idx = self.tabs.firstIndex(where: { $0.id == id }),
                               let newTitle = state.title, !newTitle.isEmpty else { return }
+                        // Respect user renames — don't overwrite if restoredTitle is set
+                        if self.tabs[idx].restoredTitle != nil { return }
                         self.tabs[idx].title = newTitle
                     }
                 }
@@ -645,38 +647,79 @@ final class TaskState: ObservableObject, Identifiable {
         return tabs.filter { secondaryIds.contains($0.id) }
     }
 
-    func reorderTab(_ tabId: UUID, toIndex newIndex: Int) {
-        guard splitPane == nil else {
-            // Split mode: figure out which pane and reorder within that subset
-            let isSecondary = splitPane?.secondaryTabIds.contains(tabId) ?? false
-            var paneTabs = isSecondary ? secondaryTabs : primaryTabs
-            guard let oldIndex = paneTabs.firstIndex(where: { $0.id == tabId }) else { return }
-            let clamped = min(max(newIndex, 0), paneTabs.count)
-            guard oldIndex != clamped else { return }
+    func reorderTab(_ tabId: UUID, toIndex newIndex: Int, inPane targetPane: PanePosition? = nil) {
+        guard var split = splitPane else {
+            // Unsplit mode: simple array reorder
+            guard let oldIndex = tabs.firstIndex(where: { $0.id == tabId }) else { return }
+            guard oldIndex != newIndex, newIndex >= 0, newIndex <= tabs.count else { return }
+            let tab = tabs.remove(at: oldIndex)
+            let insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex
+            tabs.insert(tab, at: min(insertAt, tabs.count))
+            return
+        }
+
+        // Split mode — determine current and target pane
+        let isInSecondary = split.secondaryTabIds.contains(tabId)
+        let target = targetPane ?? (isInSecondary ? PanePosition.secondary : .primary)
+        let targetIsSecondary = target == .secondary
+
+        // Cross-pane move: update membership before reorder
+        if isInSecondary && !targetIsSecondary {
+            split.secondaryTabIds.removeAll { $0 == tabId }
+            if split.secondarySelectedId == tabId {
+                split.secondarySelectedId = split.secondaryTabIds.last
+            }
+            selectedTabId = tabId
+            focusedPane = .primary
+        } else if !isInSecondary && targetIsSecondary {
+            split.secondaryTabIds.append(tabId)
+            split.secondarySelectedId = tabId
+            if selectedTabId == tabId {
+                let secIds = Set(split.secondaryTabIds)
+                selectedTabId = tabs.first(where: { !secIds.contains($0.id) && $0.id != tabId })?.id
+            }
+            focusedPane = .secondary
+        }
+
+        // Reorder within target pane
+        let secIds = Set(split.secondaryTabIds)
+        var paneTabs = targetIsSecondary
+            ? tabs.filter { secIds.contains($0.id) }
+            : tabs.filter { !secIds.contains($0.id) }
+
+        guard let oldIndex = paneTabs.firstIndex(where: { $0.id == tabId }) else {
+            if split.secondaryTabIds.isEmpty { splitPane = nil; focusedPane = .primary }
+            else { splitPane = split }
+            return
+        }
+
+        let clamped = min(max(newIndex, 0), paneTabs.count)
+        if oldIndex != clamped {
             let tab = paneTabs.remove(at: oldIndex)
             let insertAt = clamped > oldIndex ? clamped - 1 : clamped
             paneTabs.insert(tab, at: min(insertAt, paneTabs.count))
-            // Rebuild full array: replace pane tabs in their new order
-            let paneIds = Set(paneTabs.map(\.id))
-            var rebuilt: [TabInfo] = []
-            var pi = 0
-            for t in tabs {
-                if paneIds.contains(t.id) {
-                    rebuilt.append(paneTabs[pi])
-                    pi += 1
-                } else {
-                    rebuilt.append(t)
-                }
-            }
-            tabs = rebuilt
-            return
         }
-        // Unsplit mode: simple array reorder
-        guard let oldIndex = tabs.firstIndex(where: { $0.id == tabId }) else { return }
-        guard oldIndex != newIndex, newIndex >= 0, newIndex <= tabs.count else { return }
-        let tab = tabs.remove(at: oldIndex)
-        let insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex
-        tabs.insert(tab, at: min(insertAt, tabs.count))
+
+        // Rebuild full array preserving pane order
+        let paneIds = Set(paneTabs.map(\.id))
+        var rebuilt: [TabInfo] = []
+        var pi = 0
+        for t in tabs {
+            if paneIds.contains(t.id) {
+                rebuilt.append(paneTabs[pi])
+                pi += 1
+            } else {
+                rebuilt.append(t)
+            }
+        }
+        tabs = rebuilt
+
+        if split.secondaryTabIds.isEmpty {
+            splitPane = nil
+            focusedPane = .primary
+        } else {
+            splitPane = split
+        }
     }
 
     func splitTab(_ tabId: UUID, to zone: DropZone) {
@@ -777,6 +820,7 @@ final class TaskState: ObservableObject, Identifiable {
         split.secondaryTabIds.append(id)
         split.secondarySelectedId = id
         splitPane = split  // Trigger @Published update
+        focusedPane = .secondary
         return id
     }
 
@@ -790,6 +834,7 @@ final class TaskState: ObservableObject, Identifiable {
         split.secondaryTabIds.append(id)
         split.secondarySelectedId = id
         splitPane = split  // Trigger @Published update
+        focusedPane = .secondary
         return id
     }
 
@@ -1048,15 +1093,14 @@ final class TaskState: ObservableObject, Identifiable {
                       let title = info["title"] as? String,
                       let index = self.tabs.firstIndex(where: { $0.id == surfaceId }) else { return }
 
-                // If we have a restored title, don't let shell/path titles overwrite it.
-                // Only accept titles from Claude (spinner or "Claude" keyword).
+                // If we have a restored title, block idle/shell titles.
+                // Show Claude's active status temporarily but keep restoredTitle as
+                // the home name to restore when Claude goes idle again.
                 if self.tabs[index].restoredTitle != nil {
                     if Self.parseAgentStatus(from: title) != .inactive {
-                        // Claude set a real title — accept it and clear the restored flag
                         self.tabs[index].title = title
-                        self.tabs[index].restoredTitle = nil
                     }
-                    // Otherwise keep the restored title (ignore shell/path/tmux titles)
+                    // else: keep restoredTitle as display title
                 } else {
                     self.tabs[index].title = title
                 }
@@ -1072,6 +1116,10 @@ final class TaskState: ObservableObject, Identifiable {
                 // Transition from active → idle: mark completed (persists until user opens tab)
                 if (oldStatus == .working || oldStatus == .thinking) && newStatus == .inactive {
                     self.tabs[index].agentStatus = .completed
+                    // Restore the user's home title now that Claude is idle.
+                    if let pinned = self.tabs[index].restoredTitle {
+                        self.tabs[index].title = pinned
+                    }
                 } else if self.tabs[index].agentStatus == .completed && newStatus == .inactive {
                     // Stay completed — don't overwrite with inactive until user opens the tab
                 } else {
@@ -1107,9 +1155,11 @@ final class TaskState: ObservableObject, Identifiable {
 
         if tabs[index].restoredTitle != nil {
             if Self.parseAgentStatus(from: title) != .inactive {
+                // Claude is active — show status in the tab title, but keep restoredTitle
+                // as the "home" name to restore when Claude goes idle.
                 tabs[index].title = title
-                tabs[index].restoredTitle = nil
             }
+            // else: idle/shell title — keep restoredTitle as the display title (block overwrite)
         } else {
             tabs[index].title = title
         }
@@ -1123,6 +1173,10 @@ final class TaskState: ObservableObject, Identifiable {
 
         if (oldStatus == .working || oldStatus == .thinking) && newStatus == .inactive {
             tabs[index].agentStatus = .completed
+            // Restore the user's home title now that Claude is idle.
+            if let pinned = tabs[index].restoredTitle {
+                tabs[index].title = pinned
+            }
         } else if tabs[index].agentStatus == .completed && newStatus == .inactive {
             // Stay completed
         } else {
