@@ -163,6 +163,8 @@ final class TaskState: ObservableObject, Identifiable {
                 )
                 createBuilderSession(from: fallback)
             }
+            // Show builder chat now that session + specState are both ready
+            showBuilderChat = true
         }
 
         // Only create terminal tabs when NOT using the GUI builder
@@ -267,7 +269,8 @@ final class TaskState: ObservableObject, Identifiable {
         return tabId
     }
 
-    /// Create builder session from a parsed spec (no tab — builder lives below the tab bar)
+    /// Create builder session from a parsed spec (no tab — builder lives below the tab bar).
+    /// Does NOT set showBuilderChat — caller controls visibility after state is ready.
     func createBuilderSession(from spec: SpecParseResult, contextSummary: String = "") {
         let session = BuilderSession.from(spec: spec, contextSummary: contextSummary)
         builderSession = session
@@ -276,9 +279,6 @@ final class TaskState: ObservableObject, Identifiable {
         let chatManager = CLISubprocessManager()
         let agent = BuilderAgent(builderSession: session, chatManager: chatManager)
         builderAgent = agent
-
-        // Show the builder chat
-        showBuilderChat = true
     }
 
     func closePlanTab(_ id: UUID) {

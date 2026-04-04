@@ -1,30 +1,10 @@
 import SwiftUI
 
-// MARK: - Step Panel Display State
-
-private enum StepPanelDisplayState: Equatable {
-    case hidden     // pre-build or user dismissed
-    case collapsed  // slim header strip only
-    case expanded   // full step list visible
-}
-
 // MARK: - Step Index Wrapper (for sheet presentation)
 
 private struct StepIndexWrapper: Identifiable {
     let index: Int
     var id: Int { index }
-}
-
-// MARK: - Pulsing Dot
-
-private struct PulsingDot: ViewModifier {
-    @State private var isPulsing = false
-    func body(content: Content) -> some View {
-        content
-            .opacity(isPulsing ? 0.4 : 1.0)
-            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-            .onAppear { isPulsing = true }
-    }
 }
 
 // MARK: - Builder Chat View
@@ -46,8 +26,8 @@ struct BuilderChatView: View {
     /// Show spec sheet (post-build-start "View Spec" or Edit Spec button)
     @State private var showSpecSheet: Bool = false
 
-    // Step panel state
-    @State private var stepPanelState: StepPanelDisplayState = .hidden
+    // Side panel state
+    @State private var sidePanelMode: SidePanelMode = .hidden
     @State private var selectedStepIndex: Int? = nil
 
     // Input bar state (owned here, passed as binding to ChatInputBar)
@@ -72,48 +52,62 @@ struct BuilderChatView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            VStack(spacing: 0) {
-                // Step status header (compact — shows while building)
-                stepHeader
-
-                // Message list
-                messageList
-                    .overlay(alignment: .bottom) {
-                        LinearGradient(
-                            colors: [Color.clear, Theme.Colors.appBackground],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 40)
-                        .allowsHitTesting(false)
-                    }
-
-                // Inline collapsible step panel (appears once build starts)
-                if stepPanelState != .hidden {
-                    inlineStepPanel
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-
-                // Bottom area: option sheet, question stepper, or input bar
-                bottomArea
-            }
-            .background(Theme.Colors.appBackground)
-
-            // Turn scrubber on right edge
-            if !session.turnMarkers.isEmpty {
-                ChatTurnScrubber(
-                    markers: session.turnMarkers,
-                    activeMessageId: scrollTarget,
-                    stepColorProvider: { stepIndex in
-                        builderStepColor(for: stepIndex, steps: session.steps)
+        HStack(spacing: 0) {
+            // Left side panel (accordion steps)
+            if sidePanelMode != .hidden {
+                BuilderSidePanel(
+                    session: session,
+                    mode: sidePanelMode,
+                    onToggle: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            sidePanelMode = sidePanelMode == .expanded ? .collapsed : .expanded
+                        }
                     },
-                    onMarkerTap: { messageId in
-                        scrollTarget = messageId
+                    onStepTap: { index in
+                        selectedStepIndex = index
                     }
                 )
-                .padding(.top, 48)
-                .padding(.trailing, 14)
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
+            // Main chat area
+            ZStack(alignment: .trailing) {
+                VStack(spacing: 0) {
+                    // Step status header (compact — shows while building)
+                    stepHeader
+
+                    // Message list
+                    messageList
+                        .overlay(alignment: .bottom) {
+                            LinearGradient(
+                                colors: [Color.clear, Theme.Colors.appBackground],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 40)
+                            .allowsHitTesting(false)
+                        }
+
+                    // Bottom area: option sheet, question stepper, or input bar
+                    bottomArea
+                }
+                .background(Theme.Colors.appBackground)
+
+                // Turn scrubber on right edge
+                if !session.turnMarkers.isEmpty {
+                    ChatTurnScrubber(
+                        markers: session.turnMarkers,
+                        activeMessageId: scrollTarget,
+                        stepColorProvider: { stepIndex in
+                            builderStepColor(for: stepIndex, steps: session.steps)
+                        },
+                        onMarkerTap: { messageId in
+                            scrollTarget = messageId
+                        }
+                    )
+                    .padding(.top, 48)
+                    .padding(.trailing, 14)
+                }
             }
         }
         .onAppear {
@@ -192,10 +186,10 @@ struct BuilderChatView: View {
             }
         }
         .onChange(of: session.buildState) { _, newState in
-            // Auto-show panel (collapsed) when build starts
-            if newState != .ready && stepPanelState == .hidden {
+            // Auto-show side panel (expanded) when build starts
+            if newState != .ready && sidePanelMode == .hidden {
                 withAnimation(.easeInOut(duration: 0.25)) {
-                    stepPanelState = .collapsed
+                    sidePanelMode = .expanded
                 }
             }
         }
@@ -421,6 +415,21 @@ struct BuilderChatView: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .lineLimit(1)
                     Spacer()
+                    // Toggle side panel
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            if sidePanelMode == .hidden {
+                                sidePanelMode = .expanded
+                            } else {
+                                sidePanelMode = sidePanelMode == .expanded ? .collapsed : .expanded
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "sidebar.left")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.Colors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
                     // View Spec button — opens spec sheet
                     Button("View Spec") { showSpecSheet = true }
                         .font(Theme.label(11))
@@ -436,225 +445,7 @@ struct BuilderChatView: View {
         }
     }
 
-    // MARK: - Inline Step Panel
-
-    private var inlineStepPanel: some View {
-        VStack(spacing: 0) {
-            // Header strip — always visible when panel is not hidden
-            stepPanelHeader
-
-            // Expanded content
-            if stepPanelState == .expanded {
-                stepPanelList
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .background(Theme.Colors.surface)
-        .overlay(alignment: .top) {
-            Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
-        }
-    }
-
-    private var stepPanelHeader: some View {
-        HStack(spacing: 8) {
-            // State dot
-            Circle()
-                .fill(stepStateColor)
-                .frame(width: 6, height: 6)
-                .modifier(PulsingDot())
-                .opacity(session.buildState == .building ? 1 : 0)
-                .overlay {
-                    if session.buildState != .building {
-                        Circle().fill(stepStateColor).frame(width: 6, height: 6)
-                    }
-                }
-
-            // Progress text
-            Text("\(session.completedCount)/\(session.totalCount)")
-                .font(Theme.code(11, weight: .medium))
-                .foregroundStyle(stepStateColor)
-
-            // Spec title
-            Text(specTitle)
-                .font(Theme.label(11))
-                .foregroundStyle(Theme.Colors.textTertiary)
-                .lineLimit(1)
-
-            // Progress bar — tap a segment to open that step's modal
-            SpecProgressBar(steps: session.steps, size: .mini, onSegmentTap: { index in
-                selectedStepIndex = index
-                if stepPanelState == .collapsed {
-                    withAnimation(.easeInOut(duration: 0.2)) { stepPanelState = .expanded }
-                }
-            })
-            .frame(maxWidth: .infinity)
-
-            // Expand/collapse toggle
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    stepPanelState = stepPanelState == .expanded ? .collapsed : .expanded
-                }
-            } label: {
-                Image(systemName: stepPanelState == .expanded ? "chevron.down" : "chevron.up")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.textTertiary)
-                    .frame(width: 22, height: 22)
-                    .background(Theme.Colors.surfaceElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-            .buttonStyle(.plain)
-
-            // Close/hide button
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    stepPanelState = .hidden
-                }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.textTertiary)
-                    .frame(width: 22, height: 22)
-                    .background(Theme.Colors.surfaceElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 36)
-    }
-
-    private var stepPanelList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 1) {
-                    ForEach(Array(session.steps.enumerated()), id: \.element.id) { index, step in
-                        stepPanelRow(step: step, index: index)
-                            .id(step.id)
-                            .contentShape(Rectangle())
-                            .onTapGesture { selectedStepIndex = index }
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-            .frame(maxHeight: 180)
-            .onChange(of: session.activeStepIndex) { _, newIndex in
-                guard let idx = newIndex, session.steps.indices.contains(idx) else { return }
-                withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo(session.steps[idx].id, anchor: .center)
-                }
-            }
-        }
-    }
-
-    private func stepPanelRow(step: BuildStep, index: Int) -> some View {
-        let isActive = index == session.activeStepIndex
-
-        return HStack(spacing: 8) {
-            // State indicator
-            stepRowIndicator(state: step.state, isActive: isActive)
-
-            // Title
-            Text(step.title)
-                .font(Theme.body(11))
-                .fontWeight(isActive ? .semibold : .regular)
-                .foregroundStyle(
-                    step.state == .done ? Color.white.opacity(0.25) :
-                    isActive ? Color(hex: 0xFFFFFF).opacity(0.8) :
-                    Color.white.opacity(0.2)
-                )
-                .strikethrough(step.state == .done, color: Color.white.opacity(0.2))
-                .lineLimit(1)
-
-            Spacer()
-
-            // Sub-task progress on active step
-            if isActive && !step.subTasks.isEmpty {
-                Text("\(step.subTasksDone)/\(step.subTasksTotal)")
-                    .font(Theme.code(10))
-                    .foregroundStyle(Theme.Colors.statusWorking)
-            }
-
-            // Per-step pause/resume/cancel on active row
-            if isActive {
-                if session.buildState == .building {
-                    HStack(spacing: 2) {
-                        miniActionButton("pause.fill") { pauseBuild() }
-                        miniActionButton("xmark") { cancelBuild() }
-                    }
-                } else if session.buildState == .paused {
-                    HStack(spacing: 2) {
-                        miniActionButton("play.fill") { resumeBuild() }
-                        miniActionButton("xmark") { cancelBuild() }
-                    }
-                }
-            }
-
-            // Failed attempt badge
-            if step.state == .failed {
-                Text("×\(step.attemptCount)")
-                    .font(Theme.caption(10))
-                    .foregroundStyle(Theme.Colors.error.opacity(0.7))
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .background(
-            isActive
-                ? RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color(hex: 0xA78BFA).opacity(0.051))
-                    .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .strokeBorder(Color(hex: 0xA78BFA).opacity(0.122), lineWidth: 1))
-                : nil
-        )
-    }
-
-    @ViewBuilder
-    private func stepRowIndicator(state: StepState, isActive: Bool) -> some View {
-        Group {
-            switch state {
-            case .done:
-                Text("✓")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.statusDone)
-                    .frame(width: 12)
-            case .failed:
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Theme.Colors.error)
-                    .frame(width: 12)
-            case .skipped:
-                Image(systemName: "forward.fill")
-                    .font(.system(size: 8))
-                    .foregroundStyle(Color.white.opacity(0.2))
-                    .frame(width: 12)
-            case .building:
-                Circle()
-                    .fill(Theme.Colors.statusWorking)
-                    .frame(width: 4, height: 4)
-                    .modifier(PulsingDot())
-                    .frame(width: 12)
-            case .queued:
-                Circle()
-                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
-                    .frame(width: 6, height: 6)
-                    .frame(width: 12)
-            }
-        }
-    }
-
-    private func miniActionButton(_ systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(Theme.Colors.textTertiary)
-                .frame(width: 22, height: 22)
-                .background(Theme.Colors.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-        }
-        .buttonStyle(.plain)
-    }
-
-    // Step panel binding for sheet presentation
+    // Step detail sheet binding
     private var selectedStepBinding: Binding<StepIndexWrapper?> {
         Binding(
             get: {
@@ -663,16 +454,6 @@ struct BuilderChatView: View {
             },
             set: { wrapper in selectedStepIndex = wrapper?.index }
         )
-    }
-
-    private var stepStateColor: Color {
-        switch session.buildState {
-        case .ready:    return Theme.Colors.textTertiary
-        case .building: return Theme.Colors.statusWorking
-        case .paused:   return Theme.Colors.warning
-        case .done:     return Theme.Colors.statusDone
-        case .failed:   return Theme.Colors.error
-        }
     }
 
     // MARK: - Message List

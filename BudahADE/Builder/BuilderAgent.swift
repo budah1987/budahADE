@@ -44,18 +44,19 @@ final class BuilderAgent: ObservableObject {
             model: .sonnet,
             agentMode: .developer,
             systemPrompt: systemPrompt,
-            workingDirectory: worktreePath
+            workingDirectory: worktreePath,
+            enableAgentTeams: true
         )
 
         self.agentSession = session
         builderSession.agentSessionId = session.id
 
-        // Observe agent session status
-        statusObserver = session.objectWillChange.sink { [weak self] _ in
-            Task { @MainActor in
+        // Observe agent session status — throttled to 5/sec to prevent main-thread saturation
+        statusObserver = session.objectWillChange
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] _ in
                 self?.syncState()
             }
-        }
 
         // Ensure at least one step exists
         if builderSession.steps.isEmpty {
@@ -120,7 +121,7 @@ final class BuilderAgent: ObservableObject {
 
         // Process new messages through step tracker
         let existingIds = Set(builderSession.messages.map(\.id))
-        let newMessages = session.messages.filter { !existingIds.contains($0.id) }
+        let newMessages = session.messages.filter { !existingIds.contains($0.id) && $0.role != .user }
 
         for message in newMessages {
             if message.role == .assistant {

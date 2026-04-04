@@ -7,12 +7,12 @@ struct EditableMarkdownRenderer: View {
     @State private var editingBlockId: UUID?
     @State private var editText: String = ""
     @State private var hoveredBlockId: UUID?
+    @State private var cachedBlocks: [MarkdownBlockItem] = []
+    @State private var cachedContentHash: Int = 0
 
     var body: some View {
-        let blocks = MarkdownParser.parse(content)
-
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(blocks) { block in
+            ForEach(cachedBlocks) { block in
                 if block.id == editingBlockId {
                     editableBlock(block: block)
                 } else {
@@ -36,6 +36,15 @@ struct EditableMarkdownRenderer: View {
             }
             .padding(.top, 8)
         }
+        .onAppear { reparse() }
+        .onChange(of: content) { _, _ in reparse() }
+    }
+
+    private func reparse() {
+        let hash = content.hashValue
+        guard hash != cachedContentHash else { return }
+        cachedContentHash = hash
+        cachedBlocks = MarkdownParser.parse(content)
     }
 
     @ViewBuilder
@@ -86,8 +95,7 @@ struct EditableMarkdownRenderer: View {
 
     private func commitEdit() {
         guard let blockId = editingBlockId else { return }
-        let blocks = MarkdownParser.parse(content)
-        guard let block = blocks.first(where: { $0.id == blockId }) else { return }
+        guard let block = cachedBlocks.first(where: { $0.id == blockId }) else { return }
 
         if let range = content.range(of: block.sourceText) {
             content.replaceSubrange(range, with: editText)
