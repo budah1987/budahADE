@@ -396,53 +396,128 @@ struct BuilderChatView: View {
         .padding(.vertical, 16)
     }
 
-    // MARK: - Step Header (compact top strip while building)
+    // MARK: - Persistent Spec Header
 
     private var stepHeader: some View {
-        Group {
-            if session.buildState == .building, let step = session.activeStep {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(Theme.Colors.statusWorking)
-                        .frame(width: 6, height: 6)
-                    Text("Step \(session.completedCount + 1)/\(session.totalCount)")
-                        .font(Theme.label(12))
-                        .foregroundStyle(Theme.Colors.statusWorking)
-                    Text("—")
+        VStack(alignment: .leading, spacing: 0) {
+            // Spec identity row — always visible
+            HStack(spacing: 8) {
+                // Spec filename + author
+                if let path = specFilePath {
+                    Text(URL(fileURLWithPath: path).lastPathComponent)
+                        .font(Theme.code(11))
                         .foregroundStyle(Theme.Colors.textTertiary)
-                    Text(step.title)
-                        .font(Theme.body(12))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                        .lineLimit(1)
-                    Spacer()
-                    // Toggle side panel
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            if sidePanelMode == .hidden {
-                                sidePanelMode = .expanded
-                            } else {
-                                sidePanelMode = sidePanelMode == .expanded ? .collapsed : .expanded
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "sidebar.left")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Theme.Colors.textTertiary)
-                    }
-                    .buttonStyle(.plain)
-                    // View Spec button — opens spec sheet
-                    Button("View Spec") { showSpecSheet = true }
-                        .font(Theme.label(11))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                        .buttonStyle(.plain)
-                    SpecProgressBar(steps: session.steps, size: .mini)
-                        .frame(width: 100)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Theme.Colors.surface)
+                Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1, height: 12)
+                Text("Spec Author")
+                    .font(Theme.body(11))
+                    .foregroundStyle(Color(hex: 0x666666))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+
+                Spacer()
+
+                // Side panel toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if sidePanelMode == .hidden {
+                            sidePanelMode = .expanded
+                        } else {
+                            sidePanelMode = sidePanelMode == .expanded ? .collapsed : .expanded
+                        }
+                    }
+                } label: {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .frame(width: 22, height: 22)
+                        .background(sidePanelMode != .hidden ? Theme.Colors.surfaceElevated : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
+
+                // View Spec button
+                Button("View Spec") { showSpecSheet = true }
+                    .font(Theme.label(11))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                    .buttonStyle(.plain)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+
+            // Title
+            Text(specTitle)
+                .font(.custom("Geist-SemiBold", size: 20))
+                .foregroundStyle(Color(hex: 0xE8E8E8))
+                .tracking(-0.3)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+
+            // Stats row: task count, sections, branch, progress bar
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Text("\(session.totalCount)")
+                        .font(Theme.code(11))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color(hex: 0xA78BFA))
+                    Text("tasks")
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                }
+
+                HStack(spacing: 4) {
+                    Text("\(session.steps.count)")
+                        .font(Theme.code(11))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                    Text("sections")
+                        .font(Theme.body(11))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                }
+
+                if let branch = branchName {
+                    Text(branch)
+                        .font(Theme.code(10))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Color.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                }
+
+                Spacer()
+
+                // Active step indicator (when building)
+                if session.buildState == .building, let step = session.activeStep {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(Theme.Colors.statusWorking)
+                            .frame(width: 5, height: 5)
+                        Text("Step \(session.completedCount + 1)/\(session.totalCount)")
+                            .font(Theme.code(10))
+                            .foregroundStyle(Theme.Colors.statusWorking)
+                        Text("—")
+                            .font(Theme.code(10))
+                            .foregroundStyle(Theme.Colors.textTertiary)
+                        Text(step.title)
+                            .font(Theme.body(10))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                SpecProgressBar(steps: session.steps, size: .mini)
+                    .frame(width: 100)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+
+            Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
         }
+        .background(Theme.Colors.surface)
     }
 
     // Step detail sheet binding

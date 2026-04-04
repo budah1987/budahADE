@@ -147,28 +147,68 @@ final class BuilderSession {
     // MARK: - Factory
 
     /// Create a BuilderSession from a parsed spec result.
-    /// Prefers sections as steps (H2/H3 headings). Falls back to flat checkbox list.
+    /// Only sections with checkbox tasks become steps. H2 phases aggregate
+    /// child H3 checkboxes as sub-tasks. Sections without tasks are skipped.
     static func from(spec: SpecParseResult, contextSummary: String = "") -> BuilderSession {
         let session = BuilderSession()
         session.contextSummary = contextSummary
 
         if !spec.sections.isEmpty {
-            // Each section → one BuildStep; its checkboxes → sub-tasks
-            session.steps = spec.sections.map { section in
+            // Strategy: H2 sections with tasks (direct or via child H3s) become steps.
+            // H3 sections with tasks become sub-tasks of their parent H2.
+            // Sections with zero tasks are skipped entirely.
+            var steps: [BuildStep] = []
+            var currentH2Step: BuildStep?
+
+            for section in spec.sections {
                 let subTasks = section.tasks.map { task in
                     BuildSubTask(title: task.title, state: task.isCompleted ? .done : .queued)
                 }
-                let allDone = !subTasks.isEmpty && subTasks.allSatisfy { $0.state == .done }
-                return BuildStep(
-                    id: section.id,
-                    title: section.title,
-                    description: section.content,
-                    state: allDone ? .done : .queued,
-                    subTasks: subTasks
-                )
+
+                if section.level == 2 {
+                    // Flush previous H2 step if it had tasks
+                    if var h2 = currentH2Step, !h2.subTasks.isEmpty {
+                        let allDone = h2.subTasks.allSatisfy { $0.state == .done }
+                        h2.state = allDone ? .done : .queued
+                        steps.append(h2)
+                    }
+                    // Start new H2 step (may accumulate sub-tasks from child H3s)
+                    currentH2Step = BuildStep(
+                        id: section.id,
+                        title: section.title,
+                        description: section.content,
+                        subTasks: subTasks
+                    )
+                } else if section.level == 3, !subTasks.isEmpty {
+                    // H3 with tasks → add as sub-tasks to current H2
+                    if currentH2Step != nil {
+                        currentH2Step!.subTasks.append(contentsOf: subTasks)
+                    } else {
+                        // Orphan H3 with tasks — promote to its own step
+                        let allDone = subTasks.allSatisfy { $0.state == .done }
+                        steps.append(BuildStep(
+                            id: section.id,
+                            title: section.title,
+                            description: section.content,
+                            state: allDone ? .done : .queued,
+                            subTasks: subTasks
+                        ))
+                    }
+                }
             }
-        } else {
-            // Fallback: flat checkbox list → each checkbox is a step
+
+            // Flush last H2 step
+            if var h2 = currentH2Step, !h2.subTasks.isEmpty {
+                let allDone = h2.subTasks.allSatisfy { $0.state == .done }
+                h2.state = allDone ? .done : .queued
+                steps.append(h2)
+            }
+
+            session.steps = steps
+        }
+
+        // Fallback: if no steps were created from sections, use flat checkbox list
+        if session.steps.isEmpty && !spec.tasks.isEmpty {
             session.steps = spec.tasks.map { task in
                 BuildStep(
                     id: "\(task.id)",
@@ -177,6 +217,7 @@ final class BuilderSession {
                 )
             }
         }
+
         return session
     }
 
