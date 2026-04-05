@@ -163,14 +163,13 @@ struct WorkspaceView: View {
                     } else {
                         // Build mode: file tree + tabs (chrome) + agent content (dark inset) + git panel
                         HStack(spacing: 0) {
-                            if state.leftPanelVisible {
-                                LeftPanelView(
-                                    state: state,
-                                    worktreePath: state.activeTask?.repoPath ?? state.projectPath
-                                )
-                                .id("\(state.activeTaskId?.uuidString ?? "")-\(state.activeTask?.tabs.count ?? 0)")
-                                .transition(.move(edge: .leading).combined(with: .opacity))
-                            }
+                            LeftPanelView(
+                                state: state,
+                                worktreePath: state.activeTask?.repoPath ?? state.projectPath
+                            )
+                            .frame(width: state.leftPanelVisible ? nil : 0)
+                            .clipped()
+                            .allowsHitTesting(state.leftPanelVisible)
 
                             // Tabs on chrome, agent content in dark rounded inset
                             VStack(spacing: 0) {
@@ -185,10 +184,12 @@ struct WorkspaceView: View {
                                     .padding(.horizontal, Theme.Spacing.lg)
                             }
 
-                            if state.rightPanelVisible, let task = state.activeTask {
+                            if let task = state.activeTask {
                                 GitSidebarView(task: task, projectPath: state.projectPath)
                                     .id(state.activeTaskId)
-                                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                                    .frame(width: state.rightPanelVisible ? nil : 0)
+                                    .clipped()
+                                    .allowsHitTesting(state.rightPanelVisible)
                             }
                         }
                     }
@@ -416,10 +417,9 @@ struct WorkspaceView: View {
     // MARK: - Agent Content Area (dark rounded inset)
 
     private var agentContentArea: some View {
-        VStack(spacing: 0) {
-            // Builder chat
+        ZStack {
+            // Builder chat — persisted once session exists, hidden via opacity
             if let task = state.activeTask,
-               task.showBuilderChat,
                let builderSession = task.builderSession {
                 BuilderChatView(
                     session: builderSession,
@@ -433,9 +433,11 @@ struct WorkspaceView: View {
                     onEditSpec: nil,
                     branchName: task.branchName
                 )
+                .opacity(task.showBuilderChat ? 1 : 0)
+                .allowsHitTesting(task.showBuilderChat)
             }
 
-            if state.activeTask?.showBuilderChat != true {
+            // Terminal/browser content — hidden when builder chat is shown
             ZStack(alignment: .top) {
                 // Tab content panels (terminal + browser) — single or split
                 if let task = state.activeTask, let split = task.splitPane {
@@ -523,10 +525,9 @@ struct WorkspaceView: View {
                     }
                 } else {
                     ZStack {
-                        ForEach(state.tasks) { task in
-                            let isActiveTask = task.id == state.activeTaskId
+                        if let task = state.activeTask {
                             ForEach(task.tabs) { tab in
-                                let isVisible = isActiveTask && tab.id == task.selectedTabId
+                                let isVisible = tab.id == task.selectedTabId
                                 tabContentPanel(task: task, tab: tab)
                                     .opacity(isVisible ? 1 : 0)
                                     .allowsHitTesting(isVisible)
@@ -572,7 +573,8 @@ struct WorkspaceView: View {
             }
             .background(Theme.Colors.appBackground)
             .animation(.easeInOut(duration: 0.25), value: state.activeTask?.isBuilderDrawerOpen)
-            } // end if !showBuilderChat
+            .opacity(state.activeTask?.showBuilderChat != true ? 1 : 0)
+            .allowsHitTesting(state.activeTask?.showBuilderChat != true)
         }
     }
 

@@ -531,11 +531,26 @@ struct BuilderChatView: View {
         )
     }
 
+    // MARK: - Step Divider Map (precomputed)
+
+    /// Precomputed map of message ID → step divider label.
+    /// Evaluated once per body pass instead of per-message.
+    private var stepDividerMap: [UUID: String] {
+        var map: [UUID: String] = [:]
+        for (index, step) in session.steps.enumerated() {
+            if let startId = step.chatMessageRange?.start {
+                map[startId] = "Step \(index + 1): \(step.title)"
+            }
+        }
+        return map
+    }
+
     // MARK: - Message List
 
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                let dividers = stepDividerMap
                 LazyVStack(alignment: .leading, spacing: 8) {
                     if session.buildState == .ready {
                         if !specMarkdown.isEmpty {
@@ -553,8 +568,8 @@ struct BuilderChatView: View {
                     }
 
                     ForEach(session.messages) { message in
-                        // Step transition divider
-                        if let marker = stepTransitionMarker(before: message) {
+                        // Step transition divider (precomputed lookup)
+                        if let marker = dividers[message.id] {
                             stepDivider(marker)
                         }
 
@@ -566,13 +581,11 @@ struct BuilderChatView: View {
                         )
                         .id(message.id)
 
-                        // Inline confirm button
+                        // Inline confirm button — uses cached detection
                         if let agent = agentSession,
                            message.role == .assistant,
                            !message.content.isEmpty,
-                           (agent.parseInteractiveMarkers(in: message.content).contains(where: {
-                               if case .confirm = $0 { return true }; return false
-                           }) || agent.detectConfirmation(in: message.content) != nil),
+                           agent.cachedHasConfirm(for: message),
                            (confirmedMessageIds.contains(message.id) ||
                             (!agent.confirmDismissed &&
                              !isRunning &&
@@ -619,10 +632,7 @@ struct BuilderChatView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 32)
             }
-            .onChange(of: session.messages.count) { _, _ in
-                scrollToBottom(proxy: proxy)
-            }
-            .onChange(of: agentSession?.currentStreamingText) { _, _ in
+            .onChange(of: agentSession?.scrollGeneration) { _, _ in
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: scrollTarget) { _, newId in
@@ -632,9 +642,6 @@ struct BuilderChatView: View {
                     }
                 }
             }
-            .onChange(of: agentSession?.activityFeed.count) { _, _ in
-                scrollToBottom(proxy: proxy)
-            }
             .onChange(of: agentSession?.status) { _, newValue in
                 if newValue == .connecting {
                     thinkingStartDate = Date()
@@ -642,9 +649,6 @@ struct BuilderChatView: View {
                     agentSession?.isThinking = false
                 } else if newValue == .idle || newValue == .done || newValue == nil {
                     thinkingStartDate = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        scrollToBottom(proxy: proxy)
-                    }
                 } else if case .error = newValue {
                     thinkingStartDate = nil
                 }

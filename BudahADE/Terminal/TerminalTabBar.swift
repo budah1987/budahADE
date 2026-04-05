@@ -338,29 +338,59 @@ struct RotatingBorderGlow: View {
     let state: TabAgentState
 
     @State private var sweepStart = Date()
+    /// Whether the completion sweep has finished — freeze to static border
+    @State private var sweepDone = false
 
     private let workingCycle: Double = 9.0       // seconds per full rotation
     private let doneSweepDuration: Double = 1.5  // seconds for single sweep
     private let cornerRadius: CGFloat = 7
     private let borderWidth: CGFloat = 1.5
 
+    /// Whether the TimelineView should be active (avoids 60fps when idle or sweep done)
+    private var isAnimating: Bool {
+        switch state {
+        case .working: return true
+        case .completed: return !sweepDone
+        case .idle: return false
+        }
+    }
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-            let angle = computeAngle(at: timeline.date)
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(
-                    AngularGradient(
-                        gradient: lightGradient,
-                        center: .center,
-                        angle: .degrees(angle)
-                    ),
-                    lineWidth: borderWidth
-                )
+        Group {
+            if isAnimating {
+                TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                    let angle = computeAngle(at: timeline.date)
+                    glowBorder(angle: angle)
+                }
+            } else if state == .completed && sweepDone {
+                // Static frozen border — no TimelineView, zero GPU cost
+                glowBorder(angle: 360)
+            } else {
+                // Idle — no glow
+                EmptyView()
+            }
         }
         .allowsHitTesting(false)
         .onChange(of: state) { _, newState in
-            if newState == .completed { sweepStart = Date() }
+            if newState == .completed {
+                sweepStart = Date()
+                sweepDone = false
+            } else {
+                sweepDone = false
+            }
         }
+    }
+
+    private func glowBorder(angle: Double) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .strokeBorder(
+                AngularGradient(
+                    gradient: lightGradient,
+                    center: .center,
+                    angle: .degrees(angle)
+                ),
+                lineWidth: borderWidth
+            )
     }
 
     private func computeAngle(at date: Date) -> Double {
@@ -371,11 +401,14 @@ struct RotatingBorderGlow: View {
         case .completed:
             let elapsed = date.timeIntervalSince(sweepStart)
             let progress = min(elapsed / doneSweepDuration, 1.0)
+            if progress >= 1.0 {
+                // Schedule freeze on next frame
+                DispatchQueue.main.async { sweepDone = true }
+            }
             let eased = 1 - pow(1 - progress, 3)  // ease-out cubic
             return eased * 360
         case .idle:
-            let t = date.timeIntervalSinceReferenceDate
-            return (t / workingCycle).truncatingRemainder(dividingBy: 1.0) * 360
+            return 0
         }
     }
 

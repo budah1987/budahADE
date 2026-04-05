@@ -133,6 +133,9 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var pendingLoopWarning: String?
     /// Last result event for cost/trace recording
     var lastResult: StreamEvent.ResultInfo?
+    /// Monotonic counter — incremented on any scroll-worthy event (message, streaming text,
+    /// activity feed, status change). Views observe this single value instead of 4-5 onChange watchers.
+    @Published var scrollGeneration: UInt = 0
 
     struct StagedContent {
         let content: String
@@ -159,12 +162,31 @@ final class AgentSession: ObservableObject, Identifiable {
 
     // MARK: - Message Handling
 
+    /// Increment scroll generation — signals views to scroll to bottom
+    func bumpScroll() { scrollGeneration &+= 1 }
+
+    /// Cache of per-message confirm detection (computed once, reused on every render)
+    private var confirmCache: [UUID: Bool] = [:]
+
+    /// Returns whether a message contains a confirmation prompt (marker or regex).
+    /// Result is cached — safe to call in ForEach body without per-render cost.
+    func cachedHasConfirm(for message: ChatMessage) -> Bool {
+        if let cached = confirmCache[message.id] { return cached }
+        let markers = parseInteractiveMarkers(in: message.content)
+        let hasMarkerConfirm = markers.contains(where: { if case .confirm = $0 { return true }; return false })
+        let hasRegexConfirm = detectConfirmation(in: message.content) != nil
+        let result = hasMarkerConfirm || hasRegexConfirm
+        confirmCache[message.id] = result
+        return result
+    }
+
     func addUserMessage(_ content: String) {
         let message = ChatMessage(
             role: .user,
             content: content
         )
         messages.append(message)
+        bumpScroll()
     }
 
     /// Tool calls accumulating during the current turn (before the text response)
@@ -210,10 +232,12 @@ final class AgentSession: ObservableObject, Identifiable {
         optionsDismissed = false
         confirmDismissed = false
         questionSeriesDismissed = false
+        bumpScroll()
     }
 
     func handleContentDelta(_ text: String) {
         currentStreamingText += text
+        bumpScroll()
     }
 
     /// Available slash commands from the CLI init event.
@@ -229,6 +253,7 @@ final class AgentSession: ObservableObject, Identifiable {
     func handleResult(_ result: StreamEvent.ResultInfo) {
         status = .done
         lastResult = result
+        bumpScroll()
         if claudeSessionId == nil, let sessionId = result.sessionId {
             claudeSessionId = sessionId
         }
@@ -259,6 +284,7 @@ final class AgentSession: ObservableObject, Identifiable {
         )
         activityFeed.append(entry)
         if activityFeed.count > 200 { activityFeed.removeFirst(activityFeed.count - 200) }
+        bumpScroll()
 
         // Loop detection: track edits and flag doom loops
         if let filePath = loopDetector.filePathFromToolEvent(event),

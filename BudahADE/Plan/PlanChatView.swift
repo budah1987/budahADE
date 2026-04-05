@@ -369,12 +369,10 @@ struct PlanChatView: View {
                             .id(message.id)
 
                             // Inline confirm button — green "Accepted" persists for all confirmed messages
-                            // Check markers first, then regex fallback
+                            // Uses cached detection to avoid per-render regex parsing
                             if message.role == .assistant,
                                !message.content.isEmpty,
-                               (session.parseInteractiveMarkers(in: message.content).contains(where: {
-                                   if case .confirm = $0 { return true }; return false
-                               }) || session.detectConfirmation(in: message.content) != nil),
+                               session.cachedHasConfirm(for: message),
                                (confirmedMessageIds.contains(message.id) ||
                                 (!session.confirmDismissed &&
                                  !isRunning &&
@@ -422,7 +420,7 @@ struct PlanChatView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 32)
             }
-            .onChange(of: session?.messages.count) { _, _ in
+            .onChange(of: session?.scrollGeneration) { _, _ in
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: scrollToMessage) { _, newId in
@@ -433,12 +431,6 @@ struct PlanChatView: View {
                     scrollToMessage = nil
                 }
             }
-            .onChange(of: session?.currentStreamingText) { _, _ in
-                scrollToBottom(proxy: proxy)
-            }
-            .onChange(of: session?.activityFeed.count) { _, _ in
-                scrollToBottom(proxy: proxy)
-            }
             .onChange(of: session?.status) { _, newValue in
                 if newValue == .connecting {
                     thinkingStartDate = Date()
@@ -446,10 +438,6 @@ struct PlanChatView: View {
                     session?.isThinking = false
                 } else if newValue == .idle || newValue == .done || newValue == nil {
                     thinkingStartDate = nil
-                    // Scroll when response completes
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        scrollToBottom(proxy: proxy)
-                    }
                 } else if case .error = newValue {
                     thinkingStartDate = nil
                 }

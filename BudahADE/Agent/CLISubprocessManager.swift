@@ -111,6 +111,7 @@ final class CLISubprocessManager: ObservableObject {
         }
         session.status = .connecting
         session.currentStreamingText = ""
+        session.bumpScroll()
 
         // Reasoning sandwich: switch model based on phase
         let phase = ReasoningSandwich.currentPhase(
@@ -425,6 +426,7 @@ final class CLISubprocessManager: ObservableObject {
                         guard let mgr = weakSelf else { return }
                         if session.status == .connecting {
                             session.status = .streaming
+                            session.bumpScroll()
                         }
                         mgr.processStreamLine(capturedLine, session: session)
                     }
@@ -447,6 +449,7 @@ final class CLISubprocessManager: ObservableObject {
                             session.status = .done
                         }
                     }
+                    session.bumpScroll()
                 }
             }
         }
