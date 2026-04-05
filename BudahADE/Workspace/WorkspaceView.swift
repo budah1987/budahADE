@@ -383,8 +383,8 @@ struct WorkspaceView: View {
     @ViewBuilder
     private var buildModeTabBar: some View {
         if let task = state.activeTask {
-            if task.splitPane == nil {
-                VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                if task.splitPane == nil {
                     TerminalTabBar(
                         selectedTabID: Binding(
                             get: { task.selectedTabId ?? UUID() },
@@ -404,10 +404,10 @@ struct WorkspaceView: View {
                         onNewBrowserTab: { task.createBrowserTab() },
                         onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex) }
                     )
+                }
 
-                    if task.builderSession != nil {
-                        BuilderTabRow(task: task)
-                    }
+                if task.builderSession != nil {
+                    BuilderTabRow(task: task)
                 }
             }
         }

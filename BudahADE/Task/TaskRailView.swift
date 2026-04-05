@@ -27,9 +27,10 @@ struct TaskRailView: View {
             .padding(.bottom, Theme.Spacing.lg)
             .disabled(workspace.activeTask == nil)
 
-            // Notification Summary — aggregate progress across all tasks
-            if !workspace.tasks.isEmpty {
-                NotificationSummaryBar(tasks: workspace.tasks)
+            // Builder step summary — shows active builder progress
+            if let task = workspace.activeTask,
+               let session = task.builderSession {
+                BuilderRailSummary(session: session, task: task)
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.bottom, Theme.Spacing.lg)
             }
@@ -163,46 +164,60 @@ struct ViewToggle: View {
     }
 }
 
-// MARK: - Notification Summary Bar
+// MARK: - Builder Rail Summary (replaces notification summary)
 
-private struct NotificationSummaryBar: View {
-    let tasks: [TaskState]
+private struct BuilderRailSummary: View {
+    @Bindable var session: BuilderSession
+    @ObservedObject var task: TaskState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-            HStack {
-                Text("Notification Summary")
-                    .font(Theme.body(9))
-                    .foregroundColor(.white)
-                Spacer()
-                Text("\(doneCount)/\(totalCount)")
-                    .font(Theme.body(9))
-                    .foregroundColor(Theme.Colors.statusIdle)
+        Button {
+            task.enterBuildMode()
+            task.showBuilderChat = true
+        } label: {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 6, height: 6)
+
+                    Text(task.specState.activeSpec?.title ?? "Builder")
+                        .font(Theme.label(10))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text("\(session.completedCount)/\(session.totalCount)")
+                        .font(Theme.code(9, weight: .medium))
+                        .foregroundColor(statusColor)
+                }
+
+                SpecProgressBar(steps: session.steps, size: .mini)
             }
-
-            SpecProgressBar(steps: aggregateSteps, size: .mini)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color(hex: 0xA78BFA).opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(Color(hex: 0xA78BFA).opacity(0.12), lineWidth: 0.5)
+                    )
+            )
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
-    private var aggregateSteps: [BuildStep] {
-        var steps: [BuildStep] = []
-        for task in tasks {
-            if let session = task.builderSession {
-                steps.append(contentsOf: session.steps)
-            } else {
-                let state: StepState = task.status == .completed ? .done : .queued
-                steps.append(BuildStep(id: task.id.uuidString, title: task.name, state: state))
-            }
+    private var statusColor: Color {
+        switch session.buildState {
+        case .building: return Theme.Colors.statusWorking
+        case .done:     return Theme.Colors.statusDone
+        case .failed:   return Theme.Colors.error
+        case .ready:    return Theme.Colors.statusIdle
+        case .paused:   return Theme.Colors.warning
         }
-        return steps
-    }
-
-    private var doneCount: Int {
-        aggregateSteps.filter { $0.state == .done }.count
-    }
-
-    private var totalCount: Int {
-        aggregateSteps.count
     }
 }
 

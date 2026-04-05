@@ -33,7 +33,6 @@ struct BuilderSidePanel: View {
                 expandedPanel
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: mode)
     }
 
     // MARK: - Collapsed Icon Rail
@@ -55,13 +54,13 @@ struct BuilderSidePanel: View {
                 .foregroundStyle(stepStateColor)
                 .padding(.bottom, 8)
 
-            // State dots — one per step
-            VStack(spacing: 6) {
+            // Collapsed section summaries — one per step
+            VStack(spacing: 2) {
                 ForEach(Array(session.steps.enumerated()), id: \.element.id) { index, step in
-                    railDot(step: step, index: index)
+                    collapsedSectionRow(step: step, index: index)
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 4)
 
             Spacer()
         }
@@ -72,40 +71,63 @@ struct BuilderSidePanel: View {
         }
     }
 
-    private func railDot(step: BuildStep, index: Int) -> some View {
-        Button {
+    /// Collapsed row: state dot + mini bar graph + fraction
+    private func collapsedSectionRow(step: BuildStep, index: Int) -> some View {
+        let isActive = index == session.activeStepIndex
+
+        return Button {
             onStepTap(index)
         } label: {
-            Group {
-                switch step.state {
-                case .done:
-                    Circle()
-                        .fill(Theme.Colors.statusDone)
-                        .frame(width: 6, height: 6)
-                case .building:
-                    Circle()
-                        .fill(Theme.Colors.statusWorking)
-                        .frame(width: 6, height: 6)
-                        .modifier(PulsingDotModifier())
-                case .failed:
-                    Circle()
-                        .fill(Theme.Colors.error)
-                        .frame(width: 6, height: 6)
-                case .queued:
-                    Circle()
-                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
-                        .frame(width: 6, height: 6)
-                case .skipped:
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 6, height: 6)
+            VStack(spacing: 2) {
+                // State dot
+                stepDot(state: step.state, isActive: isActive)
+
+                // Mini bar graph if has subtasks
+                if !step.subTasks.isEmpty {
+                    miniBarGraph(done: step.subTasksDone, total: step.subTasksTotal, isActive: isActive)
                 }
             }
-            .frame(width: 20, height: 16)
+            .frame(width: 28, height: step.subTasks.isEmpty ? 16 : 28)
+            .background(
+                isActive
+                    ? RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color(hex: 0xA78BFA).opacity(0.12))
+                    : nil
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(step.title)
+    }
+
+    private func stepDot(state: StepState, isActive: Bool) -> some View {
+        Group {
+            switch state {
+            case .done:
+                Circle().fill(Theme.Colors.statusDone).frame(width: 6, height: 6)
+            case .building:
+                Circle().fill(Theme.Colors.statusWorking).frame(width: 6, height: 6)
+            case .failed:
+                Circle().fill(Theme.Colors.error).frame(width: 6, height: 6)
+            case .queued:
+                Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 1).frame(width: 6, height: 6)
+            case .skipped:
+                Circle().fill(Color.white.opacity(0.1)).frame(width: 6, height: 6)
+            }
+        }
+    }
+
+    /// Tiny vertical bars: filled = done, empty = remaining
+    private func miniBarGraph(done: Int, total: Int, isActive: Bool) -> some View {
+        HStack(spacing: 1) {
+            ForEach(0..<min(total, 8), id: \.self) { i in
+                RoundedRectangle(cornerRadius: 0.5)
+                    .fill(i < done
+                        ? (isActive ? Color(hex: 0xA78BFA) : Theme.Colors.statusDone.opacity(0.6))
+                        : Color.white.opacity(0.1))
+                    .frame(width: 2, height: 6)
+            }
+        }
     }
 
     // MARK: - Expanded Panel
@@ -132,13 +154,6 @@ struct BuilderSidePanel: View {
             Circle()
                 .fill(stepStateColor)
                 .frame(width: 6, height: 6)
-                .modifier(PulsingDotModifier())
-                .opacity(session.buildState == .building ? 1 : 0)
-                .overlay {
-                    if session.buildState != .building {
-                        Circle().fill(stepStateColor).frame(width: 6, height: 6)
-                    }
-                }
 
             // Progress fraction
             Text("\(session.completedCount)/\(session.totalCount)")
@@ -172,7 +187,7 @@ struct BuilderSidePanel: View {
     private var stepList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 1) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(session.steps.enumerated()), id: \.element.id) { index, step in
                         accordionSection(step: step, index: index)
                             .id(step.id)
@@ -182,9 +197,8 @@ struct BuilderSidePanel: View {
             }
             .onChange(of: session.activeStepIndex) { _, newIndex in
                 guard let idx = newIndex, session.steps.indices.contains(idx) else { return }
-                // Auto-expand the active step
                 expandedSteps.insert(session.steps[idx].id)
-                withAnimation(.easeOut(duration: 0.2)) {
+                withAnimation(.easeOut(duration: 0.15)) {
                     proxy.scrollTo(session.steps[idx].id, anchor: .center)
                 }
             }
@@ -198,123 +212,163 @@ struct BuilderSidePanel: View {
         let isExpanded = expandedSteps.contains(step.id) || isActive
 
         return VStack(alignment: .leading, spacing: 0) {
-            // Accordion header row
-            Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
-                    if expandedSteps.contains(step.id) {
-                        expandedSteps.remove(step.id)
-                    } else {
-                        expandedSteps.insert(step.id)
-                    }
-                }
-            } label: {
-                HStack(spacing: 7) {
-                    // State indicator (larger, more distinct)
-                    stepIndicator(state: step.state, isActive: isActive)
+            accordionHeader(step: step, index: index, isActive: isActive, isExpanded: isExpanded)
 
-                    // Title
-                    Text(step.title)
-                        .font(Theme.body(11))
-                        .fontWeight(isActive ? .medium : .regular)
-                        .foregroundStyle(
-                            step.state == .done ? Color.white.opacity(0.35) :
-                            step.state == .failed ? Theme.Colors.error.opacity(0.85) :
-                            isActive ? Color.white.opacity(0.9) :
-                            Color.white.opacity(0.5)
-                        )
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    // Sub-task count
-                    if !step.subTasks.isEmpty {
-                        Text("\(step.subTasksDone)/\(step.subTasksTotal)")
-                            .font(Theme.code(9))
-                            .foregroundStyle(
-                                isActive ? Theme.Colors.statusWorking :
-                                step.state == .done ? Theme.Colors.statusDone.opacity(0.5) :
-                                Theme.Colors.textTertiary
-                            )
-                    }
-
-                    // Failed badge
-                    if step.state == .failed {
-                        Text("\u{00D7}\(step.attemptCount)")
-                            .font(Theme.code(9, weight: .medium))
-                            .foregroundStyle(Theme.Colors.error)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Theme.Colors.error.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
-                    }
-
-                    // Chevron (only if has sub-tasks)
-                    if !step.subTasks.isEmpty {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 7, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.15))
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .frame(width: 10)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, isActive ? 8 : 6)
-                .background(stepRowBackground(step: step, isActive: isActive))
-                .contentShape(Rectangle())
+            if isExpanded && !step.subTasks.isEmpty {
+                accordionSubTasks(step: step, isActive: isActive)
             }
-            .buttonStyle(.plain)
-            .contextMenu {
-                Button("View Details") { onStepTap(index) }
-                if step.state == .building || isActive {
-                    Button("Pause Build") { /* wired by parent */ }
-                }
-                if step.state == .queued {
-                    Button("Skip Step") { session.skipStep(at: index) }
+        }
+        .background(accordionBackground(isActive: isActive))
+        .padding(.horizontal, 4)
+    }
+
+    private func accordionHeader(step: BuildStep, index: Int, isActive: Bool, isExpanded: Bool) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                if expandedSteps.contains(step.id) {
+                    expandedSteps.remove(step.id)
+                } else {
+                    expandedSteps.insert(step.id)
                 }
             }
+        } label: {
+            HStack(spacing: 7) {
+                stepIndicator(state: step.state, isActive: isActive)
 
-            // Expanded content: sub-tasks (clipped height reveal)
-            if !step.subTasks.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(step.subTasks) { subTask in
-                        HStack(spacing: 6) {
-                            subTaskIndicator(state: subTask.state)
-                            Text(subTask.title)
-                                .font(Theme.body(10))
-                                .foregroundStyle(
-                                    subTask.state == .done ? Color.white.opacity(0.25) :
-                                    subTask.state == .building ? Color.white.opacity(0.75) :
-                                    Color.white.opacity(0.35)
-                                )
-                                .lineLimit(2)
-                        }
-                        .padding(.leading, 28)
-                        .padding(.trailing, 12)
-                        .padding(.vertical, 3)
-                    }
-                }
-                .padding(.bottom, 4)
-                .frame(maxHeight: isExpanded ? .infinity : 0, alignment: .top)
-                .clipped()
-                .opacity(isExpanded ? 1 : 0)
+                Text(step.title)
+                    .font(Theme.body(11))
+                    .fontWeight(isActive ? .medium : .regular)
+                    .foregroundStyle(titleColor(state: step.state, isActive: isActive))
+                    .lineLimit(1)
+
+                Spacer()
+
+                accordionTrailing(step: step, isActive: isActive, isExpanded: isExpanded)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, isActive ? 8 : 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("View Details") { onStepTap(index) }
+            if step.state == .building || isActive {
+                Button("Pause Build") { /* wired by parent */ }
+            }
+            if step.state == .queued {
+                Button("Skip Step") { session.skipStep(at: index) }
             }
         }
     }
 
-    // MARK: - Step Row Background
+    @ViewBuilder
+    private func accordionTrailing(step: BuildStep, isActive: Bool, isExpanded: Bool) -> some View {
+        if !step.subTasks.isEmpty && !isExpanded {
+            HStack(spacing: 4) {
+                inlineBarGraph(done: step.subTasksDone, total: step.subTasksTotal, isActive: isActive)
+                Text("\(step.subTasksDone)/\(step.subTasksTotal)")
+                    .font(Theme.code(9))
+                    .foregroundStyle(fractionColor(state: step.state, isActive: isActive))
+            }
+        } else if !step.subTasks.isEmpty {
+            Text("\(step.subTasksDone)/\(step.subTasksTotal)")
+                .font(Theme.code(9))
+                .foregroundStyle(fractionColor(state: step.state, isActive: isActive))
+        }
+
+        if step.state == .failed {
+            Text("\u{00D7}\(step.attemptCount)")
+                .font(Theme.code(9, weight: .medium))
+                .foregroundStyle(Theme.Colors.error)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Theme.Colors.error.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+        }
+
+        if !step.subTasks.isEmpty {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 7, weight: .semibold))
+                .foregroundStyle(isActive ? Color.white.opacity(0.4) : Color.white.opacity(0.15))
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                .frame(width: 10)
+        }
+    }
+
+    private func accordionSubTasks(step: BuildStep, isActive: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(step.subTasks) { subTask in
+                HStack(spacing: 6) {
+                    subTaskIndicator(state: subTask.state)
+                    Text(subTask.title)
+                        .font(Theme.body(10))
+                        .foregroundStyle(subTaskColor(state: subTask.state, isActive: isActive))
+                        .lineLimit(2)
+                }
+                .padding(.leading, 28)
+                .padding(.trailing, 12)
+                .padding(.vertical, 3)
+            }
+        }
+        .padding(.bottom, 4)
+        .transition(.opacity)
+    }
 
     @ViewBuilder
-    private func stepRowBackground(step: BuildStep, isActive: Bool) -> some View {
+    private func accordionBackground(isActive: Bool) -> some View {
         if isActive {
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(Color(hex: 0xA78BFA).opacity(0.10))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .strokeBorder(Color(hex: 0xA78BFA).opacity(0.18), lineWidth: 1)
                 )
-        } else if step.state == .failed {
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(Theme.Colors.error.opacity(0.05))
+        }
+    }
+
+    // MARK: - Color Helpers
+
+    private func titleColor(state: StepState, isActive: Bool) -> Color {
+        if isActive { return .white }
+        switch state {
+        case .done: return .white.opacity(0.35)
+        case .failed: return Theme.Colors.error.opacity(0.85)
+        default: return .white.opacity(0.5)
+        }
+    }
+
+    private func fractionColor(state: StepState, isActive: Bool) -> Color {
+        if isActive { return .white.opacity(0.7) }
+        if state == .done { return Theme.Colors.statusDone.opacity(0.5) }
+        return Theme.Colors.textTertiary
+    }
+
+    private func subTaskColor(state: StepState, isActive: Bool) -> Color {
+        if isActive {
+            switch state {
+            case .done: return .white.opacity(0.5)
+            case .building: return .white
+            default: return .white.opacity(0.6)
+            }
+        } else {
+            switch state {
+            case .done: return .white.opacity(0.25)
+            case .building: return .white.opacity(0.75)
+            default: return .white.opacity(0.35)
+            }
+        }
+    }
+
+    /// Inline bar graph for collapsed accordion headers
+    private func inlineBarGraph(done: Int, total: Int, isActive: Bool) -> some View {
+        HStack(spacing: 1) {
+            ForEach(0..<min(total, 10), id: \.self) { i in
+                RoundedRectangle(cornerRadius: 0.5)
+                    .fill(i < done
+                        ? (isActive ? Color.white.opacity(0.6) : Theme.Colors.statusDone.opacity(0.5))
+                        : Color.white.opacity(0.08))
+                    .frame(width: 2, height: 8)
+            }
         }
     }
 
@@ -342,7 +396,6 @@ struct BuilderSidePanel: View {
             Circle()
                 .fill(Theme.Colors.statusWorking)
                 .frame(width: 7, height: 7)
-                .modifier(PulsingDotModifier())
                 .frame(width: 16)
         case .queued:
             Circle()
@@ -364,7 +417,6 @@ struct BuilderSidePanel: View {
             Circle()
                 .fill(Theme.Colors.statusWorking)
                 .frame(width: 3, height: 3)
-                .modifier(PulsingDotModifier())
                 .frame(width: 10)
         default:
             Circle()
@@ -384,17 +436,5 @@ struct BuilderSidePanel: View {
         case .done:     return Theme.Colors.statusDone
         case .failed:   return Theme.Colors.error
         }
-    }
-}
-
-// MARK: - Pulsing Dot Modifier
-
-private struct PulsingDotModifier: ViewModifier {
-    @State private var isPulsing = false
-    func body(content: Content) -> some View {
-        content
-            .opacity(isPulsing ? 0.4 : 1.0)
-            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-            .onAppear { isPulsing = true }
     }
 }

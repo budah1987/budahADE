@@ -166,7 +166,7 @@ struct PlanChatView: View {
                                 handleApprove()
                             }
                         )
-                        .frame(maxWidth: 640)
+                        .frame(maxWidth: 752)
                         .frame(maxWidth: .infinity)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     } else {
@@ -187,7 +187,7 @@ struct PlanChatView: View {
                                 session.questionSeriesDismissed = true
                             }
                         )
-                        .frame(maxWidth: 640)
+                        .frame(maxWidth: 752)
                         .frame(maxWidth: .infinity)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     } else {
@@ -227,7 +227,7 @@ struct PlanChatView: View {
                         handleApprove()
                     }
                 )
-                .frame(maxWidth: 640)
+                .frame(maxWidth: 752)
                 .frame(maxWidth: .infinity)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             } else if isSpecComplete {
@@ -249,7 +249,7 @@ struct PlanChatView: View {
                         dismissSpecSignal()
                     }
                 )
-                .frame(maxWidth: 640)
+                .frame(maxWidth: 752)
                 .frame(maxWidth: .infinity)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             } else if let session,
@@ -273,7 +273,7 @@ struct PlanChatView: View {
                         session.questionSeriesDismissed = true
                     }
                 )
-                .frame(maxWidth: 640)
+                .frame(maxWidth: 752)
                 .frame(maxWidth: .infinity)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {

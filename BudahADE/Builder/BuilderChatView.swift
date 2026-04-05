@@ -247,7 +247,7 @@ struct BuilderChatView: View {
                     sendMessage(text)
                 }
             )
-            .frame(maxWidth: 640)
+            .frame(maxWidth: 752)
             .frame(maxWidth: .infinity)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if let agent = agentSession,
@@ -268,7 +268,7 @@ struct BuilderChatView: View {
                 },
                 onDismiss: { agent.questionSeriesDismissed = true }
             )
-            .frame(maxWidth: 640)
+            .frame(maxWidth: 752)
             .frame(maxWidth: .infinity)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
