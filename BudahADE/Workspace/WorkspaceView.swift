@@ -429,7 +429,8 @@ struct WorkspaceView: View {
                     onLaunchAgent: { launchBuilderAgent(task: task) },
                     onBackToPlan: { task.enterPlanMode() },
                     onEditSpec: nil,
-                    branchName: task.branchName
+                    branchName: task.branchName,
+                    isVisible: task.showBuilderChat
                 )
                 .opacity(task.showBuilderChat ? 1 : 0)
                 .allowsHitTesting(task.showBuilderChat)

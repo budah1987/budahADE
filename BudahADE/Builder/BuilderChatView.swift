@@ -46,12 +46,24 @@ struct BuilderChatView: View {
     var onEditSpec: (() -> Void)?
     /// Git branch name — shown in spec header
     var branchName: String? = nil
+    /// Whether this view is currently visible — when false, renders a lightweight placeholder
+    /// to avoid expensive body evaluation while hidden behind opacity(0)
+    var isVisible: Bool = true
 
     private var isRunning: Bool {
         agentSession?.status == .streaming || agentSession?.status == .connecting
     }
 
     var body: some View {
+        if isVisible {
+            mainContent
+        } else {
+            // Lightweight placeholder — preserves @State but skips all layout work
+            Color.clear
+        }
+    }
+
+    private var mainContent: some View {
         HStack(spacing: 0) {
             // Left side panel (accordion steps)
             if sidePanelMode != .hidden {

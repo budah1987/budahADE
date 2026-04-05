@@ -135,7 +135,9 @@ final class AgentSession: ObservableObject, Identifiable {
     var lastResult: StreamEvent.ResultInfo?
     /// Monotonic counter — incremented on any scroll-worthy event (message, streaming text,
     /// activity feed, status change). Views observe this single value instead of 4-5 onChange watchers.
-    @Published var scrollGeneration: UInt = 0
+    /// NOT @Published — avoids double objectWillChange. onChange detects it during body re-evaluation
+    /// triggered by other @Published changes (currentStreamingText, messages, status, etc).
+    var scrollGeneration: UInt = 0
 
     struct StagedContent {
         let content: String
@@ -193,6 +195,8 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var pendingToolCalls: [ToolCall] = []
 
     func handleAssistantMessage(_ event: StreamEvent.AssistantMessage) {
+        // Flush any buffered streaming text before finalizing
+        flushStreamingBuffer()
         // Use streamed text if the event content is empty (deltas accumulated it)
         let text = event.content.isEmpty ? currentStreamingText : event.content
 
@@ -235,9 +239,39 @@ final class AgentSession: ObservableObject, Identifiable {
         bumpScroll()
     }
 
+    /// Pending streaming text that hasn't been flushed to @Published yet
+    private var streamingBuffer: String = ""
+    /// Whether a flush is already scheduled
+    private var flushScheduled: Bool = false
+    /// Throttle interval for streaming text updates (seconds)
+    private let streamingFlushInterval: TimeInterval = 0.08
+
     func handleContentDelta(_ text: String) {
-        currentStreamingText += text
-        bumpScroll()
+        streamingBuffer += text
+        scheduleStreamingFlush()
+    }
+
+    /// Batches rapid streaming deltas and flushes at a capped rate.
+    /// Reduces objectWillChange invalidations from 30+/sec to ~12/sec.
+    private func scheduleStreamingFlush() {
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + streamingFlushInterval) { [weak self] in
+            guard let self else { return }
+            self.flushScheduled = false
+            guard !self.streamingBuffer.isEmpty else { return }
+            self.currentStreamingText += self.streamingBuffer
+            self.streamingBuffer = ""
+            self.bumpScroll()
+        }
+    }
+
+    /// Force-flush any pending streaming text (call before finalizing a message)
+    private func flushStreamingBuffer() {
+        flushScheduled = false
+        guard !streamingBuffer.isEmpty else { return }
+        currentStreamingText += streamingBuffer
+        streamingBuffer = ""
     }
 
     /// Available slash commands from the CLI init event.
