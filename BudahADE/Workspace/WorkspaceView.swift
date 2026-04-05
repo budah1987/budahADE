@@ -184,12 +184,10 @@ struct WorkspaceView: View {
                                     .padding(.horizontal, Theme.Spacing.lg)
                             }
 
-                            if let task = state.activeTask {
+                            if state.rightPanelVisible, let task = state.activeTask {
                                 GitSidebarView(task: task, projectPath: state.projectPath)
                                     .id(state.activeTaskId)
-                                    .frame(width: state.rightPanelVisible ? nil : 0)
-                                    .clipped()
-                                    .allowsHitTesting(state.rightPanelVisible)
+                                    .transition(.move(edge: .trailing).combined(with: .opacity))
                             }
                         }
                     }
