@@ -200,7 +200,7 @@ struct BuilderSidePanel: View {
         return VStack(alignment: .leading, spacing: 0) {
             // Accordion header row
             Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
                     if expandedSteps.contains(step.id) {
                         expandedSteps.remove(step.id)
                     } else {
@@ -208,26 +208,20 @@ struct BuilderSidePanel: View {
                     }
                 }
             } label: {
-                HStack(spacing: 8) {
-                    // Chevron
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.2))
-                        .frame(width: 10)
-
-                    // State indicator
+                HStack(spacing: 7) {
+                    // State indicator (larger, more distinct)
                     stepIndicator(state: step.state, isActive: isActive)
 
                     // Title
                     Text(step.title)
                         .font(Theme.body(11))
-                        .fontWeight(isActive ? .semibold : .regular)
+                        .fontWeight(isActive ? .medium : .regular)
                         .foregroundStyle(
-                            step.state == .done ? Color.white.opacity(0.3) :
-                            isActive ? Color.white.opacity(0.85) :
-                            Color.white.opacity(0.45)
+                            step.state == .done ? Color.white.opacity(0.35) :
+                            step.state == .failed ? Theme.Colors.error.opacity(0.85) :
+                            isActive ? Color.white.opacity(0.9) :
+                            Color.white.opacity(0.5)
                         )
-                        .strikethrough(step.state == .done, color: Color.white.opacity(0.15))
                         .lineLimit(1)
 
                     Spacer()
@@ -246,20 +240,26 @@ struct BuilderSidePanel: View {
                     // Failed badge
                     if step.state == .failed {
                         Text("\u{00D7}\(step.attemptCount)")
-                            .font(Theme.caption(9))
-                            .foregroundStyle(Theme.Colors.error.opacity(0.7))
+                            .font(Theme.code(9, weight: .medium))
+                            .foregroundStyle(Theme.Colors.error)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Theme.Colors.error.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+
+                    // Chevron (only if has sub-tasks)
+                    if !step.subTasks.isEmpty {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 7, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.15))
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .frame(width: 10)
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    isActive
-                        ? RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color(hex: 0xA78BFA).opacity(0.05))
-                            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .strokeBorder(Color(hex: 0xA78BFA).opacity(0.12), lineWidth: 1))
-                        : nil
-                )
+                .padding(.vertical, isActive ? 8 : 6)
+                .background(stepRowBackground(step: step, isActive: isActive))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -273,8 +273,8 @@ struct BuilderSidePanel: View {
                 }
             }
 
-            // Expanded content: sub-tasks
-            if isExpanded && !step.subTasks.isEmpty {
+            // Expanded content: sub-tasks (clipped height reveal)
+            if !step.subTasks.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(step.subTasks) { subTask in
                         HStack(spacing: 6) {
@@ -282,21 +282,39 @@ struct BuilderSidePanel: View {
                             Text(subTask.title)
                                 .font(Theme.body(10))
                                 .foregroundStyle(
-                                    subTask.state == .done ? Color.white.opacity(0.2) :
-                                    subTask.state == .building ? Color.white.opacity(0.7) :
-                                    Color.white.opacity(0.3)
+                                    subTask.state == .done ? Color.white.opacity(0.25) :
+                                    subTask.state == .building ? Color.white.opacity(0.75) :
+                                    Color.white.opacity(0.35)
                                 )
-                                .strikethrough(subTask.state == .done, color: Color.white.opacity(0.12))
                                 .lineLimit(2)
                         }
-                        .padding(.leading, 30)
+                        .padding(.leading, 28)
                         .padding(.trailing, 12)
                         .padding(.vertical, 3)
                     }
                 }
                 .padding(.bottom, 4)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .frame(maxHeight: isExpanded ? .infinity : 0, alignment: .top)
+                .clipped()
+                .opacity(isExpanded ? 1 : 0)
             }
+        }
+    }
+
+    // MARK: - Step Row Background
+
+    @ViewBuilder
+    private func stepRowBackground(step: BuildStep, isActive: Bool) -> some View {
+        if isActive {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Color(hex: 0xA78BFA).opacity(0.10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .strokeBorder(Color(hex: 0xA78BFA).opacity(0.18), lineWidth: 1)
+                )
+        } else if step.state == .failed {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Theme.Colors.error.opacity(0.05))
         }
     }
 
@@ -306,31 +324,31 @@ struct BuilderSidePanel: View {
     private func stepIndicator(state: StepState, isActive: Bool) -> some View {
         switch state {
         case .done:
-            Text("\u{2713}")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(Theme.Colors.statusDone)
-                .frame(width: 12)
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Colors.statusDone.opacity(0.7))
+                .frame(width: 16)
         case .failed:
             Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 9))
+                .font(.system(size: 12))
                 .foregroundStyle(Theme.Colors.error)
-                .frame(width: 12)
+                .frame(width: 16)
         case .skipped:
-            Image(systemName: "forward.fill")
-                .font(.system(size: 7))
+            Image(systemName: "forward.circle")
+                .font(.system(size: 11))
                 .foregroundStyle(Color.white.opacity(0.2))
-                .frame(width: 12)
+                .frame(width: 16)
         case .building:
             Circle()
                 .fill(Theme.Colors.statusWorking)
-                .frame(width: 5, height: 5)
+                .frame(width: 7, height: 7)
                 .modifier(PulsingDotModifier())
-                .frame(width: 12)
+                .frame(width: 16)
         case .queued:
             Circle()
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                .frame(width: 6, height: 6)
-                .frame(width: 12)
+                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                .frame(width: 8, height: 8)
+                .frame(width: 16)
         }
     }
 
