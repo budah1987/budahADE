@@ -117,8 +117,6 @@ final class BuilderAgent: ObservableObject {
     private func syncState() {
         guard let session = agentSession else { return }
 
-        builderSession.isStreaming = session.status == .streaming
-
         // Process new messages through step tracker
         let existingIds = Set(builderSession.messages.map(\.id))
         let newMessages = session.messages.filter { !existingIds.contains($0.id) && $0.role != .user }
@@ -146,13 +144,6 @@ final class BuilderAgent: ObservableObject {
 
         // Check for loop detection warnings
         checkLoopDetection()
-
-        // Sync streaming text (strip markers for display)
-        if session.status == .streaming && !session.currentStreamingText.isEmpty {
-            builderSession.currentActivity = stripMarkers(session.currentStreamingText)
-        } else {
-            builderSession.currentActivity = nil
-        }
 
         // Detect completion
         if session.status == .done && builderSession.buildState == .building {

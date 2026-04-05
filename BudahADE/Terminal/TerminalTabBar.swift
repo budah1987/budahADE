@@ -76,6 +76,8 @@ struct TerminalTabBar: View {
     let onNewTab: () -> Void
     var onNewBrowserTab: (() -> Void)?
     var onReorderTab: ((UUID, Int) -> Void)?
+    /// When false, suppresses RotatingBorderGlow TimelineViews (tab bar is behind opacity(0))
+    var isVisible: Bool = true
 
     @State private var insertionIndex: Int?
     @State private var tabMidpoints: [CGFloat] = []
@@ -98,6 +100,7 @@ struct TerminalTabBar: View {
                             isSpotlit: renameTarget?.tabId == tab.id,
                             tabType: tab.tabType,
                             agentState: TabAgentState(from: tab.agentStatus),
+                            isVisible: isVisible,
                             onSelect: { onSelectTab(tab.id) },
                             onClose: { onCloseTab(tab.id) }
                         )
@@ -207,6 +210,7 @@ struct ConversationTab: View {
     var isSpotlit: Bool = false
     var tabType: TabType = .terminal
     let agentState: TabAgentState
+    var isVisible: Bool = true
     let onSelect: () -> Void
     let onClose: () -> Void
 
@@ -262,7 +266,7 @@ struct ConversationTab: View {
         .padding(.horizontal, 12)
         .frame(height: 32)
         .background(tabBackground)
-        .overlay { RotatingBorderGlow(state: agentState) }
+        .overlay { RotatingBorderGlow(state: agentState, isVisible: isVisible) }
         .shadow(color: stateShadow, radius: 4)
         .shadow(color: stateShadow, radius: 14)
         .fixedSize()
@@ -336,6 +340,7 @@ struct ConversationTab: View {
 
 struct RotatingBorderGlow: View {
     let state: TabAgentState
+    var isVisible: Bool = true
 
     @State private var sweepStart = Date()
     /// Whether the completion sweep has finished — freeze to static border
@@ -346,8 +351,9 @@ struct RotatingBorderGlow: View {
     private let cornerRadius: CGFloat = 7
     private let borderWidth: CGFloat = 1.5
 
-    /// Whether the TimelineView should be active (avoids 60fps when idle or sweep done)
+    /// Whether the TimelineView should be active (avoids 30fps when idle, sweep done, or tab bar hidden)
     private var isAnimating: Bool {
+        guard isVisible else { return false }
         switch state {
         case .working: return true
         case .completed: return !sweepDone
@@ -358,7 +364,7 @@ struct RotatingBorderGlow: View {
     var body: some View {
         Group {
             if isAnimating {
-                TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
                     let angle = computeAngle(at: timeline.date)
                     glowBorder(angle: angle)
                 }

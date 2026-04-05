@@ -193,7 +193,7 @@ private struct BuilderRailSummary: View {
                         .foregroundColor(statusColor)
                 }
 
-                SpecProgressBar(steps: session.steps, size: .mini)
+                SpecProgressBar(steps: session.steps, size: .mini, animated: false)
             }
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.vertical, Theme.Spacing.xs)
@@ -252,7 +252,7 @@ struct TaskCard: View {
                         }
 
                         if let session = task.builderSession {
-                            SpecProgressBar(steps: session.steps, size: .mini)
+                            SpecProgressBar(steps: session.steps, size: .mini, animated: false)
                         }
                     }
 

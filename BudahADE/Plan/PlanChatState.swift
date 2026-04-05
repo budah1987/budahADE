@@ -27,10 +27,13 @@ final class PlanChatState: ObservableObject {
             sessionCancellable?.cancel()
             if let session = plannerSession {
                 // Forward session's objectWillChange so PlanChatView re-renders
-                // when session.status, session.messages, etc. change
-                sessionCancellable = session.objectWillChange.sink { [weak self] _ in
-                    self?.objectWillChange.send()
-                }
+                // when session.status, session.messages, etc. change.
+                // Throttled to 100ms — caps at 10/sec during streaming (was 12.5/sec).
+                sessionCancellable = session.objectWillChange
+                    .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
+                    .sink { [weak self] _ in
+                        Task { @MainActor [weak self] in self?.objectWillChange.send() }
+                    }
             }
         }
     }
@@ -325,7 +328,7 @@ final class PlanChatState: ObservableObject {
 
         // Forward pipeline's objectWillChange so the view re-renders
         pipelineCancellable = pipeline.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
+            Task { @MainActor [weak self] in self?.objectWillChange.send() }
         }
 
         // Add user message to the display session so it shows in chat

@@ -35,7 +35,7 @@ struct SpecBar: View {
                     .foregroundStyle(Color(hex: 0xA78BFA).opacity(0.5))
                     .fixedSize()
 
-                SpecProgressBar(steps: session.steps, size: .mini)
+                SpecProgressBar(steps: session.steps, size: .mini, animated: false)
                     .frame(width: max(CGFloat(session.steps.count) * 23, 40))
                     .fixedSize(horizontal: true, vertical: false)
 
@@ -89,7 +89,7 @@ struct SpecBarCompact: View {
                 .font(Theme.code(11, weight: .bold))
                 .foregroundStyle(stateColor)
 
-            SpecProgressBar(steps: session.steps, size: .mini)
+            SpecProgressBar(steps: session.steps, size: .mini, animated: false)
                 .frame(maxWidth: .infinity)
 
             statusBadge

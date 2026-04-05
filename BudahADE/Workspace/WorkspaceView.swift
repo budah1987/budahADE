@@ -454,13 +454,19 @@ struct WorkspaceView: View {
                                 onCloseTab: { requestCloseTab(.build($0)) },
                                 onNewTab: { task.createTab() },
                                 onNewBrowserTab: { task.createBrowserTab() },
-                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex, inPane: .primary) }
+                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex, inPane: .primary) },
+                                isVisible: !task.showBuilderChat
                             )
                             ZStack {
                                 ForEach(task.primaryTabs) { tab in
-                                    tabContentPanel(task: task, tab: tab)
-                                        .opacity(tab.id == task.selectedTabId ? 1 : 0)
-                                        .allowsHitTesting(tab.id == task.selectedTabId)
+                                    let isSelected = tab.id == task.selectedTabId
+                                    // Only mount terminal Metal surface when builder chat is hidden
+                                    // (builder chat is a full overlay — no need to render Metal behind it)
+                                    if !task.showBuilderChat {
+                                        tabContentPanel(task: task, tab: tab)
+                                            .opacity(isSelected ? 1 : 0)
+                                            .allowsHitTesting(isSelected)
+                                    }
                                 }
                                 if primaryContentDropTargeted {
                                     RoundedRectangle(cornerRadius: 4)
@@ -494,13 +500,18 @@ struct WorkspaceView: View {
                                 onCloseTab: { requestCloseTab(.build($0)) },
                                 onNewTab: { task.createTabInSecondaryPane() },
                                 onNewBrowserTab: { task.createBrowserTabInSecondaryPane() },
-                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex, inPane: .secondary) }
+                                onReorderTab: { tabId, newIndex in task.reorderTab(tabId, toIndex: newIndex, inPane: .secondary) },
+                                isVisible: !task.showBuilderChat
                             )
                             ZStack {
                                 ForEach(task.secondaryTabs) { tab in
-                                    tabContentPanel(task: task, tab: tab)
-                                        .opacity(tab.id == split.secondarySelectedId ? 1 : 0)
-                                        .allowsHitTesting(tab.id == split.secondarySelectedId)
+                                    let isSelected = tab.id == split.secondarySelectedId
+                                    // Only mount terminal Metal surface when builder chat is hidden
+                                    if !task.showBuilderChat {
+                                        tabContentPanel(task: task, tab: tab)
+                                            .opacity(isSelected ? 1 : 0)
+                                            .allowsHitTesting(isSelected)
+                                    }
                                 }
                                 if secondaryContentDropTargeted {
                                     RoundedRectangle(cornerRadius: 4)
@@ -526,10 +537,13 @@ struct WorkspaceView: View {
                     ZStack {
                         if let task = state.activeTask {
                             ForEach(task.tabs) { tab in
-                                let isVisible = tab.id == task.selectedTabId
-                                tabContentPanel(task: task, tab: tab)
-                                    .opacity(isVisible ? 1 : 0)
-                                    .allowsHitTesting(isVisible)
+                                let isSelected = tab.id == task.selectedTabId
+                                // Only mount terminal Metal surface when builder chat is hidden
+                                if !task.showBuilderChat {
+                                    tabContentPanel(task: task, tab: tab)
+                                        .opacity(isSelected ? 1 : 0)
+                                        .allowsHitTesting(isSelected)
+                                }
                             }
                         }
 
@@ -803,7 +817,7 @@ struct BuilderTabRow: View {
                         .lineLimit(1)
 
                     if let session = task.builderSession {
-                        SpecProgressBar(steps: session.steps, size: .mini)
+                        SpecProgressBar(steps: session.steps, size: .mini, animated: false)
                             .frame(width: 120)
                     }
                 }

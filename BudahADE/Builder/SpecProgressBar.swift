@@ -22,6 +22,7 @@ enum ProgressBarSize {
 struct SpecProgressBar: View {
     let steps: [BuildStep]
     var size: ProgressBarSize = .standard
+    var animated: Bool = true
     var onSegmentTap: ((Int) -> Void)? = nil
 
     var body: some View {
@@ -38,7 +39,7 @@ struct SpecProgressBar: View {
         RoundedRectangle(cornerRadius: 1)
             .fill(color(for: step.state))
             .overlay {
-                if step.state == .building {
+                if step.state == .building && animated {
                     RoundedRectangle(cornerRadius: 1)
                         .fill(Color.white.opacity(0))
                         .modifier(PulsingSegment())

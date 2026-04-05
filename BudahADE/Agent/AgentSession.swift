@@ -129,8 +129,8 @@ final class AgentSession: ObservableObject, Identifiable {
     var hasVerified: Bool = false
     /// Whether this session has been marked complete (for adaptive turn limits)
     @Published var isVerifiedComplete: Bool = false
-    /// Pending loop warning to inject on next turn
-    @Published var pendingLoopWarning: String?
+    /// Pending loop warning to inject on next turn (non-view, no @Published needed)
+    var pendingLoopWarning: String?
     /// Last result event for cost/trace recording
     var lastResult: StreamEvent.ResultInfo?
     /// Monotonic counter — incremented on any scroll-worthy event (message, streaming text,

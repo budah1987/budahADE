@@ -34,9 +34,9 @@ struct ActivityFeedView: View {
                 }
 
                 if let startDate {
-                    TimelineView(.animation(minimumInterval: 0.1)) { timeline in
+                    TimelineView(.animation(minimumInterval: 1.0)) { timeline in
                         let elapsed = timeline.date.timeIntervalSince(startDate)
-                        Text(String(format: "%.1fs", elapsed))
+                        Text(String(format: "%.0fs", elapsed))
                             .font(Theme.caption(12))
                             .foregroundColor(Theme.Colors.textTertiary)
                     }
@@ -92,7 +92,6 @@ struct ActivityFeedView: View {
             Circle()
                 .fill(kind == .rateLimit ? Color.orange : Theme.Colors.accent)
                 .frame(width: 5, height: 5)
-                .modifier(PulseModifier())
 
         case .completed:
             Image(systemName: "checkmark")
@@ -120,15 +119,3 @@ struct ActivityFeedView: View {
     }
 }
 
-// MARK: - Pulse Animation
-
-private struct PulseModifier: ViewModifier {
-    @State private var isPulsing = false
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(isPulsing ? 0.4 : 1.0)
-            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-            .onAppear { isPulsing = true }
-    }
-}

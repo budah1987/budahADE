@@ -67,15 +67,19 @@ final class WorkspaceState: ObservableObject, Identifiable {
             repoPath: projectPath
         )
 
-        // Forward task's published changes → workspace so WorkspaceView re-renders
+        // Forward task's published changes → workspace so WorkspaceView re-renders.
+        // Throttled to 200ms — WorkspaceView only needs to re-evaluate for tab/task/panel changes,
+        // not every streaming flush (22 @Published properties, most irrelevant to WorkspaceView).
         var cancellables: [AnyCancellable] = []
         cancellables.append(
             task.objectWillChange
-                .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+                .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+                .sink { [weak self] (_: Void) in Task { @MainActor [weak self] in self?.objectWillChange.send() } }
         )
         cancellables.append(
             task.specState.objectWillChange
-                .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+                .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+                .sink { [weak self] (_: Void) in Task { @MainActor [weak self] in self?.objectWillChange.send() } }
         )
         taskCancellables[task.id] = cancellables
 
@@ -120,11 +124,13 @@ final class WorkspaceState: ObservableObject, Identifiable {
         var cancellables: [AnyCancellable] = []
         cancellables.append(
             task.objectWillChange
-                .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+                .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+                .sink { [weak self] (_: Void) in Task { @MainActor [weak self] in self?.objectWillChange.send() } }
         )
         cancellables.append(
             task.specState.objectWillChange
-                .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+                .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+                .sink { [weak self] (_: Void) in Task { @MainActor [weak self] in self?.objectWillChange.send() } }
         )
         taskCancellables[task.id] = cancellables
 

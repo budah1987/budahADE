@@ -28,6 +28,8 @@ struct PlanChatView: View {
     @State private var scrollToMessage: UUID?
     @State private var fastThinkingEnabled = false
     @State private var planModeEnabled = false
+    @State private var cachedAllCommands: [String] = []
+    @State private var cachedHasAssistantMessage: Bool = false
 
     /// Whether the slash command popover should be visible
     private var showSlashPopover: Bool {
@@ -66,15 +68,18 @@ struct PlanChatView: View {
         return "/\(command)"
     }
 
-    /// All available commands (local + from CLI or defaults)
+    /// All available commands filtered by current slash input (reads from cache)
     private var allCommands: [String] {
+        if slashFilter.isEmpty { return cachedAllCommands }
+        return cachedAllCommands.filter { $0.localizedCaseInsensitiveContains(slashFilter) }
+    }
+
+    private func rebuildCommandCache() {
         let local = ["clear", "model"]
         let remote = session?.availableCommands.isEmpty == false
             ? session!.availableCommands
             : Self.defaultRemoteCommands
-        let all = local + remote
-        if slashFilter.isEmpty { return all }
-        return all.filter { $0.localizedCaseInsensitiveContains(slashFilter) }
+        cachedAllCommands = local + remote
     }
 
     private var session: AgentSession? { state.plannerSession }
@@ -82,9 +87,10 @@ struct PlanChatView: View {
         session?.status == .streaming || session?.status == .connecting
     }
 
-    /// True when there's at least one assistant message
-    private var hasAssistantMessage: Bool {
-        session?.messages.contains { $0.role == .assistant } == true
+    private var hasAssistantMessage: Bool { cachedHasAssistantMessage }
+
+    private func rebuildHasAssistant() {
+        cachedHasAssistantMessage = session?.messages.contains { $0.role == .assistant } == true
     }
 
     /// Whether a spec is ready (file written to disk OR spec structure in messages)
@@ -625,7 +631,13 @@ struct PlanChatView: View {
                 .help("Toggle plan mode (⇧⇥)")
             }
         )
-        .onAppear { installKeyMonitor() }
+        .onAppear {
+            installKeyMonitor()
+            rebuildCommandCache()
+            rebuildHasAssistant()
+        }
+        .onChange(of: session?.availableCommands) { rebuildCommandCache() }
+        .onChange(of: session?.messages.count) { rebuildHasAssistant() }
         .onDisappear { removeKeyMonitor() }
         .onChange(of: inputText) { oldValue, newValue in
             if newValue.count < oldValue.count || !newValue.hasPrefix("/") {

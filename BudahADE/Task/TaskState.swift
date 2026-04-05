@@ -352,21 +352,23 @@ final class TaskState: ObservableObject, Identifiable {
 
     private func observePlanChatStatus(_ chatState: PlanChatState, tabId: UUID) {
         chatState.objectWillChange
-            .receive(on: DispatchQueue.main)
+            .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] _ in
-                guard let self,
-                      let idx = self.planTabs.firstIndex(where: { $0.id == tabId }),
-                      let session = chatState.plannerSession else { return }
-                let newStatus: PlanTabStatus
-                switch session.status {
-                case .idle:         newStatus = .idle
-                case .connecting:   newStatus = .connecting
-                case .streaming:    newStatus = .streaming
-                case .done:         newStatus = .done
-                case .error:        newStatus = .idle
-                }
-                if self.planTabs[idx].status != newStatus {
-                    self.planTabs[idx].status = newStatus
+                Task { @MainActor [weak self] in
+                    guard let self,
+                          let idx = self.planTabs.firstIndex(where: { $0.id == tabId }),
+                          let session = chatState.plannerSession else { return }
+                    let newStatus: PlanTabStatus
+                    switch session.status {
+                    case .idle:         newStatus = .idle
+                    case .connecting:   newStatus = .connecting
+                    case .streaming:    newStatus = .streaming
+                    case .done:         newStatus = .done
+                    case .error:        newStatus = .idle
+                    }
+                    if self.planTabs[idx].status != newStatus {
+                        self.planTabs[idx].status = newStatus
+                    }
                 }
             }
             .store(in: &cancellables)

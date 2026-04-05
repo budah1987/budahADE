@@ -208,6 +208,11 @@ struct MarkdownRenderer: View {
     let content: String
     let isStreaming: Bool
 
+    @State private var cachedBlocks: [MarkdownBlockItem] = []
+    @State private var cachedHash: Int = 0
+    @State private var cachedStableBlocks: [MarkdownBlockItem] = []
+    @State private var cachedStableHash: Int = 0
+
     init(_ content: String, isStreaming: Bool = false) {
         self.content = content
         self.isStreaming = isStreaming
@@ -218,17 +223,38 @@ struct MarkdownRenderer: View {
             if isStreaming {
                 streamingContent
             } else {
-                renderedBlocks(from: content)
+                ForEach(cachedBlocks) { block in
+                    blockView(for: block)
+                }
             }
+        }
+        .onAppear { reparseIfNeeded() }
+        .onChange(of: content) { reparseIfNeeded() }
+    }
+
+    private func reparseIfNeeded() {
+        let hash = content.hashValue
+        if !isStreaming {
+            guard hash != cachedHash else { return }
+            cachedHash = hash
+            cachedBlocks = MarkdownParser.parse(content)
+        } else {
+            let (stable, _) = MarkdownParser.splitAtStableBoundary(content)
+            let stableHash = stable.hashValue
+            guard stableHash != cachedStableHash else { return }
+            cachedStableHash = stableHash
+            cachedStableBlocks = stable.isEmpty ? [] : MarkdownParser.parse(stable)
         }
     }
 
     @ViewBuilder
     private var streamingContent: some View {
-        let (stable, tail) = MarkdownParser.splitAtStableBoundary(content)
+        let (_, tail) = MarkdownParser.splitAtStableBoundary(content)
 
-        if !stable.isEmpty {
-            renderedBlocks(from: stable)
+        if !cachedStableBlocks.isEmpty {
+            ForEach(cachedStableBlocks) { block in
+                blockView(for: block)
+            }
         }
 
         if !tail.isEmpty {
@@ -236,19 +262,12 @@ struct MarkdownRenderer: View {
                 .font(Theme.body(14))
                 .foregroundColor(Theme.Colors.textPrimary)
                 .textSelection(.enabled)
-                .padding(.top, stable.isEmpty ? 0 : 8)
-        }
-    }
-
-    @ViewBuilder
-    private func renderedBlocks(from markdown: String) -> some View {
-        let blocks = MarkdownParser.parse(markdown)
-        ForEach(blocks) { block in
-            blockView(for: block)
+                .padding(.top, cachedStableBlocks.isEmpty ? 0 : 8)
         }
     }
 
     // AnyView erasure breaks the recursive @ViewBuilder type explosion
+    // (blockView → listView → blockView causes exponential type-checker work)
     // (blockView → listView → blockView causes exponential type-checker work)
     private func blockView(for block: MarkdownBlockItem) -> AnyView {
         switch block.kind {

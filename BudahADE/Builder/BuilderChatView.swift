@@ -7,6 +7,32 @@ private struct StepIndexWrapper: Identifiable {
     var id: Int { index }
 }
 
+// MARK: - Streaming Overlay (isolated observation scope)
+
+/// Isolated sub-view so streaming/activity updates only re-evaluate this view,
+/// not the entire BuilderChatView message list.
+private struct BuilderStreamingOverlay: View {
+    @ObservedObject var agent: AgentSession
+    var thinkingStartDate: Date?
+
+    var body: some View {
+        Group {
+            if agent.status == .streaming, !agent.currentStreamingText.isEmpty {
+                MarkdownRenderer(agent.currentStreamingText, isStreaming: true)
+                    .id("streaming")
+            } else if agent.status == .connecting ||
+                      (agent.status == .streaming && agent.currentStreamingText.isEmpty) {
+                ActivityFeedView(
+                    activityFeed: agent.activityFeed,
+                    isThinking: agent.isThinking,
+                    startDate: thinkingStartDate
+                )
+                .id("thinking")
+            }
+        }
+    }
+}
+
 // MARK: - Builder Chat View
 
 struct BuilderChatView: View {
@@ -29,6 +55,7 @@ struct BuilderChatView: View {
     // Side panel state
     @State private var sidePanelMode: SidePanelMode = .hidden
     @State private var selectedStepIndex: Int? = nil
+    @State private var stepDividers: [UUID: String] = [:]
 
     // Input bar state (owned here, passed as binding to ChatInputBar)
     @State private var builderInputText: String = ""
@@ -55,11 +82,25 @@ struct BuilderChatView: View {
     }
 
     var body: some View {
-        if isVisible {
-            mainContent
-        } else {
-            // Lightweight placeholder — preserves @State but skips all layout work
-            Color.clear
+        Group {
+            if isVisible {
+                mainContent
+            } else {
+                // Lightweight placeholder — preserves @State but skips all layout work
+                Color.clear
+            }
+        }
+        // Keep these at body-level so they fire even while the view is hidden
+        .onChange(of: session.buildState) { _, newState in
+            if newState != .ready && sidePanelMode == .hidden {
+                sidePanelMode = .expanded
+            }
+        }
+        .onChange(of: isVisible) { _, isNowVisible in
+            // When view becomes visible, sync panel state in case build started while hidden
+            if isNowVisible, session.buildState != .ready, sidePanelMode == .hidden {
+                sidePanelMode = .expanded
+            }
         }
     }
 
@@ -195,14 +236,6 @@ struct BuilderChatView: View {
                     },
                     onSave: { selectedStepIndex = nil }
                 )
-            }
-        }
-        .onChange(of: session.buildState) { _, newState in
-            // Auto-show side panel (expanded) when build starts
-            if newState != .ready && sidePanelMode == .hidden {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    sidePanelMode = .expanded
-                }
             }
         }
         .onKeyPress(.escape) {
@@ -543,18 +576,17 @@ struct BuilderChatView: View {
         )
     }
 
-    // MARK: - Step Divider Map (precomputed)
+    // MARK: - Step Divider Map (cached)
 
-    /// Precomputed map of message ID → step divider label.
-    /// Evaluated once per body pass instead of per-message.
-    private var stepDividerMap: [UUID: String] {
+    /// Rebuild the step-divider lookup table. Called on appear and when steps change.
+    private func rebuildStepDividers() {
         var map: [UUID: String] = [:]
         for (index, step) in session.steps.enumerated() {
             if let startId = step.chatMessageRange?.start {
                 map[startId] = "Step \(index + 1): \(step.title)"
             }
         }
-        return map
+        stepDividers = map
     }
 
     // MARK: - Message List
@@ -562,7 +594,6 @@ struct BuilderChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                let dividers = stepDividerMap
                 LazyVStack(alignment: .leading, spacing: 8) {
                     if session.buildState == .ready {
                         if !specMarkdown.isEmpty {
@@ -580,8 +611,8 @@ struct BuilderChatView: View {
                     }
 
                     ForEach(session.messages) { message in
-                        // Step transition divider (precomputed lookup)
-                        if let marker = dividers[message.id] {
+                        // Step transition divider (cached lookup)
+                        if let marker = stepDividers[message.id] {
                             stepDivider(marker)
                         }
 
@@ -616,24 +647,9 @@ struct BuilderChatView: View {
                         }
                     }
 
-                    // Streaming text
-                    if let agent = agentSession,
-                       agent.status == .streaming,
-                       !agent.currentStreamingText.isEmpty {
-                        MarkdownRenderer(agent.currentStreamingText, isStreaming: true)
-                            .id("streaming")
-                    }
-
-                    // Activity feed
-                    if let agent = agentSession,
-                       (agent.status == .connecting ||
-                        (agent.status == .streaming && agent.currentStreamingText.isEmpty)) {
-                        ActivityFeedView(
-                            activityFeed: agent.activityFeed,
-                            isThinking: agent.isThinking,
-                            startDate: thinkingStartDate
-                        )
-                        .id("thinking")
+                    // Streaming text + activity feed (isolated observation scope)
+                    if let agent = agentSession {
+                        BuilderStreamingOverlay(agent: agent, thinkingStartDate: thinkingStartDate)
                     }
 
                     Color.clear.frame(height: 120).id("scroll-spacer")
@@ -644,6 +660,8 @@ struct BuilderChatView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 32)
             }
+            .onAppear { rebuildStepDividers() }
+            .onChange(of: session.steps) { rebuildStepDividers() }
             .onChange(of: agentSession?.scrollGeneration) { _, _ in
                 scrollToBottom(proxy: proxy)
             }

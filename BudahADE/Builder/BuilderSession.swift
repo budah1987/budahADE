@@ -120,8 +120,6 @@ final class BuilderSession {
     var activeStepIndex: Int? = nil
     var messages: [ChatMessage] = []
     var turnMarkers: [ChatTurnMarker] = []
-    var isStreaming: Bool = false
-    var currentActivity: String? = nil
     var contextSummary: String = ""
 
     // Agent session reference (set when build starts)
