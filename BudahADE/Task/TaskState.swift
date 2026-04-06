@@ -254,6 +254,7 @@ final class TaskState: ObservableObject, Identifiable {
         let chatState = PlanChatState(
             tabId: tabId,
             worktreePath: worktreePath,
+            repoPath: repoPath,
             taskName: name,
             branchName: branchName,
             role: role

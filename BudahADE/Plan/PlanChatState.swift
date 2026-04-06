@@ -17,6 +17,7 @@ enum PlanConversationState: Equatable {
 final class PlanChatState: ObservableObject {
     let tabId: UUID
     let worktreePath: String
+    let repoPath: String
     let taskName: String
     let branchName: String
     let role: AgentMode
@@ -92,9 +93,10 @@ final class PlanChatState: ObservableObject {
 
     // MARK: - Init
 
-    init(tabId: UUID = UUID(), worktreePath: String, taskName: String, branchName: String, role: AgentMode = .researcher) {
+    init(tabId: UUID = UUID(), worktreePath: String, repoPath: String, taskName: String, branchName: String, role: AgentMode = .researcher) {
         self.tabId = tabId
         self.worktreePath = worktreePath
+        self.repoPath = repoPath
         self.taskName = taskName
         self.branchName = branchName
         self.role = role

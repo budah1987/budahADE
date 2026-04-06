@@ -430,7 +430,7 @@ struct WorkspaceView: View {
                     onBackToPlan: { task.enterPlanMode() },
                     onEditSpec: nil,
                     branchName: task.branchName,
-                    workingDirectory: task.worktreePath,
+                    workingDirectory: task.repoPath,
                     isVisible: task.showBuilderChat
                 )
                 .opacity(task.showBuilderChat ? 1 : 0)
