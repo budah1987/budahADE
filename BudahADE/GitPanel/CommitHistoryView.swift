@@ -169,11 +169,18 @@ struct CommitHistoryView: View {
     }
 
     private func loadCommits() {
-        commits = repo.extendedLog(limit: 20)
+        let newCommits = repo.extendedLog(limit: 20)
+        // Only update if commits actually changed (avoids re-render on every poll)
+        if commits.map(\.id) != newCommits.map(\.id) {
+            commits = newCommits
+        }
     }
 
     private func loadMoreCommits() {
         let newLimit = commits.count + 20
-        commits = repo.extendedLog(limit: newLimit)
+        let allCommits = repo.extendedLog(limit: newLimit)
+        if commits.map(\.id) != allCommits.map(\.id) {
+            commits = allCommits
+        }
     }
 }
