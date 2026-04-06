@@ -470,6 +470,8 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                     }
                     .onKeyPress(.return, phases: .down) { press in
                         guard !press.modifiers.contains(.shift) else { return .ignored }
+                        // Let Cmd+Enter bubble up to parent views (plan/builder confirm handlers)
+                        guard !press.modifiers.contains(.command) else { return .ignored }
                         if let handler = onReturnKey, handler(press) == .handled {
                             return .handled
                         }
