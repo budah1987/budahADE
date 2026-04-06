@@ -168,6 +168,11 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
     var session: AgentSession?
     var isRunning: Bool
 
+    // MARK: - Document mentions
+
+    /// Working directory for @ mention file scanning. When non-nil, typing `@` triggers a file picker popover.
+    var workingDirectory: String? = nil
+
     // MARK: - Actions
 
     var onSend: (String) -> Void
@@ -204,6 +209,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         saveImage: ((Data) -> String?)? = nil,
         placeholder: String = "BeepBoopBeep...",
         ghostText: String? = nil,
+        workingDirectory: String? = nil,
         onReturnKey: ((KeyPress) -> KeyPress.Result)? = nil,
         onTabKey: ((KeyPress) -> KeyPress.Result)? = nil,
         @ViewBuilder aboveInput: () -> AboveInput,
@@ -218,6 +224,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         self.saveImage = saveImage
         self.placeholder = placeholder
         self.ghostText = ghostText
+        self.workingDirectory = workingDirectory
         self.onReturnKey = onReturnKey
         self.onTabKey = onTabKey
         self.aboveInput = aboveInput()
@@ -234,6 +241,62 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
     @State private var showModelMenu: Bool = false
     @State private var showContextMemoryOverlay: Bool = false
     @State private var attachHovering: Bool = false
+
+    // MARK: - Document mention state
+
+    @State private var mentionPopoverIndex: Int = 0
+    @StateObject private var mentionState = MentionPopoverState()
+    @State private var mentionDismissed: Bool = false
+    @State private var cachedMentionFiles: [FileMentionItem] = []
+    @State private var mentionKeyMonitor: Any?
+
+    /// Finds the active `@query` token at the end of the current input.
+    /// Returns the query text (after `@`) and the range of the full `@query` token, or nil if not in a mention context.
+    private var activeMentionContext: (query: String, range: Range<String.Index>)? {
+        guard workingDirectory != nil, !mentionDismissed else { return nil }
+        let text = inputText
+
+        // Find the last `@` that isn't preceded by a letter/digit (word boundary)
+        guard let atIndex = text.lastIndex(of: "@") else { return nil }
+
+        // `@` must be at start or preceded by whitespace
+        if atIndex != text.startIndex {
+            let before = text.index(before: atIndex)
+            let charBefore = text[before]
+            guard charBefore.isWhitespace || charBefore == "\n" else { return nil }
+        }
+
+        let afterAt = text.index(after: atIndex)
+        // Check the query doesn't contain a space (not yet completed)
+        let querySubstring = text[afterAt...]
+        if querySubstring.contains(" ") { return nil }
+
+        let query = String(querySubstring)
+        return (query: query, range: atIndex..<text.endIndex)
+    }
+
+    /// Whether the mention popover should be visible
+    private var showMentionPopover: Bool {
+        activeMentionContext != nil && !isRunning && !filteredMentionItems.isEmpty
+    }
+
+    /// Mention items filtered by current query
+    private var filteredMentionItems: [FileMentionItem] {
+        guard let ctx = activeMentionContext else { return [] }
+        return DocumentMentionScanner.filter(cachedMentionFiles, query: ctx.query)
+    }
+
+    /// Ghost text for mention completion
+    private var mentionGhostText: String? {
+        guard showMentionPopover, let ctx = activeMentionContext else { return nil }
+        let items = filteredMentionItems
+        guard !items.isEmpty else { return nil }
+        let idx = min(mentionPopoverIndex, items.count - 1)
+        let item = items[idx]
+        // Show the full @path as ghost
+        let beforeAt = inputText[inputText.startIndex..<ctx.range.lowerBound]
+        return beforeAt + "@\(item.relativePath)"
+    }
 
     // MARK: - Computed
 
@@ -266,8 +329,27 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
 
     // MARK: - Body
 
+    /// Effective ghost text — mention ghost takes priority over parent-provided ghost
+    private var effectiveGhostText: String? {
+        mentionGhostText ?? ghostText
+    }
+
     var body: some View {
         VStack(spacing: 0) {
+            // Document mention popover — floats above everything
+            if showMentionPopover {
+                DocumentMentionPopover(
+                    items: filteredMentionItems,
+                    filter: activeMentionContext?.query ?? "",
+                    onSelect: { item in completeMention(item) },
+                    onDismiss: { mentionDismissed = true },
+                    selectedIndex: $mentionPopoverIndex
+                )
+                .padding(.horizontal, 14)
+                .padding(.bottom, 4)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             // Slot: above input (slash popover, pipeline bar, done-state controls)
             aboveInput
 
@@ -358,6 +440,34 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                 pendingImagePath = url.path
             }
         }
+        .onAppear {
+            scanMentionFilesIfNeeded()
+            installMentionKeyMonitor()
+        }
+        .onDisappear {
+            removeMentionKeyMonitor()
+        }
+        .onChange(of: workingDirectory) { _, _ in
+            scanMentionFilesIfNeeded()
+        }
+        .onChange(of: inputText) { oldValue, newValue in
+            // Reset mention dismiss when @ context changes
+            if !newValue.contains("@") {
+                mentionDismissed = false
+            } else if oldValue.count != newValue.count && activeMentionContext != nil {
+                // User is typing after @, reset dismiss and reset selection
+                mentionDismissed = false
+                mentionPopoverIndex = 0
+            }
+            // Sync mention state for NSEvent monitor
+            let visible = activeMentionContext != nil && !isRunning && !mentionDismissed
+            mentionState.isVisible = visible
+            mentionState.items = visible ? filteredMentionItems : []
+            mentionState.selectedIndex = mentionPopoverIndex
+        }
+        .onChange(of: mentionState.selectedIndex) { _, newValue in
+            mentionPopoverIndex = newValue
+        }
     }
 
     // MARK: - Top Bar
@@ -437,7 +547,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                         .padding(.top, 2)
                         .allowsHitTesting(false)
                 }
-                if let ghost = ghostText, !ghost.isEmpty {
+                if let ghost = effectiveGhostText, !ghost.isEmpty {
                     Text(ghost)
                         .font(.system(size: 14))
                         .foregroundColor(Theme.Colors.textSecondary.opacity(0.5))
@@ -472,6 +582,15 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                         guard !press.modifiers.contains(.shift) else { return .ignored }
                         // Let Cmd+Enter bubble up to parent views (plan/builder confirm handlers)
                         guard !press.modifiers.contains(.command) else { return .ignored }
+                        // Mention popover intercepts Return
+                        if showMentionPopover {
+                            let items = filteredMentionItems
+                            let idx = min(mentionPopoverIndex, items.count - 1)
+                            if idx < items.count {
+                                completeMention(items[idx])
+                                return .handled
+                            }
+                        }
                         if let handler = onReturnKey, handler(press) == .handled {
                             return .handled
                         }
@@ -479,8 +598,24 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                         return .handled
                     }
                     .onKeyPress(.tab, phases: .down) { press in
+                        // Mention popover intercepts Tab
+                        if showMentionPopover {
+                            let items = filteredMentionItems
+                            let idx = min(mentionPopoverIndex, items.count - 1)
+                            if idx < items.count {
+                                completeMention(items[idx])
+                                return .handled
+                            }
+                        }
                         if let handler = onTabKey {
                             return handler(press)
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.escape, phases: .down) { _ in
+                        if showMentionPopover {
+                            mentionDismissed = true
+                            return .handled
                         }
                         return .ignored
                     }
@@ -600,6 +735,12 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         guard canSend else { return }
 
         var prompt = trimmed
+
+        // Expand @file mentions to include file contents
+        if let dir = workingDirectory {
+            prompt = expandMentions(in: prompt, rootPath: dir)
+        }
+
         if let imagePath = pendingImagePath {
             prompt = prompt.isEmpty ? "[Image: \(imagePath)]" : prompt + "\n[Image: \(imagePath)]"
         }
@@ -613,6 +754,49 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             inputFocused = true
         }
+    }
+
+    /// Expand `@relativePath` tokens into `@relativePath` with file content appended.
+    /// Matches `@` preceded by start-of-string or whitespace, followed by a non-space path.
+    private func expandMentions(in text: String, rootPath: String) -> String {
+        // Pattern: @ at word boundary followed by a non-space path
+        let pattern = #"(?:^|(?<=\s))@(\S+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        let nsText = text as NSString
+        let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+
+        guard !matches.isEmpty else { return text }
+
+        var result = text
+        var appendedContents: [String] = []
+
+        for match in matches.reversed() {
+            guard match.numberOfRanges >= 2 else { continue }
+            let pathRange = match.range(at: 1)
+            let relativePath = nsText.substring(with: pathRange)
+            let absolutePath = (rootPath as NSString).appendingPathComponent(relativePath)
+
+            // Check if the file exists and is readable
+            let fm = FileManager.default
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: absolutePath, isDirectory: &isDir), !isDir.boolValue else { continue }
+
+            // Read file content (limit to ~50KB to avoid huge payloads)
+            if let data = fm.contents(atPath: absolutePath),
+               data.count <= 50_000,
+               let content = String(data: data, encoding: .utf8) {
+                appendedContents.insert(
+                    "\n<document path=\"\(relativePath)\">\n\(content)\n</document>",
+                    at: 0
+                )
+            }
+        }
+
+        if !appendedContents.isEmpty {
+            result += appendedContents.joined()
+        }
+
+        return result
     }
 
     @discardableResult
@@ -655,6 +839,53 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         }
         return false
     }
+
+    // MARK: - Document Mention Helpers
+
+    private func scanMentionFilesIfNeeded() {
+        guard let dir = workingDirectory else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let items = DocumentMentionScanner.scan(rootPath: dir)
+            DispatchQueue.main.async {
+                cachedMentionFiles = items
+            }
+        }
+    }
+
+    private func completeMention(_ item: FileMentionItem) {
+        guard let ctx = activeMentionContext else { return }
+        // Replace the @query with @relativePath followed by a space
+        var newText = inputText
+        newText.replaceSubrange(ctx.range, with: "@\(item.relativePath) ")
+        inputText = newText
+        mentionDismissed = false
+        mentionPopoverIndex = 0
+    }
+
+    private func installMentionKeyMonitor() {
+        guard workingDirectory != nil else { return }
+        let ms = mentionState
+        mentionKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard ms.isVisible else { return event }
+            switch Int(event.keyCode) {
+            case 126: // up arrow
+                DispatchQueue.main.async { ms.moveUp() }
+                return nil
+            case 125: // down arrow
+                DispatchQueue.main.async { ms.moveDown() }
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
+    private func removeMentionKeyMonitor() {
+        if let monitor = mentionKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            mentionKeyMonitor = nil
+        }
+    }
 }
 
 // MARK: - Convenience Init (no slots)
@@ -670,6 +901,7 @@ extension ChatInputBar where AboveInput == EmptyView, TopBarExtras == EmptyView 
         saveImage: ((Data) -> String?)? = nil,
         placeholder: String = "BeepBoopBeep...",
         ghostText: String? = nil,
+        workingDirectory: String? = nil,
         onReturnKey: ((KeyPress) -> KeyPress.Result)? = nil,
         onTabKey: ((KeyPress) -> KeyPress.Result)? = nil
     ) {
@@ -682,6 +914,7 @@ extension ChatInputBar where AboveInput == EmptyView, TopBarExtras == EmptyView 
         self.saveImage = saveImage
         self.placeholder = placeholder
         self.ghostText = ghostText
+        self.workingDirectory = workingDirectory
         self.onReturnKey = onReturnKey
         self.onTabKey = onTabKey
         self.aboveInput = EmptyView()
