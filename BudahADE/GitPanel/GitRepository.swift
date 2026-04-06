@@ -359,10 +359,10 @@ final class GitRepository: ObservableObject {
             return
         }
 
-        let newCommits = output
+        let newCommits: [GitCommit] = output
             .components(separatedBy: "\n")
             .filter { !$0.isEmpty }
-            .compactMap { line in
+            .compactMap { line -> GitCommit? in
                 let parts = line.components(separatedBy: "|||")
                 guard parts.count == 4 else { return nil }
                 return GitCommit(
@@ -445,7 +445,7 @@ final class GitRepository: ObservableObject {
         return output
             .components(separatedBy: "\n")
             .filter { !$0.isEmpty }
-            .compactMap { line in
+            .compactMap { line -> GitCommit? in
                 let parts = line.components(separatedBy: "|||")
                 guard parts.count == 4 else { return nil }
                 return GitCommit(
@@ -537,7 +537,7 @@ final class GitRepository: ObservableObject {
         return output
             .components(separatedBy: "\n")
             .filter { !$0.isEmpty }
-            .compactMap { line in
+            .compactMap { line -> GitFileStatus? in
                 let parts = line.components(separatedBy: "\t")
                 guard parts.count >= 2 else { return nil }
                 return GitFileStatus(status: mapStatusChar(parts[0]), path: parts[1])

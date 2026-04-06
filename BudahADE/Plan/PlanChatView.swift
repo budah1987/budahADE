@@ -531,7 +531,7 @@ struct PlanChatView: View {
             onCancel: { state.cancel() },
             saveImage: { data in state.saveImage(data: data) },
             ghostText: ghostCompletion,
-            workingDirectory: state.worktreePath,
+            workingDirectory: state.repoPath,
             onReturnKey: { press in
                 guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
                 let idx = min(slashPopoverIndex, allCommands.count - 1)
@@ -550,6 +550,11 @@ struct PlanChatView: View {
                 let idx = min(slashPopoverIndex, allCommands.count - 1)
                 inputText = "/\(allCommands[idx]) "
                 slashCommandSelected = true
+                return .handled
+            },
+            onEscapeKey: { _ in
+                guard showSlashPopover else { return .ignored }
+                inputText = ""
                 return .handled
             },
             aboveInput: {
