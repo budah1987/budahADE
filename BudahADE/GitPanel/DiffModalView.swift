@@ -10,6 +10,10 @@ struct DiffModalView: View {
     @State private var currentIndex: Int
     @State private var showSplit = true
     @State private var loadedDiff: String?
+    @State private var parsedLeftLines: [DiffLine] = []
+    @State private var parsedRightLines: [DiffLine] = []
+    @State private var addCount: Int = 0
+    @State private var removeCount: Int = 0
     @State private var commitDetail: CommitDetail?
     @State private var hashCopied = false
     @State private var actionError: String?
@@ -175,14 +179,11 @@ struct DiffModalView: View {
 
             Spacer()
 
-            if let file = currentFile, let diffText = loadedDiff {
-                let adds = diffText.components(separatedBy: "\n").filter { $0.hasPrefix("+") && !$0.hasPrefix("+++") }.count
-                let removes = diffText.components(separatedBy: "\n").filter { $0.hasPrefix("-") && !$0.hasPrefix("---") }.count
-
-                Text("+\(adds)")
+            if let file = currentFile, loadedDiff != nil {
+                Text("+\(addCount)")
                     .font(Theme.body(11))
                     .foregroundColor(Theme.Colors.statusDone)
-                Text("−\(removes)")
+                Text("−\(removeCount)")
                     .font(Theme.body(11))
                     .foregroundColor(Theme.Colors.error)
 
@@ -264,23 +265,33 @@ struct DiffModalView: View {
     private func loadDiff() async {
         guard let file = currentFile else {
             loadedDiff = nil
+            parsedLeftLines = []
+            parsedRightLines = []
+            addCount = 0
+            removeCount = 0
             return
         }
         loadedDiff = nil
+        let rawDiff: String
         if let hash = commitHash {
-            loadedDiff = repo.diffForCommitFile(hash, file: file.path)
+            rawDiff = repo.diffForCommitFile(hash, file: file.path)
         } else {
-            loadedDiff = repo.diff(file: file.path, staged: staged)
+            rawDiff = repo.diff(file: file.path, staged: staged)
         }
+        // Pre-parse split diff lines and counts once
+        let lines = rawDiff.components(separatedBy: "\n")
+        let (left, right) = parseSplitDiff(lines)
+        parsedLeftLines = left
+        parsedRightLines = right
+        addCount = lines.filter { $0.hasPrefix("+") && !$0.hasPrefix("+++") }.count
+        removeCount = lines.filter { $0.hasPrefix("-") && !$0.hasPrefix("---") }.count
+        loadedDiff = rawDiff
     }
 
     // MARK: - Split Diff
 
     private func splitDiffView(_ diff: String) -> some View {
-        let lines = diff.components(separatedBy: "\n")
-        let (leftLines, rightLines) = parseSplitDiff(lines)
-
-        return HStack(spacing: 0) {
+        HStack(spacing: 0) {
             VStack(spacing: 0) {
                 Text("HEAD (before)")
                     .font(Theme.label(11))
@@ -290,8 +301,8 @@ struct DiffModalView: View {
                     .background(Theme.Colors.surface)
 
                 ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(leftLines.enumerated()), id: \.offset) { _, line in
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(parsedLeftLines.enumerated()), id: \.offset) { _, line in
                             diffLineView(lineNumber: line.number, text: line.text, type: line.type)
                         }
                     }
@@ -310,8 +321,8 @@ struct DiffModalView: View {
                     .background(Theme.Colors.surface)
 
                 ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(rightLines.enumerated()), id: \.offset) { _, line in
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(parsedRightLines.enumerated()), id: \.offset) { _, line in
                             diffLineView(lineNumber: line.number, text: line.text, type: line.type)
                         }
                     }
@@ -324,9 +335,10 @@ struct DiffModalView: View {
     // MARK: - Unified Diff
 
     private func unifiedDiffView(_ diff: String) -> some View {
-        ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(diff.components(separatedBy: "\n").enumerated()), id: \.offset) { idx, line in
+        let lines = diff.components(separatedBy: "\n")
+        return ScrollView(.vertical) {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(lines.enumerated()), id: \.offset) { idx, line in
                     HStack(spacing: 0) {
                         Text("\(idx + 1)")
                             .font(Theme.code(10))

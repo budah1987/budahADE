@@ -4,8 +4,8 @@ import AppKit
 
 // MARK: - Models
 
-struct GitFileStatus: Identifiable {
-    let id = UUID()
+struct GitFileStatus: Identifiable, Equatable, Hashable {
+    var id: String { "\(status):\(path)" }
     let status: String // M, A, D, R, ?
     let path: String
 }
@@ -59,19 +59,28 @@ final class GitRepository: ObservableObject {
     @Published var totalCommitCount: Int = 0
 
     private var pollTimer: Timer?
+    private var refreshDebounceTask: Task<Void, Never>?
+    private var lastActivityTime = Date()
+
+    // Diff cache: keyed by "staged:filepath" or "hash:filepath"
+    private var diffCache: [String: (result: String, timestamp: Date)] = [:]
+    private let diffCacheTTL: TimeInterval = 10 // seconds
+
+    // Polling intervals
+    private let activeInterval: TimeInterval = 3.0
+    private let idleInterval: TimeInterval = 8.0
+    private let idleThreshold: TimeInterval = 30.0 // seconds of no user action before going idle
 
     init(path: String) {
         self.path = path
         refresh()
     }
 
-    // MARK: - Polling
+    // MARK: - Polling (adaptive)
 
     func startPolling() {
         stopPolling()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.refresh() }
-        }
+        scheduleNextPoll()
     }
 
     func stopPolling() {
@@ -79,7 +88,24 @@ final class GitRepository: ObservableObject {
         pollTimer = nil
     }
 
-    // MARK: - Refresh
+    private func scheduleNextPoll() {
+        pollTimer?.invalidate()
+        let interval = Date().timeIntervalSince(lastActivityTime) > idleThreshold ? idleInterval : activeInterval
+        pollTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refresh()
+                self?.scheduleNextPoll()
+            }
+        }
+    }
+
+    /// Mark the repo as actively used (resets idle timer, invalidates diff cache)
+    private func markActive() {
+        lastActivityTime = Date()
+        diffCache.removeAll()
+    }
+
+    // MARK: - Refresh (debounced)
 
     func refresh() {
         parseStatus()
@@ -89,41 +115,58 @@ final class GitRepository: ObservableObject {
         parseMergeInfo()
     }
 
+    /// Debounced refresh — collapses rapid sequential calls (e.g. staging 10 files)
+    private func debouncedRefresh() {
+        refreshDebounceTask?.cancel()
+        refreshDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            guard !Task.isCancelled else { return }
+            self?.refresh()
+        }
+    }
+
     // MARK: - Git Operations
 
     func stage(_ file: String) {
         _ = runGit(["add", "--", file])
-        refresh()
+        markActive()
+        debouncedRefresh()
     }
 
     func unstage(_ file: String) {
         _ = runGit(["reset", "HEAD", "--", file])
-        refresh()
+        markActive()
+        debouncedRefresh()
     }
 
     func stageAll() {
         _ = runGit(["add", "-A"])
-        refresh()
+        markActive()
+        debouncedRefresh()
     }
 
     func unstageAll() {
         _ = runGit(["reset", "HEAD"])
-        refresh()
+        markActive()
+        debouncedRefresh()
     }
 
     func commit(message: String) {
         _ = runGit(["commit", "-m", message])
+        markActive()
         refresh()
     }
 
     func checkout(branch: String) {
         _ = runGit(["checkout", branch])
+        markActive()
         refresh()
     }
 
     func createBranch(_ name: String) -> Bool {
         let result = runGit(["checkout", "-b", name])
         if result != nil {
+            markActive()
             refresh()
             return true
         }
@@ -131,15 +174,23 @@ final class GitRepository: ObservableObject {
     }
 
     func diff(file: String, staged: Bool) -> String {
+        let cacheKey = "\(staged ? "staged" : "unstaged"):\(file)"
+        if let cached = diffCache[cacheKey],
+           Date().timeIntervalSince(cached.timestamp) < diffCacheTTL {
+            return cached.result
+        }
         var args = ["diff"]
         if staged { args.append("--cached") }
         args.append(contentsOf: ["--", file])
-        return runGit(args) ?? ""
+        let result = runGit(args) ?? ""
+        diffCache[cacheKey] = (result, Date())
+        return result
     }
 
     // MARK: - Push
 
     func push() async throws {
+        markActive()
         let result = try await runGitAsync(["push", "-u", "origin", currentBranch])
         if result.contains("error") || result.contains("fatal") {
             throw GitError.commandFailed(result)
@@ -150,6 +201,7 @@ final class GitRepository: ObservableObject {
     // MARK: - Merge
 
     func mergeIntoBase(_ baseBranch: String) async throws {
+        markActive()
         // Switch to base branch
         let checkoutResult = try await runGitAsync(["checkout", baseBranch])
         if checkoutResult.contains("error") {
@@ -278,34 +330,36 @@ final class GitRepository: ObservableObject {
             }
         }
 
-        self.stagedFiles = staged
-        self.unstagedFiles = unstaged
+        if self.stagedFiles != staged { self.stagedFiles = staged }
+        if self.unstagedFiles != unstaged { self.unstagedFiles = unstaged }
     }
 
     func parseBranches() {
         if let headOutput = runGit(["rev-parse", "--abbrev-ref", "HEAD"]) {
-            currentBranch = headOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            let newBranch = headOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            if currentBranch != newBranch { currentBranch = newBranch }
         }
 
         guard let output = runGit(["branch", "-a", "--sort=-committerdate"]) else {
-            branches = []
+            if !branches.isEmpty { branches = [] }
             return
         }
 
-        branches = output
+        let newBranches = output
             .components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .map { $0.hasPrefix("* ") ? String($0.dropFirst(2)) : $0 }
             .filter { !$0.isEmpty && !$0.contains("->") }
+        if branches != newBranches { branches = newBranches }
     }
 
     func parseLog() {
         guard let output = runGit(["log", "--oneline", "-10", "--format=%H|||%s|||%an|||%ar"]) else {
-            recentCommits = []
+            if !recentCommits.isEmpty { recentCommits = [] }
             return
         }
 
-        recentCommits = output
+        let newCommits = output
             .components(separatedBy: "\n")
             .filter { !$0.isEmpty }
             .compactMap { line in
@@ -318,24 +372,31 @@ final class GitRepository: ObservableObject {
                     date: parts[3]
                 )
             }
+        // Compare by commit hashes to avoid unnecessary publishes
+        if recentCommits.map(\.id) != newCommits.map(\.id) {
+            recentCommits = newCommits
+        }
     }
 
     func parseRemoteStatus() {
         // Check if remote exists
-        hasRemote = runGit(["remote", "get-url", "origin"]) != nil
+        let newHasRemote = runGit(["remote", "get-url", "origin"]) != nil
+        if hasRemote != newHasRemote { hasRemote = newHasRemote }
 
         // Count commits ahead of base
-        if hasRemote, !currentBranch.isEmpty {
+        if newHasRemote, !currentBranch.isEmpty {
             if let output = runGit(["rev-list", "--count", "origin/\(currentBranch)..HEAD"]) {
-                aheadCount = Int(output) ?? 0
+                let newCount = Int(output) ?? 0
+                if aheadCount != newCount { aheadCount = newCount }
             } else {
                 // Branch may not exist on remote yet — all commits are "ahead"
                 if let output = runGit(["rev-list", "--count", "HEAD"]) {
-                    aheadCount = Int(output) ?? 0
+                    let newCount = Int(output) ?? 0
+                    if aheadCount != newCount { aheadCount = newCount }
                 }
             }
         } else {
-            aheadCount = 0
+            if aheadCount != 0 { aheadCount = 0 }
         }
     }
 
@@ -344,28 +405,32 @@ final class GitRepository: ObservableObject {
     func parseMergeInfo() {
         if !mergeTarget.isEmpty, !currentBranch.isEmpty {
             if let output = runGit(["rev-list", "--count", "HEAD..\(mergeTarget)"]) {
-                behindCount = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+                let newCount = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+                if behindCount != newCount { behindCount = newCount }
             } else {
-                behindCount = 0
+                if behindCount != 0 { behindCount = 0 }
             }
         }
 
         if !mergeTarget.isEmpty {
             if let output = runGit(["merge-base", "HEAD", mergeTarget]) {
-                forkPointHash = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                let newHash = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if forkPointHash != newHash { forkPointHash = newHash }
             } else {
-                forkPointHash = nil
+                if forkPointHash != nil { forkPointHash = nil }
             }
         }
 
         if let output = runGit(["rev-list", "--count", "HEAD"]) {
-            totalCommitCount = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            let newCount = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            if totalCommitCount != newCount { totalCommitCount = newCount }
         }
     }
 
     func renameBranch(from oldName: String, to newName: String) -> Bool {
         let result = runGit(["branch", "-m", oldName, newName])
         if result != nil {
+            markActive()
             refresh()
             return true
         }
@@ -414,7 +479,13 @@ final class GitRepository: ObservableObject {
     }
 
     func diffForCommitFile(_ hash: String, file: String) -> String {
-        return runGit(["show", "--format=", hash, "--", file]) ?? ""
+        let cacheKey = "\(hash):\(file)"
+        if let cached = diffCache[cacheKey] {
+            return cached.result // commit diffs are immutable, no TTL needed
+        }
+        let result = runGit(["show", "--format=", hash, "--", file]) ?? ""
+        diffCache[cacheKey] = (result, Date())
+        return result
     }
 
     func githubURLForCommit(_ hash: String) -> URL? {
@@ -434,6 +505,7 @@ final class GitRepository: ObservableObject {
     }
 
     func revertCommit(_ hash: String) async throws {
+        markActive()
         let result = try await runGitAsync(["revert", "--no-edit", hash])
         if result.contains("error") || result.contains("CONFLICT") {
             throw GitError.commandFailed(result)
@@ -442,6 +514,7 @@ final class GitRepository: ObservableObject {
     }
 
     func cherryPickCommit(_ hash: String, onto branch: String) async throws {
+        markActive()
         let originalBranch = currentBranch
         let _ = try await runGitAsync(["checkout", branch])
         do {
