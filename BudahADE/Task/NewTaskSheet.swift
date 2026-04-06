@@ -7,7 +7,6 @@ struct NewTaskSheet: View {
     @State private var branchPrefix: String? = "feat"
     @State private var branchSlug: String = ""
     @State private var baseBranch: String = "main"
-    @State private var startWithPlan: Bool = false
     @State private var isCreating: Bool = false
     @State private var showPrefixDropdown = false
     @State private var showBasedOnDropdown = false
@@ -57,8 +56,8 @@ struct NewTaskSheet: View {
                         .font(Theme.body(13))
                         .foregroundColor(Theme.Colors.textPrimary)
                         .focused($focusedField, equals: .name)
-                        .onChange(of: taskName) { _, newValue in
-                            let prevSlug = slugify(taskName.dropLast())
+                        .onChange(of: taskName) { oldValue, newValue in
+                            let prevSlug = slugify(oldValue)
                             if branchSlug.isEmpty || branchSlug == prevSlug {
                                 branchSlug = slugify(newValue)
                             }
@@ -165,14 +164,6 @@ struct NewTaskSheet: View {
 
                     Spacer()
 
-                    if !hasSpec {
-                        Toggle(isOn: $startWithPlan) {
-                            Text("Plan first")
-                                .font(Theme.caption(11))
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        }
-                        .toggleStyle(.checkbox)
-                    }
                 }
 
                 Rectangle()
@@ -433,7 +424,6 @@ struct NewTaskSheet: View {
         isCreating = true
         let name = taskName.trimmingCharacters(in: .whitespaces)
         let savedSpecPath = specFilePath
-        let shouldPlan = startWithPlan
         let branch = fullBranchName
         let base = baseBranch
 
@@ -446,8 +436,6 @@ struct NewTaskSheet: View {
                     // Copy spec to .budahade/spec.md and go straight to Build
                     copySpecToWorktree(specPath, task: task)
                     task.enterBuildMode()
-                } else if shouldPlan {
-                    task.enterPlanMode()
                 }
             }
             workspace.showNewTaskSheet = false
@@ -468,7 +456,6 @@ struct NewTaskSheet: View {
         specItemCount = content.components(separatedBy: "\n")
             .filter { $0.contains("- [ ]") || $0.contains("- [x]") || $0.contains("- [X]") }
             .count
-        startWithPlan = false
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

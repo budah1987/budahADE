@@ -93,6 +93,40 @@ enum AgentSessionStatus: Equatable {
 
 @MainActor
 final class AgentSession: ObservableObject, Identifiable {
+
+    // MARK: - Cached Regexes (compiled once at class load, not per call)
+
+    private static let questionRegex = try! NSRegularExpression(
+        pattern: "which.*prefer|would you like|should I|do you want|what approach|which option",
+        options: .caseInsensitive
+    )
+    private static let numberedRegex = try! NSRegularExpression(
+        pattern: #"^(\d+)[.)]\s+(.+)$"#
+    )
+    private static let letteredRegex = try! NSRegularExpression(
+        pattern: #"^([A-Za-z])[.)]\s+(.+)$"#
+    )
+    private static let bulletLetteredRegex = try! NSRegularExpression(
+        pattern: #"^[-•·‣›]\s+\*{0,2}([A-Za-z])[.)]\s*(.+?)\*{0,2}\s*(—.*)?$"#
+    )
+    private static let optionHeadingRegex = try! NSRegularExpression(
+        pattern: #"^(?:#{1,6}\s+|[-•·‣›]\s+|\d+[.)]\s+)?\*{0,2}Option\s+([A-Za-z0-9]+)\s*[:.]\s*\*{0,2}\s*(.+)$"#,
+        options: .caseInsensitive
+    )
+    private static let questionSeriesRegex = try! NSRegularExpression(
+        pattern: #"^(\d+)[.)]\s+\*{2}(.+?)\*{2}\s*(.*)$"#
+    )
+    private static let choicePatternRegexes: [NSRegularExpression] = [
+        try! NSRegularExpression(pattern: "which.*prefer", options: .caseInsensitive),
+        try! NSRegularExpression(pattern: "which.*choose", options: .caseInsensitive),
+        try! NSRegularExpression(pattern: "which.*option", options: .caseInsensitive),
+        try! NSRegularExpression(pattern: "which.*approach", options: .caseInsensitive),
+        try! NSRegularExpression(pattern: "what approach", options: .caseInsensitive),
+        try! NSRegularExpression(pattern: "what option", options: .caseInsensitive),
+        try! NSRegularExpression(pattern: "what would you prefer", options: .caseInsensitive),
+        try! NSRegularExpression(pattern: "how would you like to", options: .caseInsensitive),
+    ]
+
     let id: UUID
     var model: AgentModel
     let agentMode: AgentMode?
@@ -487,16 +521,11 @@ final class AgentSession: ObservableObject, Identifiable {
     func detectQuestionSeries(in text: String) -> [DetectedQuestionItem]? {
         let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
 
-        // Pattern: "1. **Question text?** Description text"
-        let pattern = try! NSRegularExpression(
-            pattern: #"^(\d+)[.)]\s+\*{2}(.+?)\*{2}\s*(.*)$"#
-        )
-
         var items: [DetectedQuestionItem] = []
 
         for line in lines {
             let range = NSRange(line.startIndex..<line.endIndex, in: line)
-            guard let match = pattern.firstMatch(in: line, range: range),
+            guard let match = Self.questionSeriesRegex.firstMatch(in: line, range: range),
                   let questionRange = Range(match.range(at: 2), in: line) else { continue }
 
             let question = String(line[questionRange]).trimmingCharacters(in: .whitespaces)
@@ -712,14 +741,9 @@ final class AgentSession: ObservableObject, Identifiable {
 
         // Exclude questions that ask the user to CHOOSE between options
         // These are multi-choice and should get the option modal instead
-        let choicePatterns = [
-            "which.*prefer", "which.*choose", "which.*option", "which.*approach",
-            "what approach", "what option", "what would you prefer",
-            "how would you like to",
-        ]
-        for pattern in choicePatterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-               regex.firstMatch(in: q, range: NSRange(q.startIndex..<q.endIndex, in: q)) != nil {
+        let qRange = NSRange(q.startIndex..<q.endIndex, in: q)
+        for regex in Self.choicePatternRegexes {
+            if regex.firstMatch(in: q, range: qRange) != nil {
                 return nil
             }
         }
@@ -746,10 +770,9 @@ final class AgentSession: ObservableObject, Identifiable {
         let nonEmptyLines = lines.filter { !$0.isEmpty }
         let hasQuestion: Bool = {
             if let last = nonEmptyLines.last, last.hasSuffix("?") { return true }
-            let questionPattern = try? NSRegularExpression(pattern: "which.*prefer|would you like|should I|do you want|what approach|which option", options: .caseInsensitive)
             return nonEmptyLines.contains { line in
                 let range = NSRange(line.startIndex..<line.endIndex, in: line)
-                return questionPattern?.firstMatch(in: line, range: range) != nil
+                return Self.questionRegex.firstMatch(in: line, range: range) != nil
             }
         }()
         guard hasQuestion else {
@@ -761,13 +784,10 @@ final class AgentSession: ObservableObject, Identifiable {
         if detectConfirmation(in: text) != nil { return nil }
 
         // Find option lines — numbered, lettered, or explicit option headings
-        let numberedPattern = try! NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.+)$"#)
-        let letteredPattern = try! NSRegularExpression(pattern: #"^([A-Za-z])[.)]\s+(.+)$"#)
-        // Bullet + lettered: "• **A) Label** — desc" or "· A) Label" etc.
-        let bulletLetteredPattern = try! NSRegularExpression(pattern: #"^[-•·‣›]\s+\*{0,2}([A-Za-z])[.)]\s*(.+?)\*{0,2}\s*(—.*)?$"#)
-        // "Option 1:" / "Option A:" / "**Option B:**" heading format
-        // Handles: "### **Option 1: …**", "- **Option 1:** …", "1. Option 1: …", plain "Option 1: …"
-        let optionHeadingPattern = try! NSRegularExpression(pattern: #"^(?:#{1,6}\s+|[-•·‣›]\s+|\d+[.)]\s+)?\*{0,2}Option\s+([A-Za-z0-9]+)\s*[:.]\s*\*{0,2}\s*(.+)$"#, options: .caseInsensitive)
+        let numberedPattern = Self.numberedRegex
+        let letteredPattern = Self.letteredRegex
+        let bulletLetteredPattern = Self.bulletLetteredRegex
+        let optionHeadingPattern = Self.optionHeadingRegex
 
         // Track which lines are inside code fences
         var inCodeBlock = false

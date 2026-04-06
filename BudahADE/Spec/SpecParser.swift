@@ -196,7 +196,7 @@ enum SpecParser {
     }
 }
 
-// MARK: - Markdown Section (for section-based editing in MarkdownTileView)
+// MARK: - Markdown Section
 
 struct MarkdownSection: Identifiable, Equatable {
     let id: String          // slugified heading

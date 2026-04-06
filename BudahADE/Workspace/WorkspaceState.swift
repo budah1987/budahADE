@@ -93,11 +93,11 @@ final class WorkspaceState: ObservableObject, Identifiable {
                 branchName: branchName,
                 baseBranch: baseBranch
             )
+            // Start terminal only once directory is confirmed ready
+            task.startTerminal()
         } catch {
             print("Worktree creation failed: \(error.localizedDescription)")
         }
-        // Start terminal once directory is ready
-        task.startTerminal()
     }
 
     /// Restore a task from saved state (no worktree creation — already exists)

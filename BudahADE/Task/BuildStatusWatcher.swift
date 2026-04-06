@@ -1,19 +1,30 @@
 import Foundation
-import Combine
 
-/// Polls `.budahade/build-status.json` for real-time build progress
+/// Watches `.budahade/build-status.json` for real-time build progress.
+/// Event-driven via DispatchSourceFileSystemObject — zero CPU when idle.
 @MainActor
 final class BuildStatusWatcher {
     let buildStatus: BuildStatusState
-    private var timer: Timer?
     private let worktreePath: String
     private var lastContent: String = ""
 
-    // Adaptive polling (same pattern as SpecWatcher)
-    private let normalInterval: TimeInterval = 2.0
-    private let rapidInterval: TimeInterval = 0.5
-    private let rapidPollMax = 20
-    private var rapidPollCount = 0
+    // Event-driven watching
+    private var source: DispatchSourceFileSystemObject?
+    private var dirFd: Int32 = -1
+    private var debounceWork: DispatchWorkItem?
+    private let debounceMs = 200
+
+    // Fallback timer when .budahade/ doesn't exist yet
+    private var fallbackTimer: Timer?
+    private let fallbackInterval: TimeInterval = 5.0
+
+    private var budahadeDir: String {
+        (worktreePath as NSString).appendingPathComponent(".budahade")
+    }
+
+    private var statusPath: String {
+        (worktreePath as NSString).appendingPathComponent(".budahade/build-status.json")
+    }
 
     init(worktreePath: String, buildStatus: BuildStatusState) {
         self.worktreePath = worktreePath
@@ -22,39 +33,95 @@ final class BuildStatusWatcher {
 
     func startWatching() {
         checkForChanges()
-        scheduleTimer(interval: normalInterval)
+        attemptDirectoryWatch()
     }
 
     func stopWatching() {
-        timer?.invalidate()
-        timer = nil
+        stopSource()
+        fallbackTimer?.invalidate()
+        fallbackTimer = nil
     }
 
-    private func scheduleTimer(interval: TimeInterval) {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+    // MARK: - Private
+
+    private func attemptDirectoryWatch() {
+        let fd = open(budahadeDir, O_EVTONLY)
+        if fd >= 0 {
+            startSource(fd: fd)
+        } else {
+            startFallbackTimer()
+        }
+    }
+
+    private func startFallbackTimer() {
+        fallbackTimer?.invalidate()
+        fallbackTimer = Timer.scheduledTimer(withTimeInterval: fallbackInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.checkForChanges()
+                guard let self else { return }
+                self.checkForChanges()
+                let fd = open(self.budahadeDir, O_EVTONLY)
+                if fd >= 0 {
+                    self.fallbackTimer?.invalidate()
+                    self.fallbackTimer = nil
+                    self.startSource(fd: fd)
+                }
             }
         }
     }
 
+    private func startSource(fd: Int32) {
+        stopSource()
+        dirFd = fd
+
+        let src = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .delete, .rename],
+            queue: .global(qos: .utility)
+        )
+
+        src.setEventHandler { [weak self] in
+            self?.scheduleCheck()
+        }
+
+        src.setCancelHandler { [weak self] in
+            guard let self, self.dirFd >= 0 else { return }
+            close(self.dirFd)
+            self.dirFd = -1
+        }
+
+        src.resume()
+        source = src
+    }
+
+    private func stopSource() {
+        debounceWork?.cancel()
+        debounceWork = nil
+        if let src = source {
+            src.cancel()
+            source = nil
+        } else if dirFd >= 0 {
+            close(dirFd)
+            dirFd = -1
+        }
+    }
+
+    private func scheduleCheck() {
+        debounceWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            DispatchQueue.main.async { self?.checkForChanges() }
+        }
+        debounceWork = work
+        DispatchQueue.global(qos: .utility).asyncAfter(
+            deadline: .now() + .milliseconds(debounceMs),
+            execute: work
+        )
+    }
+
     private func checkForChanges() {
-        let statusPath = (worktreePath as NSString)
-            .appendingPathComponent(".budahade/build-status.json")
-
-        guard let content = try? String(contentsOfFile: statusPath, encoding: .utf8) else {
-            tickRapidPoll(changed: false)
-            return
-        }
-
-        let changed = content != lastContent
-        if changed {
-            lastContent = content
-            parseStatus(content)
-        }
-
-        tickRapidPoll(changed: changed)
+        guard let content = try? String(contentsOfFile: statusPath, encoding: .utf8) else { return }
+        guard content != lastContent else { return }
+        lastContent = content
+        parseStatus(content)
     }
 
     private func parseStatus(_ json: String) {
@@ -78,23 +145,8 @@ final class BuildStatusWatcher {
             }
         }
 
-        // Track elapsed time per task
         if buildStatus.currentTaskTitle != previousTask || (buildStatus.status == .working && buildStatus.taskStartedAt == nil) {
             buildStatus.taskStartedAt = Date()
-        }
-    }
-
-    // MARK: - Adaptive Polling
-
-    private func tickRapidPoll(changed: Bool) {
-        if changed {
-            rapidPollCount = rapidPollMax
-            scheduleTimer(interval: rapidInterval)
-        } else if rapidPollCount > 0 {
-            rapidPollCount -= 1
-            if rapidPollCount == 0 {
-                scheduleTimer(interval: normalInterval)
-            }
         }
     }
 }
