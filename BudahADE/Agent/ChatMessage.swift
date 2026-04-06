@@ -16,6 +16,13 @@ struct ToolCall: Equatable, Codable {
     let input: String // raw JSON
 }
 
+// MARK: - Document Attachment
+
+struct DocumentAttachment: Equatable, Codable {
+    let path: String
+    let lineCount: Int
+}
+
 // MARK: - ChatMessage
 
 struct ChatMessage: Identifiable, Equatable, Codable {
@@ -26,6 +33,7 @@ struct ChatMessage: Identifiable, Equatable, Codable {
     let timestamp: Date
     let inputTokens: Int
     let outputTokens: Int
+    let attachments: [DocumentAttachment]
 
     var totalTokens: Int {
         inputTokens + outputTokens
@@ -38,7 +46,8 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         toolCalls: [ToolCall]? = nil,
         timestamp: Date = Date(),
         inputTokens: Int = 0,
-        outputTokens: Int = 0
+        outputTokens: Int = 0,
+        attachments: [DocumentAttachment] = []
     ) {
         self.id = id
         self.role = role
@@ -47,6 +56,7 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         self.timestamp = timestamp
         self.inputTokens = inputTokens
         self.outputTokens = outputTokens
+        self.attachments = attachments
     }
 }
 

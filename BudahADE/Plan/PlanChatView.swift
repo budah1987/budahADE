@@ -31,41 +31,75 @@ struct PlanChatView: View {
     @State private var cachedAllCommands: [String] = []
     @State private var cachedHasAssistantMessage: Bool = false
 
+    /// Active slash command context — finds the last `/` token in the input
+    /// that is at start of text or preceded by whitespace, and hasn't been completed yet.
+    private var activeSlashContext: (filter: String, range: Range<String.Index>)? {
+        guard !isRunning, !slashCommandSelected else { return nil }
+        let text = inputText
+
+        // Find the last `/` that is at start or preceded by whitespace
+        guard let slashIndex = text.lastIndex(of: "/") else { return nil }
+        if slashIndex != text.startIndex {
+            let before = text.index(before: slashIndex)
+            guard text[before].isWhitespace || text[before] == "\n" else { return nil }
+        }
+
+        let afterSlash = text.index(after: slashIndex)
+        guard afterSlash <= text.endIndex else { return nil }
+        let querySubstring = text[afterSlash...]
+        // If there's a space, the command token is complete — no popover
+        if querySubstring.contains(" ") { return nil }
+
+        let filter = String(querySubstring)
+        return (filter: filter, range: slashIndex..<text.endIndex)
+    }
+
     /// Whether the slash command popover should be visible
     private var showSlashPopover: Bool {
-        inputText.hasPrefix("/") && !isRunning && !slashCommandSelected
+        activeSlashContext != nil
     }
 
     /// The filter text after the "/"
     private var slashFilter: String {
-        guard inputText.hasPrefix("/") else { return "" }
-        let afterSlash = String(inputText.dropFirst())
-        // Only filter on the first word (before any space = arguments)
-        return afterSlash.split(separator: " ").first.map(String.init) ?? afterSlash
+        activeSlashContext?.filter ?? ""
     }
 
     /// Default commands to show before CLI init event provides the real list
     private static let defaultRemoteCommands = [
-        "update-config", "debug", "simplify", "batch", "loop", "schedule",
-        "claude-api", "qmd-sessions", "site-extract", "prepare-to-build",
-        "handoff", "find-skills", "figma-design-system", "design-apply",
+        "update-config", "simplify", "loop", "schedule",
+        "claude-api", "site-extract", "prepare-to-build",
+        "handoff", "prd-to-plan", "find-skills",
+        "figma-design-system", "qa", "design-apply",
+        "design-an-interface", "grill-me",
         "design-extract", "kill-mcp", "notion-update", "figma-connect",
-        "interface-design:extract", "interface-design:status",
-        "interface-design:audit", "interface-design:init",
-        "interface-design:interface-design",
-        "figma-friend:figma-designer", "figma-friend:clone-ui",
+        "keybindings-help",
+        "claude-hud:setup", "claude-hud:configure",
         "compact", "context", "cost", "heapdump", "init",
         "pr-comments", "release-notes", "review", "security-review",
         "extra-usage", "insights",
     ]
 
-    /// Ghost text completion — shows the full command with typed portion + faint remainder
+    /// Ghost text completion — shows the full input with slash command completed
     private var ghostCompletion: String? {
-        guard showSlashPopover, !allCommands.isEmpty else { return nil }
+        guard let ctx = activeSlashContext, !allCommands.isEmpty else { return nil }
         let idx = min(slashPopoverIndex, allCommands.count - 1)
         let command = allCommands[idx]
-        // Show the full "/command" as ghost text
-        return "/\(command)"
+        // Replace the slash token range with the full command
+        var ghost = inputText
+        ghost.replaceSubrange(ctx.range, with: "/\(command)")
+        return ghost
+    }
+
+    /// Number of characters in the skill prefix (e.g. "/grill-me " = 10).
+    /// Returns 0 when no skill is selected.
+    private var skillPrefixCharCount: Int {
+        guard slashCommandSelected, inputText.hasPrefix("/") else { return 0 }
+        // Find the first space after the slash — the prefix includes it
+        if let spaceIdx = inputText.firstIndex(of: " ") {
+            return inputText.distance(from: inputText.startIndex, to: inputText.index(after: spaceIdx))
+        }
+        // No space yet — the entire text is the command
+        return inputText.count
     }
 
     /// All available commands filtered by current slash input (reads from cache)
@@ -141,10 +175,15 @@ struct PlanChatView: View {
             }
 
             // Interactive detection: markers first, regex fallback
+            // Only show modals when streaming is complete — prevents flickering/resetting
+            // as questions arrive staggered during streaming.
             if let session,
+               session.status != .streaming,
+               session.status != .connecting,
                let lastMsg = session.messages.last,
                lastMsg.role == .assistant,
                !lastMsg.content.isEmpty,
+               !session.isLastBlockSelfAnswered(in: lastMsg.content),
                let markerBlock = session.parseInteractiveMarkers(in: lastMsg.content).first {
                 // Marker-based detection — agent emitted structured markers
                 switch markerBlock {
@@ -179,7 +218,7 @@ struct PlanChatView: View {
                         inputArea
                     }
                 case .questions where !session.questionSeriesDismissed:
-                    if let detectedQuestions = markerBlock.asDetectedQuestions {
+                    if let detectedQuestions = markerBlock.asDetectedQuestions(idGenerator: { session.nextQuestionId() }) {
                         QuestionStepperSheet(
                             questions: detectedQuestions,
                             onComplete: { answers in
@@ -204,6 +243,8 @@ struct PlanChatView: View {
                     inputArea
                 }
             } else if let session,
+               session.status != .streaming,
+               session.status != .connecting,
                !session.optionsDismissed,
                let lastMsg = session.messages.last,
                lastMsg.role == .assistant,
@@ -259,6 +300,8 @@ struct PlanChatView: View {
                 .frame(maxWidth: .infinity)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             } else if let session,
+                      session.status != .streaming,
+                      session.status != .connecting,
                       !session.questionSeriesDismissed,
                       let lastMsg = session.messages.last,
                       lastMsg.role == .assistant,
@@ -527,15 +570,16 @@ struct PlanChatView: View {
             selectedModel: $state.selectedModel,
             session: session,
             isRunning: isRunning,
-            onSend: { prompt in state.sendMessage(prompt) },
+            onSend: { prompt, attachments in state.sendMessage(prompt, attachments: attachments) },
             onCancel: { state.cancel() },
             saveImage: { data in state.saveImage(data: data) },
             ghostText: ghostCompletion,
             workingDirectory: state.repoPath,
+            skillPrefixLength: skillPrefixCharCount,
             onReturnKey: { press in
-                guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
+                guard let ctx = activeSlashContext, !allCommands.isEmpty else { return .ignored }
                 let idx = min(slashPopoverIndex, allCommands.count - 1)
-                inputText = "/\(allCommands[idx]) "
+                inputText.replaceSubrange(ctx.range, with: "/\(allCommands[idx]) ")
                 slashCommandSelected = true
                 return .handled
             },
@@ -546,15 +590,10 @@ struct PlanChatView: View {
                     }
                     return .handled
                 }
-                guard showSlashPopover && !allCommands.isEmpty else { return .ignored }
+                guard let ctx = activeSlashContext, !allCommands.isEmpty else { return .ignored }
                 let idx = min(slashPopoverIndex, allCommands.count - 1)
-                inputText = "/\(allCommands[idx]) "
+                inputText.replaceSubrange(ctx.range, with: "/\(allCommands[idx]) ")
                 slashCommandSelected = true
-                return .handled
-            },
-            onEscapeKey: { _ in
-                guard showSlashPopover else { return .ignored }
-                inputText = ""
                 return .handled
             },
             aboveInput: {
@@ -564,10 +603,14 @@ struct PlanChatView: View {
                         commands: allCommands,
                         filter: "",
                         onSelect: { command in
-                            inputText = "/\(command) "
+                            if let ctx = activeSlashContext {
+                                inputText.replaceSubrange(ctx.range, with: "/\(command) ")
+                            }
                         },
                         onDismiss: {
-                            inputText = ""
+                            if let ctx = activeSlashContext {
+                                inputText.replaceSubrange(ctx.range, with: "")
+                            }
                         },
                         selectedIndex: $slashPopoverIndex
                     )
@@ -646,10 +689,11 @@ struct PlanChatView: View {
         .onChange(of: session?.messages.count) { rebuildHasAssistant() }
         .onDisappear { removeKeyMonitor() }
         .onChange(of: inputText) { oldValue, newValue in
-            if newValue.count < oldValue.count || !newValue.hasPrefix("/") {
+            // Reset slash selection when text shrinks or slash token disappears
+            if newValue.count < oldValue.count || activeSlashContext == nil {
                 slashCommandSelected = false
             }
-            let visible = newValue.hasPrefix("/") && !isRunning && !slashCommandSelected
+            let visible = showSlashPopover
             slashState.isVisible = visible
             slashState.commands = visible ? allCommands : []
             if oldValue.count != newValue.count {
@@ -867,6 +911,9 @@ struct PlanMessageBubble: View {
     let onEdit: (() -> Void)?
     let onDoneEditing: (() -> Void)?
 
+    @State private var isHovered = false
+    @State private var copied = false
+
     init(
         message: ChatMessage,
         isSpec: Bool = false,
@@ -889,6 +936,7 @@ struct PlanMessageBubble: View {
         switch message.role {
         case .user:
             userBubble
+                .contextMenu { copyContextMenu }
         case .assistant:
             VStack(alignment: .leading, spacing: 0) {
                 if isEditing {
@@ -899,22 +947,130 @@ struct PlanMessageBubble: View {
                     assistantBubble
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                if isHovered && !isEditing && !message.content.isEmpty {
+                    copyButton
+                        .padding(.top, -2)
+                        .padding(.trailing, -2)
+                        .transition(.opacity)
+                }
+            }
+            .onHover { isHovered = $0 }
+            .contextMenu { copyContextMenu }
         case .system:
             systemBubble
+                .contextMenu { copyContextMenu }
         }
     }
 
+    private func copyMessageContent() {
+        let content = parsedContent.displayText.isEmpty ? message.content : parsedContent.displayText
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(content, forType: .string)
+        copied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            copied = false
+        }
+    }
+
+    private var copyButton: some View {
+        Button {
+            copyMessageContent()
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 10))
+                Text(copied ? "Copied" : "Copy")
+                    .font(Theme.caption(10))
+            }
+            .foregroundColor(copied ? Theme.Colors.accent : Theme.Colors.textTertiary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var copyContextMenu: some View {
+        Button {
+            copyMessageContent()
+        } label: {
+            Label("Copy Message", systemImage: "doc.on.doc")
+        }
+    }
+
+    /// Parsed display content and document attachments from message content
+    private var parsedContent: (displayText: String, attachments: [(path: String, lineCount: Int)]) {
+        let content = message.content
+        // Fast path: no documents embedded
+        guard content.contains("<document path=") else {
+            return (content, [])
+        }
+
+        var displayText = content
+        var attachments: [(path: String, lineCount: Int)] = []
+
+        // Extract <document path="...">...</document> blocks
+        let pattern = #"\n?<document path="([^"]+)">\n([\s\S]*?)\n</document>"#
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let nsContent = content as NSString
+            let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+
+            for match in matches.reversed() {
+                let pathRange = match.range(at: 1)
+                let bodyRange = match.range(at: 2)
+                let path = nsContent.substring(with: pathRange)
+                let body = nsContent.substring(with: bodyRange)
+                let lines = body.components(separatedBy: "\n").count
+                attachments.insert((path: path, lineCount: lines), at: 0)
+
+                // Remove from display text
+                displayText = (displayText as NSString).replacingCharacters(in: match.range, with: "")
+            }
+        }
+
+        return (displayText.trimmingCharacters(in: .whitespacesAndNewlines), attachments)
+    }
+
     private var userBubble: some View {
-        HStack {
+        // Prefer message.attachments (new flow); fall back to regex parsing (legacy messages)
+        let attachments: [(path: String, lineCount: Int)]
+        let displayText: String
+        if !message.attachments.isEmpty {
+            attachments = message.attachments.map { ($0.path, $0.lineCount) }
+            displayText = message.content
+        } else {
+            let parsed = parsedContent
+            attachments = parsed.attachments
+            displayText = parsed.displayText
+        }
+
+        return HStack {
             Spacer(minLength: 80)
-            Text(message.content)
-                .font(Theme.body(14))
-                .foregroundColor(.white)
-                .textSelection(.enabled)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color(hex: 0x30221f))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .trailing, spacing: 6) {
+                // Main message text
+                if !displayText.isEmpty {
+                    Text(displayText)
+                        .font(Theme.body(14))
+                        .foregroundColor(.white)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color(hex: 0x30221f))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+
+                // Document attachment chips
+                if !attachments.isEmpty {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        ForEach(Array(attachments.enumerated()), id: \.offset) { _, attachment in
+                            DocumentAttachmentChip(path: attachment.path, lineCount: attachment.lineCount)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -998,6 +1154,55 @@ struct PlanMessageBubble: View {
     }
 }
 
+// MARK: - Document Attachment Chip
+
+struct DocumentAttachmentChip: View {
+    let path: String
+    let lineCount: Int
+    @State private var isExpanded = false
+
+    private var fileName: String {
+        (path as NSString).lastPathComponent
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 10))
+                    Text(fileName)
+                        .font(Theme.code(11))
+                        .lineLimit(1)
+                    Text("\(lineCount) lines")
+                        .font(Theme.caption(10))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+                .foregroundColor(Theme.Colors.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(hex: 0x30221f).opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                Text(path)
+                    .font(Theme.code(10))
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+            }
+        }
+    }
+}
 
 // MARK: - Option Buttons Sheet
 
@@ -1599,7 +1804,8 @@ struct QuestionStepperSheet: View {
                     Text(current.context)
                         .font(Theme.body(12))
                         .foregroundColor(Theme.Colors.textSecondary)
-                        .lineLimit(3)
+                        .lineLimit(8)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 // Suggestion buttons

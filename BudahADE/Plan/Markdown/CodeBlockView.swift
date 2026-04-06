@@ -5,6 +5,7 @@ struct CodeBlockView: View {
     let language: String?
 
     @State private var copied = false
+    @State private var highlightedText: AttributedString?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -13,6 +14,12 @@ struct CodeBlockView: View {
         }
         .background(Theme.Colors.sidebarBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onAppear { cacheHighlight() }
+        .onChange(of: code) { cacheHighlight() }
+    }
+
+    private func cacheHighlight() {
+        highlightedText = SyntaxHighlighter.highlight(code, language: language)
     }
 
     private var header: some View {
@@ -45,9 +52,8 @@ struct CodeBlockView: View {
     }
 
     private var codeContent: some View {
-        let highlighted = SyntaxHighlighter.highlight(code, language: language)
-        return ScrollView(.horizontal, showsIndicators: false) {
-            Text(highlighted)
+        ScrollView(.horizontal, showsIndicators: false) {
+            Text(highlightedText ?? AttributedString(code))
                 .font(Theme.code(13))
                 .textSelection(.enabled)
                 .padding(.horizontal, 14)

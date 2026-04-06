@@ -60,7 +60,7 @@ final class CLISubprocessManager: ObservableObject {
         return session
     }
 
-    func send(sessionId: UUID, prompt: String, model: AgentModel? = nil, showInChat: Bool = true) {
+    func send(sessionId: UUID, prompt: String, model: AgentModel? = nil, showInChat: Bool = true, attachments: [DocumentAttachment] = []) {
         let t0 = CFAbsoluteTimeGetCurrent()
         logTiming("[TIMING] T0 send() called")
 
@@ -107,7 +107,7 @@ final class CLISubprocessManager: ObservableObject {
         }
 
         if showInChat {
-            session.addUserMessage(prompt) // Show original prompt in UI
+            session.addUserMessage(prompt, attachments: attachments) // Show original prompt in UI
         }
         session.status = .connecting
         session.currentStreamingText = ""

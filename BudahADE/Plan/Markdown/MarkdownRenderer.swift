@@ -4,7 +4,9 @@ import Markdown
 // MARK: - Data Model
 
 struct MarkdownBlockItem: Identifiable {
-    let id = UUID()
+    /// Stable identity based on position — prevents SwiftUI from destroying/recreating
+    /// all block views when the parsed array is replaced during streaming.
+    let id: Int
     let kind: MarkdownBlock
     let sourceText: String
 }
@@ -91,37 +93,47 @@ struct MarkdownParser {
 private struct BlockWalker: MarkupWalker {
     let source: String
     var blocks: [MarkdownBlockItem] = []
+    private var nextIndex = 0
+
+    init(source: String) {
+        self.source = source
+    }
 
     mutating func visitHeading(_ heading: Heading) {
         let inlines = parseInlines(heading.children)
         let sourceText = extractSource(heading)
-        blocks.append(MarkdownBlockItem(kind: .heading(level: heading.level, inlines: inlines), sourceText: sourceText))
+        blocks.append(MarkdownBlockItem(id: nextIndex, kind: .heading(level: heading.level, inlines: inlines), sourceText: sourceText))
+        nextIndex += 1
     }
 
     mutating func visitParagraph(_ paragraph: Paragraph) {
         let inlines = parseInlines(paragraph.children)
         let sourceText = extractSource(paragraph)
-        blocks.append(MarkdownBlockItem(kind: .paragraph(inlines: inlines), sourceText: sourceText))
+        blocks.append(MarkdownBlockItem(id: nextIndex, kind: .paragraph(inlines: inlines), sourceText: sourceText))
+        nextIndex += 1
     }
 
     mutating func visitCodeBlock(_ codeBlock: CodeBlock) {
         let language = codeBlock.language?.isEmpty == false ? codeBlock.language : nil
         let code = codeBlock.code.hasSuffix("\n") ? String(codeBlock.code.dropLast()) : codeBlock.code
         let sourceText = extractSource(codeBlock)
-        blocks.append(MarkdownBlockItem(kind: .codeBlock(language: language, code: code), sourceText: sourceText))
+        blocks.append(MarkdownBlockItem(id: nextIndex, kind: .codeBlock(language: language, code: code), sourceText: sourceText))
+        nextIndex += 1
     }
 
     mutating func visitUnorderedList(_ unorderedList: UnorderedList) {
         let items = parseListItems(unorderedList.children)
         let sourceText = extractSource(unorderedList)
-        blocks.append(MarkdownBlockItem(kind: .unorderedList(items: items), sourceText: sourceText))
+        blocks.append(MarkdownBlockItem(id: nextIndex, kind: .unorderedList(items: items), sourceText: sourceText))
+        nextIndex += 1
     }
 
     mutating func visitOrderedList(_ orderedList: OrderedList) {
         let items = parseListItems(orderedList.children)
         let start = Int(orderedList.startIndex)
         let sourceText = extractSource(orderedList)
-        blocks.append(MarkdownBlockItem(kind: .orderedList(start: start, items: items), sourceText: sourceText))
+        blocks.append(MarkdownBlockItem(id: nextIndex, kind: .orderedList(start: start, items: items), sourceText: sourceText))
+        nextIndex += 1
     }
 
     mutating func visitTable(_ table: Markdown.Table) {
@@ -139,12 +151,14 @@ private struct BlockWalker: MarkupWalker {
             row.cells.map { cell in parseInlines(cell.children) }
         }
         let sourceText = extractSource(table)
-        blocks.append(MarkdownBlockItem(kind: .table(headers: headers, rows: rows, alignments: alignments), sourceText: sourceText))
+        blocks.append(MarkdownBlockItem(id: nextIndex, kind: .table(headers: headers, rows: rows, alignments: alignments), sourceText: sourceText))
+        nextIndex += 1
     }
 
     mutating func visitThematicBreak(_ thematicBreak: ThematicBreak) {
         let sourceText = extractSource(thematicBreak)
-        blocks.append(MarkdownBlockItem(kind: .thematicBreak, sourceText: sourceText))
+        blocks.append(MarkdownBlockItem(id: nextIndex, kind: .thematicBreak, sourceText: sourceText))
+        nextIndex += 1
     }
 
     private func parseInlines(_ children: some Sequence<Markup>) -> [InlineNode] {
@@ -212,6 +226,7 @@ struct MarkdownRenderer: View {
     @State private var cachedHash: Int = 0
     @State private var cachedStableBlocks: [MarkdownBlockItem] = []
     @State private var cachedStableHash: Int = 0
+    @State private var cachedTail: String = ""
 
     init(_ content: String, isStreaming: Bool = false) {
         self.content = content
@@ -239,7 +254,8 @@ struct MarkdownRenderer: View {
             cachedHash = hash
             cachedBlocks = MarkdownParser.parse(content)
         } else {
-            let (stable, _) = MarkdownParser.splitAtStableBoundary(content)
+            let (stable, tail) = MarkdownParser.splitAtStableBoundary(content)
+            cachedTail = tail
             let stableHash = stable.hashValue
             guard stableHash != cachedStableHash else { return }
             cachedStableHash = stableHash
@@ -249,16 +265,15 @@ struct MarkdownRenderer: View {
 
     @ViewBuilder
     private var streamingContent: some View {
-        let (_, tail) = MarkdownParser.splitAtStableBoundary(content)
-
+        // Use the cached tail from reparseIfNeeded — avoids calling splitAtStableBoundary twice
         if !cachedStableBlocks.isEmpty {
             ForEach(cachedStableBlocks) { block in
                 blockView(for: block)
             }
         }
 
-        if !tail.isEmpty {
-            SwiftUI.Text(tail)
+        if !cachedTail.isEmpty {
+            SwiftUI.Text(cachedTail)
                 .font(Theme.body(14))
                 .foregroundColor(Theme.Colors.textPrimary)
                 .textSelection(.enabled)

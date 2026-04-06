@@ -4,9 +4,9 @@ struct EditableMarkdownRenderer: View {
     @Binding var content: String
     let onDone: () -> Void
 
-    @State private var editingBlockId: UUID?
+    @State private var editingBlockId: Int?
     @State private var editText: String = ""
-    @State private var hoveredBlockId: UUID?
+    @State private var hoveredBlockId: Int?
     @State private var cachedBlocks: [MarkdownBlockItem] = []
     @State private var cachedContentHash: Int = 0
 

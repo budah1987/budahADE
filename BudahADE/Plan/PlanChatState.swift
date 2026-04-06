@@ -212,7 +212,7 @@ final class PlanChatState: ObservableObject {
         return session
     }
 
-    func sendMessage(_ text: String) {
+    func sendMessage(_ text: String, attachments: [DocumentAttachment] = []) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Handle /commands
@@ -247,7 +247,7 @@ final class PlanChatState: ObservableObject {
         // Reset adaptive turn limit — user explicitly wants to continue
         session.isVerifiedComplete = false
         session.hasVerified = false
-        chatManager.send(sessionId: session.id, prompt: text, model: selectedModel)
+        chatManager.send(sessionId: session.id, prompt: text, model: selectedModel, attachments: attachments)
 
         // Track user turn for scrubber
         if let lastUserMsg = session.messages.last(where: { $0.role == .user }) {

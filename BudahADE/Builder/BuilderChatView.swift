@@ -860,11 +860,11 @@ struct BuilderChatView: View {
 
     // MARK: - Actions
 
-    private func sendMessage(_ text: String) {
+    private func sendMessage(_ text: String, attachments: [DocumentAttachment] = []) {
         if let agent = builderAgent {
             agent.sendMessage(text)
         } else {
-            let message = ChatMessage(role: .user, content: text)
+            let message = ChatMessage(role: .user, content: text, attachments: attachments)
             session.messages.append(message)
             session.addTurnMarker(for: message)
         }

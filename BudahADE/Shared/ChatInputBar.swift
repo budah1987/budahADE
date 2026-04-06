@@ -175,7 +175,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
 
     // MARK: - Actions
 
-    var onSend: (String) -> Void
+    var onSend: (String, [DocumentAttachment]) -> Void
     var onCancel: (() -> Void)? = nil
     /// Called to persist image data; returns file path. If nil, clipboard paste is disabled.
     var saveImage: ((Data) -> String?)? = nil
@@ -184,6 +184,8 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
 
     var placeholder: String = "BeepBoopBeep..."
     var ghostText: String? = nil
+    /// When set, the first N characters of inputText are rendered in accent blue (skill prefix like "/grill-me ").
+    var skillPrefixLength: Int = 0
 
     // MARK: - Key event overrides (called before built-in handlers)
 
@@ -204,12 +206,13 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         selectedModel: Binding<AgentModel>,
         session: AgentSession? = nil,
         isRunning: Bool = false,
-        onSend: @escaping (String) -> Void,
+        onSend: @escaping (String, [DocumentAttachment]) -> Void,
         onCancel: (() -> Void)? = nil,
         saveImage: ((Data) -> String?)? = nil,
         placeholder: String = "BeepBoopBeep...",
         ghostText: String? = nil,
         workingDirectory: String? = nil,
+        skillPrefixLength: Int = 0,
         onReturnKey: ((KeyPress) -> KeyPress.Result)? = nil,
         onTabKey: ((KeyPress) -> KeyPress.Result)? = nil,
         @ViewBuilder aboveInput: () -> AboveInput,
@@ -225,6 +228,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         self.placeholder = placeholder
         self.ghostText = ghostText
         self.workingDirectory = workingDirectory
+        self.skillPrefixLength = skillPrefixLength
         self.onReturnKey = onReturnKey
         self.onTabKey = onTabKey
         self.aboveInput = aboveInput()
@@ -237,6 +241,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
     @State private var inputTextHeight: CGFloat = 36
     @State private var pendingImage: NSImage?
     @State private var pendingImagePath: String?
+    @State private var pendingDocuments: [(path: String, relativePath: String, lineCount: Int)] = []
     @State private var showFilePicker: Bool = false
     @State private var showModelMenu: Bool = false
     @State private var showContextMemoryOverlay: Bool = false
@@ -318,7 +323,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
     }
 
     private var canSend: Bool {
-        hasInput || pendingImagePath != nil
+        hasInput || pendingImagePath != nil || !pendingDocuments.isEmpty
     }
 
     private var totalTokens: Int { session?.totalTokens ?? 0 }
@@ -347,6 +352,40 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         mentionGhostText ?? ghostText
     }
 
+    /// Build an attributed string where the already-typed prefix is transparent
+    /// and only the completion tail is visible in a faint color.
+    private func ghostAttributedString(ghost: String, typed: String) -> AttributedString {
+        var attr = AttributedString(ghost)
+        attr.foregroundColor = Theme.Colors.textSecondary.opacity(0.5)
+
+        // Make the typed prefix invisible so only the completion portion shows
+        let typedCount = typed.count
+        if typedCount > 0 && typedCount < ghost.count {
+            let prefixEnd = attr.characters.index(attr.startIndex, offsetBy: typedCount)
+            attr[attr.startIndex..<prefixEnd].foregroundColor = .clear
+        } else if typedCount >= ghost.count {
+            // Ghost matches typed text entirely — hide it all
+            attr.foregroundColor = .clear
+        }
+
+        return attr
+    }
+
+    /// Build an attributed string with the skill prefix in blue and the rest in white.
+    private var skillPrefixAttributedString: AttributedString {
+        let text = inputText
+        var attr = AttributedString(text)
+        let prefixLen = min(skillPrefixLength, text.count)
+        if prefixLen > 0 {
+            let prefixEnd = attr.characters.index(attr.startIndex, offsetBy: prefixLen)
+            attr[attr.startIndex..<prefixEnd].foregroundColor = Theme.Colors.accent
+            if prefixEnd < attr.endIndex {
+                attr[prefixEnd..<attr.endIndex].foregroundColor = .white
+            }
+        }
+        return attr
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Document mention popover — floats above everything
@@ -369,9 +408,12 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
             // Slot: above input (slash popover, pipeline bar, done-state controls)
             aboveInput
 
-            // Pending attachment preview
+            // Pending attachment previews
             if pendingImage != nil || pendingImagePath != nil {
                 attachmentPreview
+            }
+            if !pendingDocuments.isEmpty {
+                documentAttachmentPreview
             }
 
             // Two-bar input container
@@ -571,9 +613,16 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                         .padding(.top, 2)
                         .allowsHitTesting(false)
                 }
+                // Skill prefix overlay — shows "/command " in blue, rest in white
+                if skillPrefixLength > 0, !inputText.isEmpty {
+                    Text(skillPrefixAttributedString)
+                        .font(.system(size: 14))
+                        .padding(.top, 2)
+                        .allowsHitTesting(false)
+                }
                 TextEditor(text: $inputText)
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(hasInput ? 1.0 : 0.4))
+                    .foregroundColor(skillPrefixLength > 0 ? .clear : .white.opacity(hasInput ? 1.0 : 0.4))
                     .frame(height: min(max(inputTextHeight + 10, 36), 200))
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
@@ -742,6 +791,44 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         .padding(.top, 8)
     }
 
+    private var documentAttachmentPreview: some View {
+        HStack(spacing: 6) {
+            ForEach(Array(pendingDocuments.enumerated()), id: \.offset) { index, doc in
+                HStack(spacing: 5) {
+                    Image(systemName: iconForFile(doc.relativePath))
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                    Text((doc.relativePath as NSString).lastPathComponent)
+                        .font(Theme.code(11))
+                        .foregroundColor(Theme.Colors.textSecondary)
+                        .lineLimit(1)
+                    Text("\(doc.lineCount) lines")
+                        .font(Theme.caption(9))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                    Button {
+                        pendingDocuments.remove(at: index)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                )
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 6)
+    }
+
     private func iconForFile(_ path: String) -> String {
         let ext = (path as NSString).pathExtension.lowercased()
         switch ext {
@@ -764,9 +851,19 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
 
         var prompt = trimmed
 
-        // Expand @file mentions to include file contents
+        // Expand any remaining @file mentions in text (legacy inline mentions)
         if let dir = workingDirectory {
             prompt = expandMentions(in: prompt, rootPath: dir)
+        }
+
+        // Append pending document contents for the agent (not shown in UI)
+        var attachments: [DocumentAttachment] = []
+        for doc in pendingDocuments {
+            if let data = FileManager.default.contents(atPath: doc.path),
+               let content = String(data: data, encoding: .utf8) {
+                prompt += "\n<document path=\"\(doc.relativePath)\">\n\(content)\n</document>"
+                attachments.append(DocumentAttachment(path: doc.relativePath, lineCount: doc.lineCount))
+            }
         }
 
         if let imagePath = pendingImagePath {
@@ -776,8 +873,9 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         inputText = ""
         pendingImage = nil
         pendingImagePath = nil
+        pendingDocuments = []
 
-        onSend(prompt)
+        onSend(prompt, attachments)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             inputFocused = true
@@ -881,10 +979,10 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
     }
 
     private func completeMention(_ item: FileMentionItem) {
-        guard let ctx = activeMentionContext else { return }
-        // Replace the @query with @relativePath followed by a space
+        guard let ctx = activeMentionContext, let dir = workingDirectory else { return }
+        // Remove the @query from text
         var newText = inputText
-        newText.replaceSubrange(ctx.range, with: "@\(item.relativePath) ")
+        newText.replaceSubrange(ctx.range, with: "")
         inputText = newText
         mentionDismissed = false
         mentionPopoverIndex = 0
@@ -945,12 +1043,13 @@ extension ChatInputBar where AboveInput == EmptyView, TopBarExtras == EmptyView 
         selectedModel: Binding<AgentModel>,
         session: AgentSession? = nil,
         isRunning: Bool = false,
-        onSend: @escaping (String) -> Void,
+        onSend: @escaping (String, [DocumentAttachment]) -> Void,
         onCancel: (() -> Void)? = nil,
         saveImage: ((Data) -> String?)? = nil,
         placeholder: String = "BeepBoopBeep...",
         ghostText: String? = nil,
         workingDirectory: String? = nil,
+        skillPrefixLength: Int = 0,
         onReturnKey: ((KeyPress) -> KeyPress.Result)? = nil,
         onTabKey: ((KeyPress) -> KeyPress.Result)? = nil
     ) {
@@ -964,6 +1063,7 @@ extension ChatInputBar where AboveInput == EmptyView, TopBarExtras == EmptyView 
         self.placeholder = placeholder
         self.ghostText = ghostText
         self.workingDirectory = workingDirectory
+        self.skillPrefixLength = skillPrefixLength
         self.onReturnKey = onReturnKey
         self.onTabKey = onTabKey
         self.aboveInput = EmptyView()

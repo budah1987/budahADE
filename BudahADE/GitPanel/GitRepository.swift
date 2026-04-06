@@ -40,6 +40,136 @@ enum GitError: Error, LocalizedError {
     }
 }
 
+// MARK: - Git Snapshot (captured off main thread)
+
+/// Immutable snapshot of git state, captured entirely on a background thread
+/// so that no Process.waitUntilExit() blocks the main actor.
+struct GitSnapshot: Sendable {
+    let staged: [GitFileStatus]
+    let unstaged: [GitFileStatus]
+    let branch: String
+    let branches: [String]
+    let commits: [GitCommit]
+    let hasRemote: Bool
+    let aheadCount: Int
+    let behindCount: Int
+    let forkPointHash: String?
+    let totalCommitCount: Int
+
+    /// Run all git commands synchronously on the CALLING thread (must be background).
+    static func capture(repoPath: String, mergeTarget: String) -> GitSnapshot {
+        func run(_ args: [String]) -> String? {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = args
+            process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            do {
+                try process.run()
+                process.waitUntilExit()
+            } catch { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // --- parseStatus ---
+        var staged: [GitFileStatus] = []
+        var unstaged: [GitFileStatus] = []
+        if let output = run(["status", "--porcelain=v2"]) {
+            for line in output.components(separatedBy: "\n") where !line.isEmpty {
+                if line.hasPrefix("1 ") || line.hasPrefix("2 ") {
+                    let parts = line.components(separatedBy: " ")
+                    guard parts.count >= 9 else { continue }
+                    let xy = parts[1]
+                    let filePath: String
+                    if line.hasPrefix("2 ") {
+                        let pathParts = parts[9...].joined(separator: " ")
+                        filePath = pathParts.components(separatedBy: "\t").first ?? pathParts
+                    } else {
+                        filePath = parts[8...].joined(separator: " ")
+                    }
+                    let xIndex = xy.startIndex
+                    let yIndex = xy.index(after: xIndex)
+                    let x = String(xy[xIndex])
+                    let y = String(xy[yIndex])
+                    if x != "." { staged.append(GitFileStatus(status: mapChar(x), path: filePath)) }
+                    if y != "." { unstaged.append(GitFileStatus(status: mapChar(y), path: filePath)) }
+                } else if line.hasPrefix("? ") {
+                    unstaged.append(GitFileStatus(status: "?", path: String(line.dropFirst(2))))
+                }
+            }
+        }
+
+        // --- parseBranches ---
+        let branch = run(["rev-parse", "--abbrev-ref", "HEAD"])?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let branchList: [String] = (run(["branch", "-a", "--sort=-committerdate"]) ?? "")
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.hasPrefix("* ") ? String($0.dropFirst(2)) : $0 }
+            .filter { !$0.isEmpty && !$0.contains("->") }
+
+        // --- parseLog ---
+        let commits: [GitCommit] = (run(["log", "--oneline", "-10", "--format=%H|||%s|||%an|||%ar"]) ?? "")
+            .components(separatedBy: "\n")
+            .filter { !$0.isEmpty }
+            .compactMap { line -> GitCommit? in
+                let parts = line.components(separatedBy: "|||")
+                guard parts.count == 4 else { return nil }
+                return GitCommit(id: parts[0], message: parts[1], author: parts[2], date: parts[3])
+            }
+
+        // --- parseRemoteStatus ---
+        let hasRemote = run(["remote", "get-url", "origin"]) != nil
+        var aheadCount = 0
+        if hasRemote, !branch.isEmpty {
+            if let output = run(["rev-list", "--count", "origin/\(branch)..HEAD"]) {
+                aheadCount = Int(output) ?? 0
+            } else if let output = run(["rev-list", "--count", "HEAD"]) {
+                aheadCount = Int(output) ?? 0
+            }
+        }
+
+        // --- parseMergeInfo ---
+        var behindCount = 0
+        var forkPointHash: String?
+        var totalCommitCount = 0
+        if !mergeTarget.isEmpty, !branch.isEmpty {
+            if let output = run(["rev-list", "--count", "HEAD..\(mergeTarget)"]) {
+                behindCount = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            }
+        }
+        if !mergeTarget.isEmpty {
+            if let output = run(["merge-base", "HEAD", mergeTarget]) {
+                forkPointHash = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        if let output = run(["rev-list", "--count", "HEAD"]) {
+            totalCommitCount = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        }
+
+        return GitSnapshot(
+            staged: staged, unstaged: unstaged, branch: branch, branches: branchList,
+            commits: commits, hasRemote: hasRemote, aheadCount: aheadCount,
+            behindCount: behindCount, forkPointHash: forkPointHash, totalCommitCount: totalCommitCount
+        )
+    }
+
+    private static func mapChar(_ c: String) -> String {
+        switch c {
+        case "M": return "M"
+        case "A": return "A"
+        case "D": return "D"
+        case "R": return "R"
+        case "C": return "C"
+        case "?": return "?"
+        default:  return c
+        }
+    }
+}
+
 // MARK: - Git Repository
 
 @MainActor
@@ -73,7 +203,7 @@ final class GitRepository: ObservableObject {
 
     init(path: String) {
         self.path = path
-        refresh()
+        Task { await refreshAsync() }
     }
 
     // MARK: - Polling (adaptive)
@@ -105,14 +235,22 @@ final class GitRepository: ObservableObject {
         diffCache.removeAll()
     }
 
-    // MARK: - Refresh (debounced)
+    // MARK: - Refresh (async, off main thread)
 
+    /// Synchronous refresh — kept for backward compat in fire-and-forget callers.
+    /// Prefer `refreshAsync()` to avoid blocking the main actor.
     func refresh() {
-        parseStatus()
-        parseBranches()
-        parseLog()
-        parseRemoteStatus()
-        parseMergeInfo()
+        Task { await refreshAsync() }
+    }
+
+    /// Async refresh — runs all git commands off the main thread, then applies results.
+    func refreshAsync() async {
+        let repoPath = path
+        let currentMergeTarget = mergeTarget
+        let snapshot = await Task.detached(priority: .userInitiated) {
+            GitSnapshot.capture(repoPath: repoPath, mergeTarget: currentMergeTarget)
+        }.value
+        applySnapshot(snapshot)
     }
 
     /// Debounced refresh — collapses rapid sequential calls (e.g. staging 10 files)
@@ -121,7 +259,7 @@ final class GitRepository: ObservableObject {
         refreshDebounceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
             guard !Task.isCancelled else { return }
-            self?.refresh()
+            await self?.refreshAsync()
         }
     }
 
@@ -195,7 +333,7 @@ final class GitRepository: ObservableObject {
         if result.contains("error") || result.contains("fatal") {
             throw GitError.commandFailed(result)
         }
-        await MainActor.run { refresh() }
+        await refreshAsync()
     }
 
     // MARK: - Merge
@@ -219,7 +357,7 @@ final class GitRepository: ObservableObject {
 
         // Switch back
         _ = try? await runGitAsync(["checkout", branchToMerge])
-        await MainActor.run { refresh() }
+        await refreshAsync()
     }
 
     // MARK: - Open PR in Browser
@@ -510,7 +648,7 @@ final class GitRepository: ObservableObject {
         if result.contains("error") || result.contains("CONFLICT") {
             throw GitError.commandFailed(result)
         }
-        await MainActor.run { refresh() }
+        await refreshAsync()
     }
 
     func cherryPickCommit(_ hash: String, onto branch: String) async throws {
@@ -529,7 +667,7 @@ final class GitRepository: ObservableObject {
             throw error
         }
         _ = try? await runGitAsync(["checkout", originalBranch])
-        await MainActor.run { refresh() }
+        await refreshAsync()
     }
 
     func filesChangedInCommit(_ hash: String) -> [GitFileStatus] {
@@ -622,6 +760,20 @@ final class GitRepository: ObservableObject {
     static func listBranches(at repoPath: String) async -> [String] {
         let grouped = await listBranchesGrouped(at: repoPath)
         return grouped.local + grouped.remote
+    }
+
+    /// Apply a snapshot captured on a background thread to @Published properties.
+    private func applySnapshot(_ s: GitSnapshot) {
+        if stagedFiles != s.staged { stagedFiles = s.staged }
+        if unstagedFiles != s.unstaged { unstagedFiles = s.unstaged }
+        if currentBranch != s.branch { currentBranch = s.branch }
+        if branches != s.branches { branches = s.branches }
+        if recentCommits.map(\.id) != s.commits.map(\.id) { recentCommits = s.commits }
+        if hasRemote != s.hasRemote { hasRemote = s.hasRemote }
+        if aheadCount != s.aheadCount { aheadCount = s.aheadCount }
+        if behindCount != s.behindCount { behindCount = s.behindCount }
+        if forkPointHash != s.forkPointHash { forkPointHash = s.forkPointHash }
+        if totalCommitCount != s.totalCommitCount { totalCommitCount = s.totalCommitCount }
     }
 
     // MARK: - Private

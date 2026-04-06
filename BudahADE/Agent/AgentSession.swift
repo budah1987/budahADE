@@ -216,10 +216,24 @@ final class AgentSession: ObservableObject, Identifiable {
         return result
     }
 
-    func addUserMessage(_ content: String) {
+    func addUserMessage(_ content: String, attachments: [DocumentAttachment] = []) {
+        // Strip <document> blocks from display when attachments are provided separately
+        var displayContent = content
+        if !attachments.isEmpty {
+            let pattern = #"\n?<document path="[^"]*">\n[\s\S]*?\n</document>"#
+            if let regex = try? NSRegularExpression(pattern: pattern) {
+                displayContent = regex.stringByReplacingMatches(
+                    in: displayContent,
+                    range: NSRange(location: 0, length: (displayContent as NSString).length),
+                    withTemplate: ""
+                )
+            }
+            displayContent = displayContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         let message = ChatMessage(
             role: .user,
-            content: content
+            content: displayContent,
+            attachments: attachments
         )
         messages.append(message)
         bumpScroll()
@@ -278,7 +292,7 @@ final class AgentSession: ObservableObject, Identifiable {
     /// Whether a flush is already scheduled
     private var flushScheduled: Bool = false
     /// Throttle interval for streaming text updates (seconds)
-    private let streamingFlushInterval: TimeInterval = 0.08
+    private let streamingFlushInterval: TimeInterval = 0.15
 
     func handleContentDelta(_ text: String) {
         streamingBuffer += text
@@ -510,45 +524,66 @@ final class AgentSession: ObservableObject, Identifiable {
     // MARK: - Question Series Detection
 
     struct DetectedQuestionItem: Identifiable {
-        let id: Int
+        let id: String
         let question: String        // Bold question text
         let context: String          // Regular text with suggested answers
         let suggestions: [String]    // Parsed answer suggestions from context
     }
 
+    /// Global counter for unique question IDs across all detection calls in this session
+    private var questionIdCounter = 0
+    func nextQuestionId() -> String {
+        questionIdCounter += 1
+        return "q-\(questionIdCounter)"
+    }
+
     /// Detects a numbered series of questions (e.g. "Key Questions" list).
     /// Pattern: `1. **Bold question?** Regular text with Or alternatives`
+    /// Also captures continuation lines (non-numbered, non-empty) as additional context.
     func detectQuestionSeries(in text: String) -> [DetectedQuestionItem]? {
         let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
 
-        var items: [DetectedQuestionItem] = []
-
-        for line in lines {
+        // First pass: find question header lines and their indices
+        var questionIndices: [(index: Int, question: String, inlineContext: String)] = []
+        for (idx, line) in lines.enumerated() {
             let range = NSRange(line.startIndex..<line.endIndex, in: line)
             guard let match = Self.questionSeriesRegex.firstMatch(in: line, range: range),
                   let questionRange = Range(match.range(at: 2), in: line) else { continue }
 
             let question = String(line[questionRange]).trimmingCharacters(in: .whitespaces)
-            let context: String
+            let inlineContext: String
             if let contextRange = Range(match.range(at: 3), in: line) {
-                context = String(line[contextRange]).trimmingCharacters(in: .whitespaces)
+                inlineContext = String(line[contextRange]).trimmingCharacters(in: .whitespaces)
             } else {
-                context = ""
+                inlineContext = ""
             }
+            questionIndices.append((idx, question, inlineContext))
+        }
 
-            // Parse suggestions: split by " or " and "? Or " patterns
-            let suggestions = parseAnswerSuggestions(from: context)
+        guard questionIndices.count >= 2 else { return nil }
+
+        // Second pass: collect continuation lines between questions as context
+        var items: [DetectedQuestionItem] = []
+        for (qi, entry) in questionIndices.enumerated() {
+            let nextStart = qi + 1 < questionIndices.count ? questionIndices[qi + 1].index : lines.count
+            // Gather non-empty continuation lines after the question header
+            var contextParts: [String] = []
+            if !entry.inlineContext.isEmpty { contextParts.append(entry.inlineContext) }
+            for li in (entry.index + 1)..<nextStart {
+                let continuationLine = lines[li]
+                if !continuationLine.isEmpty { contextParts.append(continuationLine) }
+            }
+            let fullContext = contextParts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            let suggestions = parseAnswerSuggestions(from: fullContext)
 
             items.append(DetectedQuestionItem(
-                id: items.count,
-                question: question,
-                context: context,
+                id: nextQuestionId(),
+                question: entry.question,
+                context: fullContext,
                 suggestions: suggestions
             ))
         }
 
-        // Need at least 2 questions to be a "series"
-        guard items.count >= 2 else { return nil }
         return items
     }
 
@@ -608,14 +643,15 @@ final class AgentSession: ObservableObject, Identifiable {
             }
         }
 
-        /// Convert `.questions` to `[DetectedQuestionItem]` for QuestionStepperSheet
-        var asDetectedQuestions: [DetectedQuestionItem]? {
+        /// Convert `.questions` to `[DetectedQuestionItem]` for QuestionStepperSheet.
+        /// Use `AgentSession.detectedQuestions(from:)` for globally unique IDs.
+        func asDetectedQuestions(idGenerator: () -> String) -> [DetectedQuestionItem]? {
             guard case .questions(let items) = self, !items.isEmpty else { return nil }
-            return items.enumerated().map { idx, item in
+            return items.map { item in
                 DetectedQuestionItem(
-                    id: idx,
+                    id: idGenerator(),
                     question: item.question,
-                    context: "",
+                    context: item.context,
                     suggestions: item.options
                 )
             }
@@ -624,6 +660,7 @@ final class AgentSession: ObservableObject, Identifiable {
 
     struct MarkerQuestionItem {
         let question: String
+        let context: String    // Non-bold, non-option lines between question and next question/options
         let options: [String]
     }
 
@@ -671,23 +708,36 @@ final class AgentSession: ObservableObject, Identifiable {
                 case "questions":
                     var items: [MarkerQuestionItem] = []
                     var currentQuestion: String?
+                    var currentContext: [String] = []
                     var currentOptions: [String] = []
 
                     for bl in blockLines {
                         if let qMatch = bl.firstMatch(of: Self.boldLinePattern) {
                             // Save previous question group
                             if let q = currentQuestion {
-                                items.append(MarkerQuestionItem(question: q, options: currentOptions))
+                                items.append(MarkerQuestionItem(
+                                    question: q,
+                                    context: currentContext.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines),
+                                    options: currentOptions
+                                ))
                             }
                             currentQuestion = String(qMatch.1)
+                            currentContext = []
                             currentOptions = []
                         } else if let oMatch = bl.firstMatch(of: Self.optionMarkerPattern) {
                             currentOptions.append(String(oMatch.1))
+                        } else if !bl.isEmpty && currentQuestion != nil {
+                            // Non-bold, non-option line → context
+                            currentContext.append(bl)
                         }
                     }
                     // Save last question group
                     if let q = currentQuestion {
-                        items.append(MarkerQuestionItem(question: q, options: currentOptions))
+                        items.append(MarkerQuestionItem(
+                            question: q,
+                            context: currentContext.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines),
+                            options: currentOptions
+                        ))
                     }
                     if !items.isEmpty {
                         blocks.append(.questions(items))
@@ -700,6 +750,20 @@ final class AgentSession: ObservableObject, Identifiable {
         }
 
         return blocks
+    }
+
+    /// Check if the last interactive block in the text was followed by a substantive response
+    /// (indicating the agent answered its own question). Returns true if self-answered.
+    func isLastBlockSelfAnswered(in text: String) -> Bool {
+        // Find the last <!-- /INTERACTIVE --> marker
+        guard let closeRange = text.range(of: "<!-- /INTERACTIVE -->", options: .backwards) else {
+            return false
+        }
+        let afterClose = text[closeRange.upperBound...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // If there's substantial text after the last close marker, agent answered itself
+        // Threshold: more than 40 chars of non-whitespace content = substantive answer
+        return afterClose.count > 40
     }
 
     /// Strip all interactive markers from text for clean display/storage.
