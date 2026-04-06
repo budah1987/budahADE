@@ -73,6 +73,8 @@ struct BuilderChatView: View {
     var onEditSpec: (() -> Void)?
     /// Git branch name — shown in spec header
     var branchName: String? = nil
+    /// Working directory for @ mention file scanning
+    var workingDirectory: String? = nil
     /// Whether this view is currently visible — when false, renders a lightweight placeholder
     /// to avoid expensive body evaluation while hidden behind opacity(0)
     var isVisible: Bool = true
@@ -329,6 +331,7 @@ struct BuilderChatView: View {
                     isRunning: isRunning,
                     onSend: sendMessage,
                     placeholder: "Talk to the builder…",
+                    workingDirectory: workingDirectory,
                     aboveInput: {
                         // Done state: Review Diff + Commit buttons
                         if session.buildState == .done {
