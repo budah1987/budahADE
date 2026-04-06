@@ -8,12 +8,24 @@ import Combine
 /// and keeps BuilderSession in sync with agent state.
 @MainActor
 final class BuilderAgent: ObservableObject {
+
+    // MARK: - Cached Regexes
+
+    private static let markerRegexes: [NSRegularExpression] = [
+        try! NSRegularExpression(pattern: "<!-- STEP_START:\\d+ -->"),
+        try! NSRegularExpression(pattern: "<!-- STEP_DONE:\\d+ -->"),
+        try! NSRegularExpression(pattern: "<!-- STEP_FAIL:\\d+ -->"),
+        try! NSRegularExpression(pattern: "<!-- SUBTASK:\\d+\\.\\d+:\\w+ -->"),
+        try! NSRegularExpression(pattern: "<!-- BUILD_COMPLETE -->"),
+    ]
+
     let builderSession: BuilderSession
     let chatManager: CLISubprocessManager
     let stepTracker = BuildStepTracker()
 
     private(set) var agentSession: AgentSession?
     private var statusObserver: AnyCancellable?
+    private var hasSentContinuation = false
 
     init(builderSession: BuilderSession, chatManager: CLISubprocessManager) {
         self.builderSession = builderSession
@@ -72,6 +84,9 @@ final class BuilderAgent: ObservableObject {
 
         // Send initial prompt to begin building
         chatManager.send(sessionId: session.id, prompt: "Begin building. Start with step 0.")
+
+        // Register auto-continuation handler
+        registerContinuationHandler(for: session.id)
     }
 
     // MARK: - Send User Message
@@ -85,8 +100,9 @@ final class BuilderAgent: ObservableObject {
         builderSession.messages.append(userMessage)
         builderSession.addTurnMarker(for: userMessage)
 
-        // Forward to agent
+        hasSentContinuation = false
         chatManager.send(sessionId: session.id, prompt: text)
+        registerContinuationHandler(for: session.id)
     }
 
     // MARK: - Pause / Resume / Cancel
@@ -101,8 +117,10 @@ final class BuilderAgent: ObservableObject {
         guard let session = agentSession else { return }
         builderSession.buildState = .building
         resetLoopFlag()
+        hasSentContinuation = false
         let stepIdx = builderSession.activeStepIndex ?? 0
         chatManager.send(sessionId: session.id, prompt: "Resume building. Continue from step \(stepIdx).")
+        registerContinuationHandler(for: session.id)
     }
 
     func cancel() {
@@ -145,13 +163,52 @@ final class BuilderAgent: ObservableObject {
         // Check for loop detection warnings
         checkLoopDetection()
 
-        // Detect completion
-        if session.status == .done && builderSession.buildState == .building {
-            // Agent finished a turn — check if all steps done
-            if builderSession.steps.allSatisfy({ $0.state == .done || $0.state == .skipped }) {
-                builderSession.buildState = .done
-            }
+        // Reset continuation guard when a new turn starts
+        if session.status == .streaming || session.status == .connecting {
+            hasSentContinuation = false
         }
+    }
+
+    // MARK: - Auto-Continuation
+
+    /// Register a one-shot handler that auto-continues the build when a turn completes.
+    /// Re-registers itself after each continuation to handle multi-turn builds.
+    private func registerContinuationHandler(for sessionId: UUID) {
+        chatManager.onComplete(sessionId: sessionId) { [weak self] completedId in
+            self?.handleTurnCompletion(sessionId: completedId)
+        }
+    }
+
+    private func handleTurnCompletion(sessionId: UUID) {
+        guard let session = agentSession,
+              session.id == sessionId,
+              builderSession.buildState == .building else { return }
+
+        // All steps done — mark build complete
+        if builderSession.steps.allSatisfy({ $0.state == .done || $0.state == .skipped }) {
+            builderSession.buildState = .done
+            return
+        }
+
+        // Agent asked a question — wait for user to respond
+        if let lastMsg = session.messages.last,
+           lastMsg.role == .assistant,
+           !lastMsg.content.isEmpty,
+           (session.cachedHasConfirm(for: lastMsg) ||
+            session.detectOptions(in: lastMsg.content) != nil ||
+            session.detectQuestionSeries(in: lastMsg.content) != nil) {
+            return
+        }
+
+        // Prevent double-send
+        guard !hasSentContinuation else { return }
+        hasSentContinuation = true
+
+        let stepIdx = builderSession.activeStepIndex ?? 0
+        chatManager.send(sessionId: session.id, prompt: "Continue building. Proceed with step \(stepIdx).")
+
+        // Re-register for the next turn completion (one-shot handler)
+        registerContinuationHandler(for: session.id)
     }
 
     // MARK: - Loop Detection
@@ -199,21 +256,12 @@ final class BuilderAgent: ObservableObject {
     /// Strip step markers from text for display
     private func stripMarkers(_ text: String) -> String {
         var result = text
-        let patterns = [
-            "<!-- STEP_START:\\d+ -->",
-            "<!-- STEP_DONE:\\d+ -->",
-            "<!-- STEP_FAIL:\\d+ -->",
-            "<!-- SUBTASK:\\d+\\.\\d+:\\w+ -->",
-            "<!-- BUILD_COMPLETE -->"
-        ]
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern) {
-                result = regex.stringByReplacingMatches(
-                    in: result,
-                    range: NSRange(result.startIndex..., in: result),
-                    withTemplate: ""
-                )
-            }
+        for regex in Self.markerRegexes {
+            result = regex.stringByReplacingMatches(
+                in: result,
+                range: NSRange(result.startIndex..., in: result),
+                withTemplate: ""
+            )
         }
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
