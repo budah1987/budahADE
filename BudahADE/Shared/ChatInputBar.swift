@@ -249,6 +249,8 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
     @State private var mentionDismissed: Bool = false
     @State private var cachedMentionFiles: [FileMentionItem] = []
     @State private var mentionKeyMonitor: Any?
+    /// Current folder being browsed in the mention popover (relative to workingDirectory, "" = root)
+    @State private var mentionBrowsePath: String = ""
 
     /// Finds the active `@query` token at the end of the current input.
     /// Returns the query text (after `@`) and the range of the full `@query` token, or nil if not in a mention context.
@@ -280,9 +282,20 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         activeMentionContext != nil && !isRunning && !filteredMentionItems.isEmpty
     }
 
-    /// Mention items filtered by current query
+    /// Whether we're in browse mode (no query typed) vs search mode (query typed)
+    private var isBrowseMode: Bool {
+        guard let ctx = activeMentionContext else { return false }
+        return ctx.query.isEmpty
+    }
+
+    /// Mention items filtered by current query, or directory listing in browse mode
     private var filteredMentionItems: [FileMentionItem] {
-        guard let ctx = activeMentionContext else { return [] }
+        guard let ctx = activeMentionContext, let dir = workingDirectory else { return [] }
+        if ctx.query.isEmpty {
+            // Browse mode — show contents of current browse directory
+            return DocumentMentionScanner.listDirectory(rootPath: dir, subPath: mentionBrowsePath)
+        }
+        // Search mode — global fuzzy search across all cached files
         return DocumentMentionScanner.filter(cachedMentionFiles, query: ctx.query)
     }
 
@@ -342,7 +355,10 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                     items: filteredMentionItems,
                     filter: activeMentionContext?.query ?? "",
                     onSelect: { item in completeMention(item) },
+                    onFolderOpen: { folder in openMentionFolder(folder) },
                     onDismiss: { mentionDismissed = true },
+                    browsePath: mentionBrowsePath,
+                    onBrowseBack: { mentionBrowseBack() },
                     selectedIndex: $mentionPopoverIndex
                 )
                 .padding(.horizontal, 14)
@@ -451,9 +467,10 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
             scanMentionFilesIfNeeded()
         }
         .onChange(of: inputText) { oldValue, newValue in
-            // Reset mention dismiss when @ context changes
+            // Reset mention dismiss and browse when @ context changes
             if !newValue.contains("@") {
                 mentionDismissed = false
+                mentionBrowsePath = ""
             } else if oldValue.count != newValue.count && activeMentionContext != nil {
                 // User is typing after @, reset dismiss and reset selection
                 mentionDismissed = false
@@ -587,7 +604,12 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                             let items = filteredMentionItems
                             let idx = min(mentionPopoverIndex, items.count - 1)
                             if idx < items.count {
-                                completeMention(items[idx])
+                                let item = items[idx]
+                                if item.isDirectory && isBrowseMode {
+                                    openMentionFolder(item)
+                                } else {
+                                    completeMention(item)
+                                }
                                 return .handled
                             }
                         }
@@ -603,7 +625,12 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                             let items = filteredMentionItems
                             let idx = min(mentionPopoverIndex, items.count - 1)
                             if idx < items.count {
-                                completeMention(items[idx])
+                                let item = items[idx]
+                                if item.isDirectory && isBrowseMode {
+                                    openMentionFolder(item)
+                                } else {
+                                    completeMention(item)
+                                }
                                 return .handled
                             }
                         }
@@ -615,6 +642,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                     .onKeyPress(.escape, phases: .down) { _ in
                         if showMentionPopover {
                             mentionDismissed = true
+                            mentionBrowsePath = ""
                             return .handled
                         }
                         return .ignored
@@ -860,12 +888,27 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         inputText = newText
         mentionDismissed = false
         mentionPopoverIndex = 0
+        mentionBrowsePath = ""
+    }
+
+    private func openMentionFolder(_ folder: FileMentionItem) {
+        guard folder.isDirectory else { return }
+        mentionBrowsePath = folder.relativePath
+        mentionPopoverIndex = 0
+    }
+
+    private func mentionBrowseBack() {
+        if mentionBrowsePath.isEmpty { return }
+        // Go up one directory level
+        let parent = (mentionBrowsePath as NSString).deletingLastPathComponent
+        mentionBrowsePath = parent == "." ? "" : parent
+        mentionPopoverIndex = 0
     }
 
     private func installMentionKeyMonitor() {
         guard workingDirectory != nil else { return }
         let ms = mentionState
-        mentionKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+        mentionKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
             guard ms.isVisible else { return event }
             switch Int(event.keyCode) {
             case 126: // up arrow
@@ -874,6 +917,12 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
             case 125: // down arrow
                 DispatchQueue.main.async { ms.moveDown() }
                 return nil
+            case 51: // delete/backspace — go back one folder when browsing and query is empty
+                if !self.mentionBrowsePath.isEmpty && self.isBrowseMode {
+                    DispatchQueue.main.async { self.mentionBrowseBack() }
+                    return nil
+                }
+                return event
             default:
                 return event
             }

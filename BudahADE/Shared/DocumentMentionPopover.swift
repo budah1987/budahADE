@@ -25,7 +25,12 @@ struct DocumentMentionPopover: View {
     let items: [FileMentionItem]
     let filter: String
     let onSelect: (FileMentionItem) -> Void
+    let onFolderOpen: (FileMentionItem) -> Void
     let onDismiss: () -> Void
+    /// Current browse path relative to root (empty = root)
+    var browsePath: String = ""
+    /// Called when user clicks the back breadcrumb
+    var onBrowseBack: (() -> Void)? = nil
     @Binding var selectedIndex: Int
 
     var body: some View {
@@ -33,6 +38,41 @@ struct DocumentMentionPopover: View {
             EmptyView()
         } else {
             VStack(alignment: .leading, spacing: 0) {
+                // Breadcrumb bar — shows current folder path when browsing
+                if !browsePath.isEmpty {
+                    HStack(spacing: 4) {
+                        Button {
+                            onBrowseBack?()
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 9, weight: .semibold))
+                                Text("back")
+                                    .font(Theme.caption(10))
+                            }
+                            .foregroundColor(Theme.Colors.accent)
+                        }
+                        .buttonStyle(.plain)
+
+                        Text("/")
+                            .font(Theme.code(10))
+                            .foregroundColor(Theme.Colors.textTertiary)
+
+                        Text(browsePath)
+                            .font(Theme.code(10))
+                            .foregroundColor(Theme.Colors.textSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Theme.Colors.surface.opacity(0.5))
+
+                    Rectangle().fill(Theme.Colors.borderSubtle).frame(height: 0.5)
+                }
+
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
@@ -40,7 +80,16 @@ struct DocumentMentionPopover: View {
                                 MentionRow(
                                     item: item,
                                     isSelected: index == selectedIndex,
-                                    onSelect: { onSelect(item) }
+                                    onSelect: {
+                                        onSelect(item)
+                                    },
+                                    onDoubleClick: {
+                                        if item.isDirectory {
+                                            onFolderOpen(item)
+                                        } else {
+                                            onSelect(item)
+                                        }
+                                    }
                                 )
                                 .id(index)
                             }
@@ -68,6 +117,12 @@ struct DocumentMentionPopover: View {
                     HStack(spacing: 3) {
                         MentionKeyHint("⏎")
                         Text("select")
+                    }
+                    if !browsePath.isEmpty {
+                        HStack(spacing: 3) {
+                            MentionKeyHint("⌫")
+                            Text("back")
+                        }
                     }
                     HStack(spacing: 3) {
                         MentionKeyHint("esc")
@@ -117,51 +172,60 @@ private struct MentionRow: View {
     let item: FileMentionItem
     let isSelected: Bool
     let onSelect: () -> Void
+    let onDoubleClick: () -> Void
 
     @State private var isHovered = false
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 8) {
-                Image(systemName: item.icon)
-                    .font(.system(size: 11))
-                    .foregroundColor(item.iconColor)
-                    .frame(width: 16)
+        HStack(spacing: 8) {
+            Image(systemName: item.icon)
+                .font(.system(size: 11))
+                .foregroundColor(item.iconColor)
+                .frame(width: 16)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(item.name)
-                        .font(Theme.body(13))
-                        .foregroundColor(Theme.Colors.textPrimary)
-                        .lineLimit(1)
-                    Text(item.relativePath)
-                        .font(Theme.code(10))
-                        .foregroundColor(Theme.Colors.textTertiary)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.name)
+                    .font(Theme.body(13))
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .lineLimit(1)
+                Text(item.relativePath)
+                    .font(Theme.code(10))
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+            }
 
-                Spacer()
+            Spacer()
 
-                if item.isDirectory {
-                    Text("dir")
+            if item.isDirectory {
+                HStack(spacing: 4) {
+                    Text("folder")
                         .font(Theme.caption(10))
                         .foregroundColor(Theme.Colors.textTertiary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Theme.Colors.hoverFill)
-                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(Theme.Colors.hoverFill)
+                .clipShape(RoundedRectangle(cornerRadius: 3))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Theme.Colors.accent.opacity(0.15) : (isHovered ? Theme.Colors.hoverFill : Color.clear))
-                    .padding(.horizontal, 4)
-            )
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isSelected ? Theme.Colors.accent.opacity(0.15) : (isHovered ? Theme.Colors.hoverFill : Color.clear))
+                .padding(.horizontal, 4)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            onDoubleClick()
+        }
+        .onTapGesture(count: 1) {
+            onSelect()
+        }
         .onHover { isHovered = $0 }
     }
 }
@@ -192,14 +256,14 @@ private struct MentionKeyHint: View {
 enum DocumentMentionScanner {
 
     /// Recursively scans a directory and returns a flat list of FileMentionItems,
-    /// with paths relative to `rootPath`. Results are cached per root path.
-    static func scan(rootPath: String, maxResults: Int = 500) -> [FileMentionItem] {
+    /// with paths relative to `rootPath`. Used for global search.
+    static func scan(rootPath: String, maxResults: Int = 1000) -> [FileMentionItem] {
         let fm = FileManager.default
         let resolvedRoot = URL(fileURLWithPath: rootPath).standardizedFileURL.path
 
         var results: [FileMentionItem] = []
         var queue: [(path: String, depth: Int)] = [(resolvedRoot, 0)]
-        let maxDepth = 8
+        let maxDepth = 10
 
         while !queue.isEmpty && results.count < maxResults {
             let (currentPath, depth) = queue.removeFirst()
@@ -237,12 +301,56 @@ enum DocumentMentionScanner {
         return results
     }
 
-    /// Filter items by query (matches name or path, case-insensitive)
+    /// List only the immediate children of a specific directory (non-recursive).
+    /// `subPath` is relative to `rootPath`. Pass "" for the root.
+    static func listDirectory(rootPath: String, subPath: String) -> [FileMentionItem] {
+        let fm = FileManager.default
+        let resolvedRoot = URL(fileURLWithPath: rootPath).standardizedFileURL.path
+        let dirPath = subPath.isEmpty
+            ? resolvedRoot
+            : (resolvedRoot as NSString).appendingPathComponent(subPath)
+
+        guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return [] }
+
+        var dirs: [FileMentionItem] = []
+        var files: [FileMentionItem] = []
+
+        for entry in entries.sorted() {
+            if ignoredNames.contains(entry) || entry.hasPrefix(".") { continue }
+
+            let fullPath = (dirPath as NSString).appendingPathComponent(entry)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: fullPath, isDirectory: &isDir) else { continue }
+
+            let relativePath = String(fullPath.dropFirst(resolvedRoot.count + 1))
+            let ext = (entry as NSString).pathExtension.lowercased()
+            let kind = isDir.boolValue ? FileKind.directory : FileKind.from(ext: ext)
+
+            let item = FileMentionItem(
+                name: entry,
+                relativePath: relativePath,
+                absolutePath: fullPath,
+                isDirectory: isDir.boolValue,
+                icon: iconFor(kind: kind, ext: ext, isDir: isDir.boolValue),
+                iconColor: colorFor(kind: kind, ext: ext, isDir: isDir.boolValue)
+            )
+
+            if isDir.boolValue { dirs.append(item) } else { files.append(item) }
+        }
+
+        // Folders first, then files
+        return dirs + files
+    }
+
+    /// Filter items by query (matches name or path, case-insensitive).
+    /// Supports slash-separated path queries like "Shared/Chat" to match nested paths.
     static func filter(_ items: [FileMentionItem], query: String, limit: Int = 30) -> [FileMentionItem] {
         guard !query.isEmpty else { return Array(items.prefix(limit)) }
         let q = query.lowercased()
 
-        // Score-based filtering: name prefix match > name contains > path contains
+        // Split query by "/" for path-segment matching
+        let querySegments = q.split(separator: "/").map(String.init)
+
         struct Scored {
             let item: FileMentionItem
             let score: Int
@@ -251,6 +359,22 @@ enum DocumentMentionScanner {
         let scored = items.compactMap { item -> Scored? in
             let nameLower = item.name.lowercased()
             let pathLower = item.relativePath.lowercased()
+
+            // Exact path-segment matching: each query segment must appear in order in the path
+            if querySegments.count > 1 {
+                let pathSegments = pathLower.split(separator: "/").map(String.init)
+                var segIdx = 0
+                for pathSeg in pathSegments {
+                    if segIdx < querySegments.count && pathSeg.contains(querySegments[segIdx]) {
+                        segIdx += 1
+                    }
+                }
+                if segIdx == querySegments.count {
+                    // Bonus if the last segment matches the filename
+                    let lastMatch = nameLower.contains(querySegments.last ?? "")
+                    return Scored(item: item, score: lastMatch ? 5 : 4)
+                }
+            }
 
             if nameLower.hasPrefix(q) {
                 return Scored(item: item, score: 3)
