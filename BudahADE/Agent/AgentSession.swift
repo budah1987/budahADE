@@ -145,6 +145,11 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var totalOutputTokens: Int = 0
     @Published var claudeSessionId: String?
     @Published var currentStreamingText: String = ""
+    /// Stable identifier for the in-progress streaming message. Assigned on the first
+    /// content delta, reused when the message finalizes into `messages`, then cleared.
+    /// Mid-stream prompt parsing uses this so queued prompts survive the transition
+    /// from streaming text → final ChatMessage without duplicating.
+    @Published var streamingMessageId: UUID?
     /// Content staged via "Send to" from another agent, awaiting user instruction
     @Published var stagedContent: StagedContent?
     /// Live activity entries — tool calls in progress and completed
@@ -274,6 +279,7 @@ final class AgentSession: ObservableObject, Identifiable {
         }
 
         let message = ChatMessage(
+            id: streamingMessageId ?? UUID(),
             role: event.role,
             content: text,
             inputTokens: event.inputTokens,
@@ -281,6 +287,7 @@ final class AgentSession: ObservableObject, Identifiable {
         )
         messages.append(message)
         currentStreamingText = ""
+        streamingMessageId = nil
         optionsDismissed = false
         confirmDismissed = false
         questionSeriesDismissed = false
@@ -295,6 +302,7 @@ final class AgentSession: ObservableObject, Identifiable {
     private let streamingFlushInterval: TimeInterval = 0.15
 
     func handleContentDelta(_ text: String) {
+        if streamingMessageId == nil { streamingMessageId = UUID() }
         streamingBuffer += text
         scheduleStreamingFlush()
     }
@@ -530,11 +538,11 @@ final class AgentSession: ObservableObject, Identifiable {
         let suggestions: [String]    // Parsed answer suggestions from context
     }
 
-    /// Global counter for unique question IDs across all detection calls in this session
-    private var questionIdCounter = 0
-    func nextQuestionId() -> String {
-        questionIdCounter += 1
-        return "q-\(questionIdCounter)"
+    /// Generate a position-based prompt ID from a message ID and block index.
+    /// Position is the right primitive for dedup: it survives rephrasing and keeps
+    /// the same ID whether parsed mid-stream or from the finalized message.
+    nonisolated static func promptId(messageId: UUID, blockIndex: Int) -> String {
+        "\(messageId.uuidString):\(blockIndex)"
     }
 
     /// Detects a numbered series of questions (e.g. "Key Questions" list).
@@ -577,7 +585,7 @@ final class AgentSession: ObservableObject, Identifiable {
             let suggestions = parseAnswerSuggestions(from: fullContext)
 
             items.append(DetectedQuestionItem(
-                id: nextQuestionId(),
+                id: "q-\(qi)",
                 question: entry.question,
                 context: fullContext,
                 suggestions: suggestions
@@ -625,37 +633,175 @@ final class AgentSession: ObservableObject, Identifiable {
     // MARK: - Interactive Marker Parsing
 
     enum InteractiveBlock {
-        case questions([MarkerQuestionItem])
-        case choice(options: [String])
-        case confirm
+        case questions([MarkerQuestionItem], question: String?)
+        case choice(options: [String], question: String?, recommended: Int?)
+        case confirm(question: String?)
 
-        /// Convert `.choice` to `[DetectedOption]` for OptionButtonsSheet
-        var asDetectedOptions: [DetectedOption]? {
-            guard case .choice(let options) = self, !options.isEmpty else { return nil }
-            return options.enumerated().map { idx, text in
-                let parts = text.components(separatedBy: " — ")
-                return DetectedOption(
-                    id: idx,
-                    label: "\(idx + 1)",
-                    text: parts[0].trimmingCharacters(in: .whitespaces),
-                    description: parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
-                )
+        /// The embedded question text from the QUESTION: attribute
+        var question: String? {
+            switch self {
+            case .questions(_, let q): return q
+            case .choice(_, let q, _): return q
+            case .confirm(let q): return q
             }
         }
 
-        /// Convert `.questions` to `[DetectedQuestionItem]` for QuestionStepperSheet.
-        /// Use `AgentSession.detectedQuestions(from:)` for globally unique IDs.
-        func asDetectedQuestions(idGenerator: () -> String) -> [DetectedQuestionItem]? {
-            guard case .questions(let items) = self, !items.isEmpty else { return nil }
-            return items.map { item in
-                DetectedQuestionItem(
-                    id: idGenerator(),
-                    question: item.question,
-                    context: item.context,
-                    suggestions: item.options
+        /// The recommended option index (1-indexed) for choice blocks
+        var recommended: Int? {
+            if case .choice(_, _, let r) = self { return r }
+            return nil
+        }
+
+        /// Convert this interactive block to a structured `QueuedPrompt` for the unified queue.
+        /// - Parameters:
+        ///   - messageId: Stable id of the source message (mid-stream or finalized).
+        ///   - blockIndex: Position of this block within `parseInteractiveMarkers` output.
+        ///   - context: Prose preceding the marker (from `questionBeforeMarker`).
+        ///   - isSpecReady: Whether the enclosing message reads as a spec (for choice approve flow).
+        func asQueuedPrompt(
+            messageId: UUID,
+            blockIndex: Int,
+            context: String,
+            isSpecReady: Bool
+        ) -> QueuedPrompt {
+            let id = AgentSession.promptId(messageId: messageId, blockIndex: blockIndex)
+            switch self {
+            case .confirm(let q):
+                return QueuedPrompt(
+                    id: id,
+                    messageId: messageId,
+                    blockIndex: blockIndex,
+                    kind: .confirm,
+                    question: q ?? "Proceed?",
+                    context: context
+                )
+            case .choice(let options, let q, let recommended):
+                let choiceOptions = options.enumerated().map { idx, raw -> QueuedPrompt.ChoiceOption in
+                    let parts = raw.components(separatedBy: " — ")
+                    let text = (parts.first ?? raw).trimmingCharacters(in: .whitespaces)
+                    let description = parts.count > 1
+                        ? parts.dropFirst().joined(separator: " — ").trimmingCharacters(in: .whitespaces)
+                        : ""
+                    return QueuedPrompt.ChoiceOption(id: idx, text: text, description: description)
+                }
+                // Marker uses 1-indexed RECOMMENDED:N, QueuedPrompt stores 0-indexed.
+                let recIdx: Int? = recommended.flatMap { $0 > 0 ? $0 - 1 : nil }
+                return QueuedPrompt(
+                    id: id,
+                    messageId: messageId,
+                    blockIndex: blockIndex,
+                    kind: .choice(options: choiceOptions, recommendedIndex: recIdx, isSpecReady: isSpecReady),
+                    question: q ?? "Choose an option",
+                    context: context
+                )
+            case .questions(let items, let q):
+                if items.count == 1, let only = items.first {
+                    return QueuedPrompt(
+                        id: id,
+                        messageId: messageId,
+                        blockIndex: blockIndex,
+                        kind: .question(suggestions: only.options),
+                        question: only.question,
+                        context: only.context.isEmpty ? context : only.context
+                    )
+                }
+                let sub = items.enumerated().map { idx, item in
+                    QueuedPrompt.SubQuestion(
+                        id: "\(id).\(idx)",
+                        question: item.question,
+                        context: item.context,
+                        suggestions: item.options
+                    )
+                }
+                return QueuedPrompt(
+                    id: id,
+                    messageId: messageId,
+                    blockIndex: blockIndex,
+                    kind: .questionSeries(sub),
+                    question: q ?? (items.first?.question ?? "Questions"),
+                    context: context
                 )
             }
         }
+    }
+
+    // MARK: - QueuedPrompt
+
+    /// Structured prompt in the unified queue. Each renderer (confirm/choice/question/stepper)
+    /// draws the same data in its own shape — confirms stay as confirms, choices keep their
+    /// recommended index and approve-and-build affordance, steppers only appear when count >= 2.
+    struct QueuedPrompt: Identifiable, Equatable {
+        let id: String              // "messageId:blockIndex" — stable across re-parses
+        let messageId: UUID
+        let blockIndex: Int
+        let kind: Kind
+        let question: String        // The main question text (from QUESTION: attribute or bold line)
+        let context: String         // Prose context preceding the marker, if any
+
+        enum Kind: Equatable {
+            case confirm
+            case choice(options: [ChoiceOption], recommendedIndex: Int?, isSpecReady: Bool)
+            case question(suggestions: [String])
+            case questionSeries([SubQuestion])
+        }
+
+        struct ChoiceOption: Equatable, Identifiable {
+            let id: Int
+            let text: String         // Primary label (before " — ")
+            let description: String  // Secondary detail (after " — "), may be empty
+        }
+
+        struct SubQuestion: Equatable, Identifiable {
+            let id: String
+            let question: String
+            let context: String
+            let suggestions: [String]
+        }
+    }
+
+    /// Build a `QueuedPrompt` from a regex-detected question series. Used by the fallback
+    /// path in PlanChatView when no interactive markers are present. Block index is `-1`
+    /// to distinguish it from marker-based prompts in the same message.
+    nonisolated static func queuedPromptFromRegexSeries(
+        _ items: [DetectedQuestionItem],
+        messageId: UUID
+    ) -> QueuedPrompt {
+        let id = promptId(messageId: messageId, blockIndex: -1)
+        let sub = items.enumerated().map { idx, item in
+            QueuedPrompt.SubQuestion(
+                id: "\(id).\(idx)",
+                question: item.question,
+                context: item.context,
+                suggestions: item.suggestions
+            )
+        }
+        return QueuedPrompt(
+            id: id,
+            messageId: messageId,
+            blockIndex: -1,
+            kind: .questionSeries(sub),
+            question: items.first?.question ?? "Questions",
+            context: ""
+        )
+    }
+
+    /// Parse QUESTION: and RECOMMENDED: attributes from the interactive marker opening tag.
+    /// Attributes are order-independent: `QUESTION:text RECOMMENDED:1` or `RECOMMENDED:1 QUESTION:text`.
+    private static func parseMarkerAttributes(_ raw: String) -> (question: String?, recommended: Int?) {
+        // Extract RECOMMENDED first (simpler, always a single number)
+        let recommended = raw.firstMatch(of: /RECOMMENDED:(\d+)/).flatMap { Int(String($0.1)) }
+
+        // Extract QUESTION — strip any other known attribute keys, take the rest
+        var question: String?
+        if let qRange = raw.range(of: "QUESTION:") {
+            var value = String(raw[qRange.upperBound...])
+            // Remove any trailing RECOMMENDED:N that might be embedded
+            value = value.replacing(/\s*RECOMMENDED:\d+/, with: "")
+            let trimmed = value.trimmingCharacters(in: .whitespaces)
+            if !trimmed.isEmpty { question = trimmed }
+        }
+
+        return (question, recommended)
     }
 
     struct MarkerQuestionItem {
@@ -665,7 +811,7 @@ final class AgentSession: ObservableObject, Identifiable {
     }
 
     // Regex patterns for interactive markers
-    private static let interactiveOpenPattern = /<!-- INTERACTIVE:(questions|choice|confirm) -->/
+    private static let interactiveOpenPattern = /<!-- INTERACTIVE:(questions|choice|confirm)(.*?) -->/
     private static let interactiveClosePattern = /<!-- \/INTERACTIVE -->/
     private static let optionMarkerPattern = /<!-- OPTION:(.+?) -->/
     private static let boldLinePattern = /\*\*(.+?)\*\*/
@@ -683,6 +829,7 @@ final class AgentSession: ObservableObject, Identifiable {
             // Look for opening marker
             if let match = line.firstMatch(of: Self.interactiveOpenPattern) {
                 let type = String(match.1)
+                let attrs = Self.parseMarkerAttributes(String(match.2))
 
                 // Collect lines until closing marker
                 var blockLines: [String] = []
@@ -696,14 +843,14 @@ final class AgentSession: ObservableObject, Identifiable {
 
                 switch type {
                 case "confirm":
-                    blocks.append(.confirm)
+                    blocks.append(.confirm(question: attrs.question))
                 case "choice":
                     let options = blockLines.compactMap { l -> String? in
                         guard let m = l.firstMatch(of: Self.optionMarkerPattern) else { return nil }
                         return String(m.1)
                     }
                     if !options.isEmpty {
-                        blocks.append(.choice(options: options))
+                        blocks.append(.choice(options: options, question: attrs.question, recommended: attrs.recommended))
                     }
                 case "questions":
                     var items: [MarkerQuestionItem] = []
@@ -740,7 +887,7 @@ final class AgentSession: ObservableObject, Identifiable {
                         ))
                     }
                     if !items.isEmpty {
-                        blocks.append(.questions(items))
+                        blocks.append(.questions(items, question: attrs.question))
                     }
                 default:
                     break
@@ -750,6 +897,25 @@ final class AgentSession: ObservableObject, Identifiable {
         }
 
         return blocks
+    }
+
+    /// Extract the question text immediately preceding the first interactive marker block.
+    /// Falls back to `detectQuestion` if no marker is found.
+    func questionBeforeMarker(in text: String) -> String {
+        // Find the first <!-- INTERACTIVE: marker
+        guard let markerRange = text.range(of: "<!-- INTERACTIVE:", options: []) else {
+            return detectQuestion(in: text)?.contextText ?? ""
+        }
+
+        // Get text before the marker, walk backward to find the question paragraph
+        let before = String(text[text.startIndex..<markerRange.lowerBound])
+        let lines = before.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        // Take the last few meaningful lines (up to 4) as the question context
+        let contextLines = Array(lines.suffix(4))
+        return contextLines.joined(separator: "\n")
     }
 
     /// Check if the last interactive block in the text was followed by a substantive response

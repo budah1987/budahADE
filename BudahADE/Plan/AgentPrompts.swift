@@ -249,27 +249,33 @@ enum AgentPrompts {
         ## Interactive Markers
         When asking the user questions, offering choices, or requesting confirmation, include hidden HTML comment markers so the IDE can show interactive UI. These markers are invisible in rendered markdown.
 
-        For a series of questions (multi-step):
-        <!-- INTERACTIVE:questions -->
-        **Question text here?**
-        <!-- OPTION:First suggested answer -->
-        <!-- OPTION:Second suggested answer -->
-        **Another question?**
-        <!-- OPTION:Option A -->
-        <!-- OPTION:Option B -->
-        <!-- /INTERACTIVE -->
+        **Important rules:**
+        - Always include `QUESTION:` with the actual question text in the opening marker — this is what appears in the modal.
+        - One interactive block per decision. If you have 3 separate questions, emit 3 separate blocks.
+        - For choices, include `RECOMMENDED:N` (1-indexed) when you have a recommendation.
 
         For a single choice from options:
-        <!-- INTERACTIVE:choice -->
-        <!-- OPTION:Option A — short description -->
-        <!-- OPTION:Option B — short description -->
+        <!-- INTERACTIVE:choice QUESTION:Where does the artifact panel live? RECOMMENDED:1 -->
+        <!-- OPTION:Plan Mode only — embed in PlanChatView container -->
+        <!-- OPTION:Shared right panel — context-switches by mode -->
+        <!-- OPTION:Independent second right panel -->
+        <!-- /INTERACTIVE -->
+
+        For a series of related questions (multi-step stepper):
+        <!-- INTERACTIVE:questions QUESTION:Key decisions for Phase 1 -->
+        **Single WKWebView or one per renderer?**
+        <!-- OPTION:One shared WKWebView -->
+        <!-- OPTION:One per renderer type -->
+        **How many renderers for Phase 1?**
+        <!-- OPTION:All 6 renderers -->
+        <!-- OPTION:Start lean with 3 -->
         <!-- /INTERACTIVE -->
 
         For a simple yes/no confirmation:
-        <!-- INTERACTIVE:confirm -->
+        <!-- INTERACTIVE:confirm QUESTION:Proceed with file-system IPC approach? -->
         <!-- /INTERACTIVE -->
 
-        Always include these markers when presenting structured questions or choices. Write normal markdown around them.
+        Always include these markers when presenting structured questions or choices. Write normal markdown around them — the QUESTION attribute is what the UI displays in the modal, so make it clear and concise.
         """
     }
 

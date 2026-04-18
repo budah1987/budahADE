@@ -22,8 +22,12 @@ struct PlanChatView: View {
     @State private var slashPopoverIndex: Int = 0
     @State private var keyMonitor: Any?
     @StateObject private var slashState = SlashPopoverState()
-    @State private var confirmTriggered = false
-    @State private var confirmedMessageIds: Set<UUID> = []
+    /// Unified prompt queue — all interactive block types (choice, confirm, questions)
+    /// funnel here as structured `QueuedPrompt`s. New prompts append without disrupting
+    /// the current card — the `PromptDispatcher` chooses the right renderer (confirm,
+    /// choice, question, or stepper) based on queue shape.
+    @State private var promptQueue: [AgentSession.QueuedPrompt] = []
+    @State private var promptQueueSeenIds: Set<String> = []
     @State private var slashCommandSelected = false
     @State private var scrollToMessage: UUID?
     @State private var fastThinkingEnabled = false
@@ -90,16 +94,29 @@ struct PlanChatView: View {
         return ghost
     }
 
-    /// Number of characters in the skill prefix (e.g. "/grill-me " = 10).
-    /// Returns 0 when no skill is selected.
-    private var skillPrefixCharCount: Int {
-        guard slashCommandSelected, inputText.hasPrefix("/") else { return 0 }
-        // Find the first space after the slash — the prefix includes it
-        if let spaceIdx = inputText.firstIndex(of: " ") {
-            return inputText.distance(from: inputText.startIndex, to: inputText.index(after: spaceIdx))
+    /// Range of the selected slash command in inputText (e.g. "/grill-me" anywhere in text).
+    /// Returns nil when no skill is selected.
+    private var skillHighlightRange: (start: Int, length: Int)? {
+        guard slashCommandSelected else { return nil }
+        // Find the last "/" preceded by start-of-string or whitespace
+        let text = inputText
+        var searchFrom = text.endIndex
+        while searchFrom > text.startIndex {
+            guard let slashIdx = text[text.startIndex..<searchFrom].lastIndex(of: "/") else { return nil }
+            // Validate: must be at start or preceded by whitespace
+            if slashIdx == text.startIndex || text[text.index(before: slashIdx)].isWhitespace {
+                let start = text.distance(from: text.startIndex, to: slashIdx)
+                let afterSlash = text[text.index(after: slashIdx)...]
+                // Find end of command token (next space or end of string)
+                if let spaceIdx = afterSlash.firstIndex(of: " ") {
+                    let length = text.distance(from: slashIdx, to: spaceIdx)
+                    return (start: start, length: length)
+                }
+                return (start: start, length: text.count - start)
+            }
+            searchFrom = slashIdx
         }
-        // No space yet — the entire text is the command
-        return inputText.count
+        return nil
     }
 
     /// All available commands filtered by current slash input (reads from cache)
@@ -174,104 +191,20 @@ struct PlanChatView: View {
                 }
             }
 
-            // Interactive detection: markers first, regex fallback
-            // Only show modals when streaming is complete — prevents flickering/resetting
-            // as questions arrive staggered during streaming.
-            if let session,
-               session.status != .streaming,
-               session.status != .connecting,
-               let lastMsg = session.messages.last,
-               lastMsg.role == .assistant,
-               !lastMsg.content.isEmpty,
-               !session.isLastBlockSelfAnswered(in: lastMsg.content),
-               let markerBlock = session.parseInteractiveMarkers(in: lastMsg.content).first {
-                // Marker-based detection — agent emitted structured markers
-                switch markerBlock {
-                case .choice(let options) where !session.optionsDismissed:
-                    if let detectedOptions = markerBlock.asDetectedOptions {
-                        let question = session.detectQuestion(in: lastMsg.content)
-                        let specReady = state.looksLikeSpec(lastMsg.content)
-                        OptionButtonsSheet(
-                            contextText: question?.contextText ?? "",
-                            options: detectedOptions,
-                            showApproveAndBuild: specReady,
-                            onSelect: { option in
-                                session.optionsDismissed = true
-                                state.sendMessage("\(option.label). \(option.text)")
-                            },
-                            onDismiss: {
-                                session.optionsDismissed = true
-                            },
-                            onCustomResponse: { text in
-                                session.optionsDismissed = true
-                                state.sendMessage(text)
-                            },
-                            onApproveAndBuild: {
-                                session.optionsDismissed = true
-                                handleApprove()
-                            }
-                        )
-                        .frame(maxWidth: 752)
-                        .frame(maxWidth: .infinity)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else {
-                        inputArea
-                    }
-                case .questions where !session.questionSeriesDismissed:
-                    if let detectedQuestions = markerBlock.asDetectedQuestions(idGenerator: { session.nextQuestionId() }) {
-                        QuestionStepperSheet(
-                            questions: detectedQuestions,
-                            onComplete: { answers in
-                                session.questionSeriesDismissed = true
-                                let response = answers.enumerated().map { i, answer in
-                                    "\(i + 1). \(answer)"
-                                }.joined(separator: "\n")
-                                state.sendMessage(response)
-                            },
-                            onDismiss: {
-                                session.questionSeriesDismissed = true
-                            }
-                        )
-                        .frame(maxWidth: 752)
-                        .frame(maxWidth: .infinity)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else {
-                        inputArea
-                    }
-                default:
-                    // .confirm is handled inline, dismissed markers fall through
-                    inputArea
-                }
-            } else if let session,
-               session.status != .streaming,
-               session.status != .connecting,
-               !session.optionsDismissed,
-               let lastMsg = session.messages.last,
-               lastMsg.role == .assistant,
-               !lastMsg.content.isEmpty,
-               let options = session.detectOptions(in: lastMsg.content),
-               !options.isEmpty {
-                // Regex fallback — option detection
-                let question = session.detectQuestion(in: lastMsg.content)
-                let specReady = state.looksLikeSpec(lastMsg.content)
-                OptionButtonsSheet(
-                    contextText: question?.contextText ?? "",
-                    options: options,
-                    showApproveAndBuild: specReady,
-                    onSelect: { option in
-                        session.optionsDismissed = true
-                        state.sendMessage("\(option.label). \(option.text)")
+            // Unified prompt queue — ALL interactive block types funnel through one
+            // `PromptDispatcher` that picks the right card by queue shape.
+            if !promptQueue.isEmpty {
+                PromptDispatcher(
+                    queue: promptQueue,
+                    onAnswerPrompt: handleAnswer(prompt:answer:),
+                    onAnswerAll: handleAnswerAll(answers:),
+                    onApproveAndBuild: {
+                        promptQueue.removeAll()
+                        handleApprove()
                     },
                     onDismiss: {
-                        session.optionsDismissed = true
-                    },
-                    onCustomResponse: { text in
-                        session.optionsDismissed = true
-                        state.sendMessage(text)
-                    },
-                    onApproveAndBuild: {
-                        session.optionsDismissed = true
-                        handleApprove()
+                        promptQueue.removeAll()
+                        // Keep promptQueueSeenIds — dismissing doesn't mean "ask me again later"
                     }
                 )
                 .frame(maxWidth: 752)
@@ -299,32 +232,6 @@ struct PlanChatView: View {
                 .frame(maxWidth: 752)
                 .frame(maxWidth: .infinity)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-            } else if let session,
-                      session.status != .streaming,
-                      session.status != .connecting,
-                      !session.questionSeriesDismissed,
-                      let lastMsg = session.messages.last,
-                      lastMsg.role == .assistant,
-                      !lastMsg.content.isEmpty,
-                      let questions = session.detectQuestionSeries(in: lastMsg.content),
-                      !questions.isEmpty {
-                // Regex fallback — question series
-                QuestionStepperSheet(
-                    questions: questions,
-                    onComplete: { answers in
-                        session.questionSeriesDismissed = true
-                        let response = answers.enumerated().map { i, answer in
-                            "\(i + 1). \(answer)"
-                        }.joined(separator: "\n")
-                        state.sendMessage(response)
-                    },
-                    onDismiss: {
-                        session.questionSeriesDismissed = true
-                    }
-                )
-                .frame(maxWidth: 752)
-                .frame(maxWidth: .infinity)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {
                 inputArea
             }
@@ -347,23 +254,31 @@ struct PlanChatView: View {
             return .handled
         }
         .onKeyPress(.return, phases: .down) { press in
-            // Cmd+Enter confirms regardless of focus
+            // Cmd+Enter: universal "accept the obvious next action" shortcut.
             guard press.modifiers.contains(.command) else { return .ignored }
-            guard let session, !session.confirmDismissed, !isRunning,
-                  let lastMsg = session.messages.last,
-                  lastMsg.role == .assistant,
-                  !lastMsg.content.isEmpty,
-                  (session.parseInteractiveMarkers(in: lastMsg.content).contains(where: {
-                      if case .confirm = $0 { return true }; return false
-                  }) || session.detectConfirmation(in: lastMsg.content) != nil) else { return .ignored }
-            withAnimation(.easeOut(duration: 0.15)) { confirmTriggered = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                confirmTriggered = false
-                confirmedMessageIds.insert(lastMsg.id)
+            guard !isRunning else { return .ignored }
+
+            // If a prompt is active, pick the obvious answer per kind.
+            if let first = promptQueue.first {
+                if let answer = obviousAnswer(for: first) {
+                    handleAnswer(prompt: first, answer: answer)
+                    return .handled
+                }
+            }
+
+            // Regex fallback — confirm detection on the last assistant message.
+            if let session,
+               !session.confirmDismissed,
+               let lastMsg = session.messages.last,
+               lastMsg.role == .assistant,
+               !lastMsg.content.isEmpty,
+               session.detectConfirmation(in: lastMsg.content) != nil {
                 session.confirmDismissed = true
                 sendHiddenConfirmation()
+                return .handled
             }
-            return .handled
+
+            return .ignored
         }
         // Ctrl+V paste and focus now handled by ChatInputBar
     }
@@ -416,30 +331,8 @@ struct PlanChatView: View {
                                 }
                             )
                             .id(message.id)
-
-                            // Inline confirm button — green "Accepted" persists for all confirmed messages
-                            // Uses cached detection to avoid per-render regex parsing
-                            if message.role == .assistant,
-                               !message.content.isEmpty,
-                               session.cachedHasConfirm(for: message),
-                               (confirmedMessageIds.contains(message.id) ||
-                                (!session.confirmDismissed &&
-                                 !isRunning &&
-                                 message.id == session.messages.last(where: { $0.role == .assistant && !$0.content.isEmpty })?.id)) {
-                                ConfirmButton(
-                                    onConfirm: {
-                                        confirmedMessageIds.insert(message.id)
-                                        session.confirmDismissed = true
-                                        sendHiddenConfirmation()
-                                    },
-                                    onDismiss: {
-                                        session.confirmDismissed = true
-                                    },
-                                    externalTrigger: confirmedMessageIds.contains(message.id)
-                                )
-                                .padding(.top, 4)
-                                .transition(.opacity)
-                            }
+                            // Confirms, choices, and questions are now rendered by PromptDispatcher
+                            // above the input area — not inline next to the message.
                         }
 
                         // Streaming text bubble
@@ -575,7 +468,7 @@ struct PlanChatView: View {
             saveImage: { data in state.saveImage(data: data) },
             ghostText: ghostCompletion,
             workingDirectory: state.repoPath,
-            skillPrefixLength: skillPrefixCharCount,
+            skillHighlightRange: skillHighlightRange,
             onReturnKey: { press in
                 guard let ctx = activeSlashContext, !allCommands.isEmpty else { return .ignored }
                 let idx = min(slashPopoverIndex, allCommands.count - 1)
@@ -687,11 +580,37 @@ struct PlanChatView: View {
         }
         .onChange(of: session?.availableCommands) { rebuildCommandCache() }
         .onChange(of: session?.messages.count) { rebuildHasAssistant() }
+
+        .onChange(of: session?.status) { oldStatus, newStatus in
+            // When streaming completes, scan all assistant messages for unseen prompts.
+            guard oldStatus == .streaming, newStatus != .streaming,
+                  let session = session else { return }
+            for msg in session.messages where msg.role == .assistant && !msg.content.isEmpty {
+                ingestPrompts(from: msg.content, messageId: msg.id, session: session)
+            }
+        }
+        // Mid-stream detection — the biggest UX win. When the agent writes a long
+        // message that includes a question halfway through, ingest the prompt as
+        // soon as its closing marker is received, rather than waiting for the
+        // whole message to finish streaming.
+        .onChange(of: session?.currentStreamingText) { _, text in
+            guard let text, let session,
+                  let streamingId = session.streamingMessageId,
+                  !text.isEmpty else { return }
+            // Only consider blocks whose closing marker has already streamed in —
+            // everything after the final `<!-- /INTERACTIVE -->` is incomplete and
+            // must be discarded to avoid partial-parse churn.
+            guard let lastClose = text.range(of: "<!-- /INTERACTIVE -->", options: .backwards) else { return }
+            let completeText = String(text[..<lastClose.upperBound])
+            ingestPrompts(from: completeText, messageId: streamingId, session: session)
+        }
         .onDisappear { removeKeyMonitor() }
         .onChange(of: inputText) { oldValue, newValue in
-            // Reset slash selection when text shrinks or slash token disappears
-            if newValue.count < oldValue.count || activeSlashContext == nil {
-                slashCommandSelected = false
+            // Reset slash selection when the "/" prefix is deleted or text is cleared
+            if slashCommandSelected {
+                if !newValue.contains("/") || newValue.isEmpty {
+                    slashCommandSelected = false
+                }
             }
             let visible = showSlashPopover
             slashState.isVisible = visible
@@ -848,6 +767,85 @@ struct PlanChatView: View {
         let session = state.ensureSession()
         state.chatManager.send(sessionId: session.id, prompt: "Yes, looks good. Proceed.", showInChat: false)
         state.persistConversation()
+    }
+
+    // MARK: - Persistent Prompt Queue
+
+    /// Ingest any un-seen interactive prompts from a message's content into the queue.
+    /// Shared by the streaming-complete scan and the mid-stream detection path.
+    private func ingestPrompts(from text: String, messageId: UUID, session: AgentSession) {
+        guard !session.isLastBlockSelfAnswered(in: text) else { return }
+
+        let blocks = session.parseInteractiveMarkers(in: text)
+        let contextPrefix = session.questionBeforeMarker(in: text)
+        let specReady = state.looksLikeSpec(text)
+
+        for (idx, block) in blocks.enumerated() {
+            let prompt = block.asQueuedPrompt(
+                messageId: messageId,
+                blockIndex: idx,
+                context: contextPrefix,
+                isSpecReady: specReady
+            )
+            if !promptQueueSeenIds.contains(prompt.id) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    promptQueue.append(prompt)
+                }
+                promptQueueSeenIds.insert(prompt.id)
+            }
+        }
+
+        // Regex fallback — question series without marker wrapping. Only fires
+        // when the message has no marker-based blocks (blocks.isEmpty).
+        if blocks.isEmpty, let qs = session.detectQuestionSeries(in: text), !qs.isEmpty {
+            let prompt = AgentSession.queuedPromptFromRegexSeries(qs, messageId: messageId)
+            if !promptQueueSeenIds.contains(prompt.id) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    promptQueue.append(prompt)
+                }
+                promptQueueSeenIds.insert(prompt.id)
+            }
+        }
+    }
+
+    /// Handle an answer to a specific prompt. Removes it from the queue and sends the
+    /// reply. Keeping the seen-id in place prevents the next scan from re-adding it.
+    private func handleAnswer(prompt: AgentSession.QueuedPrompt, answer: String) {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+            promptQueue.removeAll { $0.id == prompt.id }
+        }
+        state.sendMessage(answer)
+    }
+
+    /// Handle answers for a stepper over a multi-prompt queue. Drains everything and
+    /// sends a numbered-list reply so the agent can thread its follow-up properly.
+    private func handleAnswerAll(answers: [String]) {
+        let response = answers.count == 1
+            ? answers[0]
+            : answers.enumerated().map { i, a in "\(i + 1). \(a)" }.joined(separator: "\n")
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+            promptQueue.removeAll()
+        }
+        state.sendMessage(response)
+    }
+
+    /// Determine the "obvious" answer for Cmd+Enter acceptance, per kind.
+    /// Confirm → "Yes", Choice → recommended option (or first), Question → first suggestion.
+    private func obviousAnswer(for prompt: AgentSession.QueuedPrompt) -> String? {
+        switch prompt.kind {
+        case .confirm:
+            return "Yes"
+        case .choice(let options, let recommendedIndex, _):
+            guard !options.isEmpty else { return nil }
+            let idx = recommendedIndex ?? 0
+            let bounded = max(0, min(idx, options.count - 1))
+            let option = options[bounded]
+            return "\(option.id + 1). \(option.text)"
+        case .question(let suggestions):
+            return suggestions.first
+        case .questionSeries:
+            return nil // Stepper handles its own submission flow
+        }
     }
 
     // canSend moved to ChatInputBar
@@ -1204,831 +1202,11 @@ struct DocumentAttachmentChip: View {
     }
 }
 
-// MARK: - Option Buttons Sheet
-
-struct OptionButtonsSheet: View {
-    let contextText: String
-    let options: [AgentSession.DetectedOption]
-    var showApproveAndBuild: Bool = false
-    let onSelect: (AgentSession.DetectedOption) -> Void
-    let onDismiss: () -> Void
-    let onCustomResponse: (String) -> Void
-    var onApproveAndBuild: (() -> Void)? = nil
-
-    @State private var customText: String = ""
-    @State private var focusedIndex: Int? = nil
-    @FocusState private var sheetFocused: Bool
-    @FocusState private var customFieldFocused: Bool
-
-    /// Auto-detect: if any option has a description, use detailed layout
-    private var isDetailed: Bool {
-        options.contains { !$0.description.isEmpty }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Accent top border
-            Rectangle()
-                .fill(Theme.Colors.accent.opacity(0.4))
-                .frame(height: 1.5)
-
-            VStack(alignment: .leading, spacing: 6) {
-                // Header: question + dismiss
-                sheetHeader
-
-                Rectangle().fill(Color.white.opacity(0.08)).frame(height: 0.5)
-                    .padding(.bottom, 2)
-
-                // Option rows — compact or detailed
-                if isDetailed {
-                    detailedOptions
-                } else {
-                    compactOptions
-                }
-
-                // Approve & Build button — shown when spec looks complete
-                if showApproveAndBuild {
-                    Button {
-                        onApproveAndBuild?()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 12))
-                            Text("Approve & Build")
-                                .font(Theme.label(13))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Theme.Colors.statusWorking)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 6)
-                }
-
-                // Custom text field
-                customTextField
-                    .padding(.top, 4)
-
-                // Keyboard hints footer
-                keyboardFooter
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 10)
-        }
-        .background(Theme.Colors.sidebarBackground)
-        .focusable()
-        .focused($sheetFocused)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                sheetFocused = true
-            }
-        }
-        .onKeyPress(.upArrow) {
-            guard !customFieldFocused else { return .ignored }
-            moveFocus(delta: -1)
-            return .handled
-        }
-        .onKeyPress(.downArrow) {
-            guard !customFieldFocused else { return .ignored }
-            moveFocus(delta: 1)
-            return .handled
-        }
-        .onKeyPress(.return) {
-            guard !customFieldFocused else { return .ignored }
-            if let idx = focusedIndex, idx < options.count {
-                withAnimation(.easeOut(duration: 0.15)) { onSelect(options[idx]) }
-                return .handled
-            }
-            return .ignored
-        }
-        .onKeyPress(characters: CharacterSet(charactersIn: "123456789"), phases: .down) { press in
-            guard !customFieldFocused else { return .ignored }
-            guard let char = press.characters.first,
-                  let num = Int(String(char)),
-                  num >= 1, num <= options.count else { return .ignored }
-            if let option = options.first(where: { $0.label == String(num) }) {
-                withAnimation(.easeOut(duration: 0.15)) { onSelect(option) }
-                return .handled
-            }
-            let idx = num - 1
-            if idx < options.count {
-                withAnimation(.easeOut(duration: 0.15)) { onSelect(options[idx]) }
-                return .handled
-            }
-            return .ignored
-        }
-        .onKeyPress(characters: CharacterSet.letters, phases: .down) { press in
-            guard !customFieldFocused else { return .ignored }
-            let char = String(press.characters).uppercased()
-            if let option = options.first(where: { $0.label.uppercased() == char }) {
-                withAnimation(.easeOut(duration: 0.15)) { onSelect(option) }
-                return .handled
-            }
-            return .ignored
-        }
-        .onKeyPress(.tab) {
-            if !customFieldFocused {
-                customFieldFocused = true
-                focusedIndex = nil
-                return .handled
-            }
-            return .ignored
-        }
-        .onKeyPress(.escape) {
-            if customFieldFocused {
-                customFieldFocused = false
-                sheetFocused = true
-                return .handled
-            }
-            withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
-            return .handled
-        }
-    }
-
-    // MARK: - Header
-
-    private var sheetHeader: some View {
-        HStack(alignment: .top) {
-            Text(cleanContext(contextText))
-                .font(Theme.body(13))
-                .foregroundColor(Theme.Colors.textPrimary)
-                .lineLimit(4)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 8)
-
-            Button {
-                withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(Theme.Colors.textTertiary)
-                    .frame(width: 22, height: 22)
-                    .background(Theme.Colors.hoverFill)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.bottom, 4)
-    }
-
-    // MARK: - Compact Options
-
-    private var compactOptions: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(options.enumerated()), id: \.element.id) { idx, option in
-                CompactOptionRow(
-                    option: option,
-                    isFocused: focusedIndex == idx,
-                    onSelect: { onSelect(option) },
-                    onHover: { hovering in
-                        if hovering { focusedIndex = idx }
-                    }
-                )
-                if idx < options.count - 1 {
-                    Rectangle().fill(Color.white.opacity(0.05)).frame(height: 0.5)
-                        .padding(.horizontal, 10)
-                }
-            }
-        }
-    }
-
-    // MARK: - Detailed Options
-
-    private var detailedOptions: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(options.enumerated()), id: \.element.id) { idx, option in
-                DetailedOptionCard(
-                    option: option,
-                    isFocused: focusedIndex == idx,
-                    onSelect: { onSelect(option) },
-                    onHover: { hovering in
-                        if hovering { focusedIndex = idx }
-                    }
-                )
-                if idx < options.count - 1 {
-                    Rectangle().fill(Color.white.opacity(0.05)).frame(height: 0.5)
-                        .padding(.vertical, 2)
-                }
-            }
-        }
-    }
-
-    // MARK: - Custom Text Field
-
-    private var customTextField: some View {
-        HStack(spacing: 8) {
-            Text("\u{270E}")  // pencil icon
-                .font(.system(size: 12))
-                .foregroundColor(Theme.Colors.textTertiary)
-                .frame(width: 22, height: 22)
-
-            TextField(options.isEmpty ? "Type your answer..." : "Something else...", text: $customText)
-                .font(Theme.body(13))
-                .foregroundColor(Theme.Colors.textPrimary)
-                .textFieldStyle(.plain)
-                .focused($customFieldFocused)
-                .onSubmit {
-                    let trimmed = customText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    onCustomResponse(trimmed)
-                }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Color.white.opacity(0.025))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-
-    // MARK: - Keyboard Footer
-
-    private var keyboardFooter: some View {
-        HStack {
-            Text("↑↓ navigate")
-                .font(Theme.label(11))
-                .foregroundColor(Theme.Colors.textTertiary)
-            + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
-            + Text("Enter select")
-                .font(Theme.label(11))
-                .foregroundColor(Theme.Colors.textTertiary)
-            + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
-            + Text("Esc skip")
-                .font(Theme.label(11))
-                .foregroundColor(Theme.Colors.textTertiary)
-
-            Spacer()
-
-            Button {
-                withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
-            } label: {
-                Text("Skip")
-                    .font(Theme.body(11))
-                    .foregroundColor(Theme.Colors.textSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 3)
-                    .background(Theme.Colors.hoverFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.top, 8)
-        .overlay(alignment: .top) {
-            Rectangle().fill(Color.white.opacity(0.06)).frame(height: 0.5)
-        }
-    }
-
-    // MARK: - Focus Navigation
-
-    private func moveFocus(delta: Int) {
-        guard !options.isEmpty else { return }
-        if let current = focusedIndex {
-            focusedIndex = (current + delta + options.count) % options.count
-        } else {
-            focusedIndex = delta > 0 ? 0 : options.count - 1
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func cleanContext(_ text: String) -> String {
-        text.replacingOccurrences(of: "**", with: "")
-            .replacingOccurrences(of: "__", with: "")
-            .components(separatedBy: "\n")
-            .map { line in
-                var l = line
-                if l.hasPrefix("• ") { l = String(l.dropFirst(2)) }
-                if l.hasPrefix("- ") { l = String(l.dropFirst(2)) }
-                return l
-            }
-            .joined(separator: "\n")
-    }
-}
-
-private struct CompactOptionRow: View {
-    let option: AgentSession.DetectedOption
-    let isFocused: Bool
-    let onSelect: () -> Void
-    let onHover: (Bool) -> Void
-
-    @State private var isHovered = false
-
-    private var isHighlighted: Bool { isFocused || isHovered }
-
-    var body: some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.15)) { onSelect() }
-        } label: {
-            HStack(spacing: 10) {
-                // Badge
-                Text(option.label)
-                    .font(Theme.label(11))
-                    .foregroundColor(Theme.Colors.accent)
-                    .frame(width: 22, height: 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(isHighlighted
-                                  ? Color(hex: 0xc4785c).opacity(0.15)
-                                  : Color.white.opacity(0.06))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5)
-                            .strokeBorder(isHighlighted
-                                          ? Color(hex: 0xc4785c).opacity(0.3)
-                                          : Color.white.opacity(0.1),
-                                          lineWidth: 1)
-                    )
-
-                // Option text
-                Text(option.text)
-                    .font(Theme.body(13))
-                    .foregroundColor(Theme.Colors.textPrimary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-
-                Spacer()
-
-                // Arrow indicator
-                Text("→")
-                    .font(.system(size: 12))
-                    .foregroundColor(Theme.Colors.accent)
-                    .opacity(isHighlighted ? 1 : 0)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHighlighted ? Color.white.opacity(isFocused ? 0.06 : 0.04) : Color.clear)
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            isHovered = hovering
-            onHover(hovering)
-        }
-    }
-}
-
-private struct DetailedOptionCard: View {
-    let option: AgentSession.DetectedOption
-    let isFocused: Bool
-    let onSelect: () -> Void
-    let onHover: (Bool) -> Void
-
-    @State private var isHovered = false
-
-    private var isHighlighted: Bool { isFocused || isHovered }
-
-    var body: some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.15)) { onSelect() }
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                // Header: badge + title + arrow
-                HStack(spacing: 10) {
-                    Text(option.label)
-                        .font(Theme.label(11))
-                        .foregroundColor(Theme.Colors.accent)
-                        .frame(width: 22, height: 22)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(isHighlighted
-                                      ? Color(hex: 0xc4785c).opacity(0.15)
-                                      : Color.white.opacity(0.06))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 5)
-                                .strokeBorder(isHighlighted
-                                              ? Color(hex: 0xc4785c).opacity(0.3)
-                                              : Color.white.opacity(0.1),
-                                              lineWidth: 1)
-                        )
-
-                    Text(option.text)
-                        .font(Theme.label(13))
-                        .foregroundColor(Theme.Colors.textPrimary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    Spacer()
-
-                    Text("→")
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.Colors.accent)
-                        .opacity(isHighlighted ? 1 : 0)
-                }
-                .padding(.bottom, 6)
-
-                // Description + Pros/Cons
-                if !option.description.isEmpty {
-                    VStack(alignment: .leading, spacing: 3) {
-                        ForEach(Array(parsedDescription.enumerated()), id: \.offset) { _, item in
-                            switch item {
-                            case .plain(let text):
-                                Text(text)
-                                    .font(Theme.body(12))
-                                    .foregroundColor(Theme.Colors.textSecondary)
-                                    .lineLimit(3)
-                            case .pros(let text):
-                                (Text("Pros: ").font(Theme.label(11)).foregroundColor(Theme.Colors.statusDone)
-                                 + Text(text).font(Theme.body(11)).foregroundColor(Color(hex: 0x777777)))
-                            case .cons(let text):
-                                (Text("Cons: ").font(Theme.label(11)).foregroundColor(Theme.Colors.error)
-                                 + Text(text).font(Theme.body(11)).foregroundColor(Color(hex: 0x777777)))
-                            }
-                        }
-                    }
-                    .padding(.leading, 32) // past badge width
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHighlighted ? Color.white.opacity(isFocused ? 0.04 : 0.03) : Color.clear)
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            isHovered = hovering
-            onHover(hovering)
-        }
-    }
-
-    // MARK: - Description Parsing
-
-    private enum DescriptionLine {
-        case plain(String)
-        case pros(String)
-        case cons(String)
-    }
-
-    private var parsedDescription: [DescriptionLine] {
-        option.description.components(separatedBy: "\n").compactMap { line in
-            let l = line.trimmingCharacters(in: .whitespaces)
-            guard !l.isEmpty else { return nil }
-            if l.lowercased().hasPrefix("pros:") {
-                return .pros(String(l.dropFirst(5)).trimmingCharacters(in: .whitespaces))
-            } else if l.lowercased().hasPrefix("cons:") {
-                return .cons(String(l.dropFirst(5)).trimmingCharacters(in: .whitespaces))
-            } else {
-                return .plain(l)
-            }
-        }
-    }
-}
-
-// MARK: - Inline Bold Text
-
-/// Parses **bold** markers in a string and renders them as bold Text segments
-private struct InlineBoldText: View {
-    let source: String
-
-    init(_ source: String) {
-        self.source = source
-    }
-
-    var body: some View {
-        parsedText
-    }
-
-    private var parsedText: Text {
-        var result = Text("")
-        var remaining = source[source.startIndex..<source.endIndex]
-
-        while let boldStart = remaining.range(of: "**") {
-            // Text before the bold marker
-            let before = remaining[remaining.startIndex..<boldStart.lowerBound]
-            if !before.isEmpty {
-                result = result + Text(before)
-            }
-
-            // Find closing **
-            let afterOpen = boldStart.upperBound
-            guard afterOpen < remaining.endIndex,
-                  let boldEnd = remaining[afterOpen...].range(of: "**") else {
-                // No closing marker — render the rest as plain text
-                result = result + Text(remaining[boldStart.lowerBound...])
-                return result
-            }
-
-            let boldContent = remaining[afterOpen..<boldEnd.lowerBound]
-            result = result + Text(boldContent).bold()
-            remaining = remaining[boldEnd.upperBound...]
-        }
-
-        // Remaining text after last bold
-        if !remaining.isEmpty {
-            result = result + Text(remaining)
-        }
-
-        return result
-    }
-}
-
-// MARK: - Question Stepper Sheet
-
-struct QuestionStepperSheet: View {
-    let questions: [AgentSession.DetectedQuestionItem]
-    let onComplete: ([String]) -> Void
-    let onDismiss: () -> Void
-
-    @State private var currentIndex = 0
-    @State private var answers: [String]
-    @State private var customText = ""
-    @FocusState private var sheetFocused: Bool
-    @FocusState private var customFocused: Bool
-
-    init(questions: [AgentSession.DetectedQuestionItem], onComplete: @escaping ([String]) -> Void, onDismiss: @escaping () -> Void) {
-        self.questions = questions
-        self.onComplete = onComplete
-        self.onDismiss = onDismiss
-        self._answers = State(initialValue: Array(repeating: "", count: questions.count))
-    }
-
-    private var current: AgentSession.DetectedQuestionItem { questions[currentIndex] }
-    private var isLast: Bool { currentIndex == questions.count - 1 }
-    private var canAdvance: Bool { !answers[currentIndex].isEmpty }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Header: step counter + dismiss
-                HStack {
-                    Text("Question \(currentIndex + 1) of \(questions.count)")
-                        .font(Theme.label(12))
-                        .foregroundColor(Theme.Colors.textTertiary)
-
-                    // Step dots
-                    HStack(spacing: 4) {
-                        ForEach(0..<questions.count, id: \.self) { i in
-                            Circle()
-                                .fill(i < currentIndex ? Color(hex: 0x34a853) :
-                                      i == currentIndex ? Theme.Colors.accent :
-                                      Color.white.opacity(0.15))
-                                .frame(width: 6, height: 6)
-                        }
-                    }
-                    .padding(.leading, 4)
-
-                    Spacer()
-
-                    Button {
-                        withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(Theme.Colors.textTertiary)
-                            .frame(width: 22, height: 22)
-                            .background(Theme.Colors.hoverFill)
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Rectangle().fill(Color.white.opacity(0.08)).frame(height: 0.5)
-
-                // Question text
-                Text(cleanBold(current.question))
-                    .font(Theme.body(14))
-                    .foregroundColor(Theme.Colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                // Context (if any)
-                if !current.context.isEmpty {
-                    Text(current.context)
-                        .font(Theme.body(12))
-                        .foregroundColor(Theme.Colors.textSecondary)
-                        .lineLimit(8)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                // Suggestion buttons
-                if !current.suggestions.isEmpty {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(current.suggestions.enumerated()), id: \.offset) { idx, suggestion in
-                            SuggestionRow(
-                                number: idx + 1,
-                                text: suggestion,
-                                isSelected: answers[currentIndex] == suggestion,
-                                onSelect: {
-                                    answers[currentIndex] = suggestion
-                                    customText = ""
-                                }
-                            )
-                            if idx < current.suggestions.count - 1 {
-                                Rectangle().fill(Color.white.opacity(0.05)).frame(height: 0.5)
-                                    .padding(.horizontal, 10)
-                            }
-                        }
-                    }
-                }
-
-                // Custom text field
-                HStack(spacing: 8) {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.Colors.textTertiary)
-                        .frame(width: 20)
-
-                    TextField("Something else...", text: $customText)
-                        .font(Theme.body(13))
-                        .foregroundColor(Theme.Colors.textPrimary)
-                        .textFieldStyle(.plain)
-                        .focused($customFocused)
-                        .onChange(of: customText) { _, newValue in
-                            if !newValue.isEmpty {
-                                answers[currentIndex] = newValue
-                            }
-                        }
-                        .onSubmit {
-                            if canAdvance { advance() }
-                        }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Color.white.opacity(0.025))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                Rectangle().fill(Color.white.opacity(0.06)).frame(height: 0.5)
-
-                // Navigation + keyboard hints
-                HStack {
-                    if !current.suggestions.isEmpty {
-                        Text("1–\(current.suggestions.count) select")
-                            .font(Theme.label(11))
-                            .foregroundColor(Theme.Colors.textTertiary)
-                        + Text("  ·  ").foregroundColor(Color.white.opacity(0.15))
-                        + Text("Enter next")
-                            .font(Theme.label(11))
-                            .foregroundColor(Theme.Colors.textTertiary)
-                    }
-                }
-                HStack {
-                    if currentIndex > 0 {
-                        Button {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                customText = ""
-                                currentIndex -= 1
-                                loadCustomText()
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 9))
-                                Text("Back")
-                                    .font(Theme.body(12))
-                            }
-                            .foregroundColor(Theme.Colors.textTertiary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Spacer()
-
-                    Button {
-                        advance()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(isLast ? "Submit" : "Next")
-                                .font(Theme.label(12))
-                                .foregroundColor(canAdvance ? .black : .black.opacity(0.4))
-                            if !isLast {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(canAdvance ? .black : .black.opacity(0.4))
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(canAdvance ? Color(white: 0.92) : Color(white: 0.92).opacity(0.5))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!canAdvance)
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 10)
-        }
-        .background(Theme.Colors.sidebarBackground)
-        .focusable()
-        .focused($sheetFocused)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                sheetFocused = true
-            }
-        }
-        .onKeyPress(.return) {
-            guard !customFocused, canAdvance else { return .ignored }
-            advance()
-            return .handled
-        }
-        .onKeyPress(.escape) {
-            withAnimation(.easeOut(duration: 0.15)) { onDismiss() }
-            return .handled
-        }
-        .onKeyPress(characters: CharacterSet(charactersIn: "123456789"), phases: .down) { press in
-            guard !customFocused else { return .ignored }
-            guard let char = press.characters.first,
-                  let num = Int(String(char)),
-                  num >= 1, num <= current.suggestions.count else { return .ignored }
-            withAnimation(.easeOut(duration: 0.1)) {
-                answers[currentIndex] = current.suggestions[num - 1]
-                customText = ""
-            }
-            return .handled
-        }
-    }
-
-    private func advance() {
-        if isLast {
-            withAnimation(.easeOut(duration: 0.15)) { onComplete(answers) }
-        } else {
-            withAnimation(.easeOut(duration: 0.15)) {
-                customText = ""
-                currentIndex += 1
-                loadCustomText()
-            }
-        }
-    }
-
-    private func loadCustomText() {
-        let answer = answers[currentIndex]
-        if !answer.isEmpty && !current.suggestions.contains(answer) {
-            customText = answer
-        } else {
-            customText = ""
-        }
-    }
-
-    private func cleanBold(_ text: String) -> String {
-        text.replacingOccurrences(of: "**", with: "")
-    }
-}
-
-private struct SuggestionRow: View {
-    let number: Int
-    let text: String
-    let isSelected: Bool
-    let onSelect: () -> Void
-
-    @State private var isHovered = false
-    private var isHighlighted: Bool { isSelected || isHovered }
-
-    var body: some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.1)) { onSelect() }
-        } label: {
-            HStack(spacing: 10) {
-                Text("\(number)")
-                    .font(Theme.label(11))
-                    .foregroundColor(isSelected ? .white : Theme.Colors.accent)
-                    .frame(width: 22, height: 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(isSelected
-                                  ? Theme.Colors.accent
-                                  : (isHighlighted ? Color(hex: 0xc4785c).opacity(0.15) : Color.white.opacity(0.06)))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5)
-                            .strokeBorder(isSelected
-                                          ? Theme.Colors.accent
-                                          : (isHighlighted ? Color(hex: 0xc4785c).opacity(0.3) : Color.white.opacity(0.1)),
-                                          lineWidth: 1)
-                    )
-
-                Text(text)
-                    .font(Theme.body(13))
-                    .foregroundColor(Theme.Colors.textPrimary)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-
-                Spacer()
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHighlighted ? Color.white.opacity(0.04) : Color.clear)
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-    }
-}
 
 // MARK: - Confirm Button
 
 struct ConfirmButton: View {
+    var questionText: String? = nil
     let onConfirm: () -> Void
     let onDismiss: () -> Void
     var externalTrigger: Bool = false
@@ -2037,6 +1215,14 @@ struct ConfirmButton: View {
     @State private var accepted = false
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let q = questionText, !q.isEmpty {
+                Text(q)
+                    .font(Theme.body(13))
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         HStack(spacing: 10) {
             Button {
                 withAnimation(.easeOut(duration: 0.15)) { accepted = true }
@@ -2087,6 +1273,7 @@ struct ConfirmButton: View {
 
             Spacer()
         }
+        } // close VStack
         .onChange(of: externalTrigger) { _, triggered in
             if triggered && !accepted {
                 withAnimation(.easeOut(duration: 0.2)) { accepted = true }

@@ -184,8 +184,8 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
 
     var placeholder: String = "BeepBoopBeep..."
     var ghostText: String? = nil
-    /// When set, the first N characters of inputText are rendered in accent blue (skill prefix like "/grill-me ").
-    var skillPrefixLength: Int = 0
+    /// When set, the characters at this range are rendered in accent blue (skill like "/grill-me").
+    var skillHighlightRange: (start: Int, length: Int)? = nil
 
     // MARK: - Key event overrides (called before built-in handlers)
 
@@ -212,7 +212,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         placeholder: String = "BeepBoopBeep...",
         ghostText: String? = nil,
         workingDirectory: String? = nil,
-        skillPrefixLength: Int = 0,
+        skillHighlightRange: (start: Int, length: Int)? = nil,
         onReturnKey: ((KeyPress) -> KeyPress.Result)? = nil,
         onTabKey: ((KeyPress) -> KeyPress.Result)? = nil,
         @ViewBuilder aboveInput: () -> AboveInput,
@@ -228,7 +228,7 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         self.placeholder = placeholder
         self.ghostText = ghostText
         self.workingDirectory = workingDirectory
-        self.skillPrefixLength = skillPrefixLength
+        self.skillHighlightRange = skillHighlightRange
         self.onReturnKey = onReturnKey
         self.onTabKey = onTabKey
         self.aboveInput = aboveInput()
@@ -371,16 +371,18 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         return attr
     }
 
-    /// Build an attributed string with the skill prefix in blue and the rest in white.
-    private var skillPrefixAttributedString: AttributedString {
+    /// Build an attributed string with the skill command in blue and the rest in white.
+    private var skillHighlightAttributedString: AttributedString {
         let text = inputText
         var attr = AttributedString(text)
-        let prefixLen = min(skillPrefixLength, text.count)
-        if prefixLen > 0 {
-            let prefixEnd = attr.characters.index(attr.startIndex, offsetBy: prefixLen)
-            attr[attr.startIndex..<prefixEnd].foregroundColor = Theme.Colors.accent
-            if prefixEnd < attr.endIndex {
-                attr[prefixEnd..<attr.endIndex].foregroundColor = .white
+        attr.foregroundColor = .white
+        if let range = skillHighlightRange {
+            let clampedStart = min(range.start, text.count)
+            let clampedEnd = min(range.start + range.length, text.count)
+            if clampedStart < clampedEnd {
+                let start = attr.characters.index(attr.startIndex, offsetBy: clampedStart)
+                let end = attr.characters.index(attr.startIndex, offsetBy: clampedEnd)
+                attr[start..<end].foregroundColor = Color(hex: 0x5B9CF5)
             }
         }
         return attr
@@ -607,22 +609,21 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
                         .allowsHitTesting(false)
                 }
                 if let ghost = effectiveGhostText, !ghost.isEmpty {
-                    Text(ghost)
+                    Text(ghostAttributedString(ghost: ghost, typed: inputText))
                         .font(.system(size: 14))
-                        .foregroundColor(Theme.Colors.textSecondary.opacity(0.5))
                         .padding(.top, 2)
                         .allowsHitTesting(false)
                 }
-                // Skill prefix overlay — shows "/command " in blue, rest in white
-                if skillPrefixLength > 0, !inputText.isEmpty {
-                    Text(skillPrefixAttributedString)
+                // Skill highlight overlay — shows "/command" in blue, rest in white
+                if skillHighlightRange != nil, !inputText.isEmpty {
+                    Text(skillHighlightAttributedString)
                         .font(.system(size: 14))
                         .padding(.top, 2)
                         .allowsHitTesting(false)
                 }
                 TextEditor(text: $inputText)
                     .font(.system(size: 14))
-                    .foregroundColor(skillPrefixLength > 0 ? .clear : .white.opacity(hasInput ? 1.0 : 0.4))
+                    .foregroundColor(skillHighlightRange != nil ? .clear : .white.opacity(hasInput ? 1.0 : 0.4))
                     .frame(height: min(max(inputTextHeight + 10, 36), 200))
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
@@ -987,6 +988,19 @@ struct ChatInputBar<AboveInput: View, TopBarExtras: View>: View {
         mentionDismissed = false
         mentionPopoverIndex = 0
         mentionBrowsePath = ""
+
+        // Add to pending documents (skip duplicates)
+        let absolutePath = (dir as NSString).appendingPathComponent(item.relativePath)
+        guard !pendingDocuments.contains(where: { $0.relativePath == item.relativePath }) else { return }
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: absolutePath, isDirectory: &isDir), !isDir.boolValue else { return }
+        if let data = fm.contents(atPath: absolutePath),
+           data.count <= 50_000,
+           let content = String(data: data, encoding: .utf8) {
+            let lines = content.components(separatedBy: "\n").count
+            pendingDocuments.append((path: absolutePath, relativePath: item.relativePath, lineCount: lines))
+        }
     }
 
     private func openMentionFolder(_ folder: FileMentionItem) {
@@ -1049,7 +1063,7 @@ extension ChatInputBar where AboveInput == EmptyView, TopBarExtras == EmptyView 
         placeholder: String = "BeepBoopBeep...",
         ghostText: String? = nil,
         workingDirectory: String? = nil,
-        skillPrefixLength: Int = 0,
+        skillHighlightRange: (start: Int, length: Int)? = nil,
         onReturnKey: ((KeyPress) -> KeyPress.Result)? = nil,
         onTabKey: ((KeyPress) -> KeyPress.Result)? = nil
     ) {
@@ -1063,7 +1077,7 @@ extension ChatInputBar where AboveInput == EmptyView, TopBarExtras == EmptyView 
         self.placeholder = placeholder
         self.ghostText = ghostText
         self.workingDirectory = workingDirectory
-        self.skillPrefixLength = skillPrefixLength
+        self.skillHighlightRange = skillHighlightRange
         self.onReturnKey = onReturnKey
         self.onTabKey = onTabKey
         self.aboveInput = EmptyView()
